@@ -1,0 +1,20 @@
+[{
+  "indexes": [
+    {
+      "class": "COLLECTION",
+      "queryScope": "COLLECTION",
+      "name": "users-doubts-createdAt-desc",
+      "fields": [
+        {
+          "path": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "path": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}]

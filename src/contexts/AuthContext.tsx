@@ -1,0 +1,196 @@
+"use client";
+
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import {
+  onAuthStateChanged,
+  User as FirebaseUser,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut,
+  updateProfile,
+} from "firebase/auth";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebase";
+import type { UserProfile, UserBoard, UserClass } from "@/types";
+
+interface AuthContextType {
+  user: UserProfile | null;
+  firebaseUser: FirebaseUser | null;
+  loading: boolean;
+  authError: string | null;
+  needsOnboarding: boolean;
+  reloadProfile: () => void;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (
+    name: string,
+    email: string,
+    password: string,
+  ) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  logout: () => Promise<void>;
+  completeOnboarding: (cls: UserClass, board: UserBoard) => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  return ctx;
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+
+  const loadUserProfile = (fbUser: FirebaseUser | null) => {
+    if (!fbUser) {
+      setUser(null);
+      setAuthError(null);
+      setNeedsOnboarding(false);
+      setLoading(false);
+      return;
+    }
+    console.log("[AuthContext] Loading profile from Firestore for uid:", fbUser.uid);
+    const db = getFirestoreDb();
+    if (!db) {
+      console.error("[AuthContext] Firestore db is not initialized");
+      setAuthError("Firestore is not initialized");
+      setUser(null);
+      setNeedsOnboarding(false);
+      setLoading(false);
+      return;
+    }
+    getDoc(doc(db, "users", fbUser.uid))
+      .then((snap) => {
+        if (snap.exists()) {
+          console.log("[AuthContext] Profile loaded (document exists)");
+          setUser(snap.data() as UserProfile);
+          setNeedsOnboarding(false);
+        } else {
+          console.log(
+            "[AuthContext] Profile document not found; redirecting to onboarding",
+          );
+          setUser(null);
+          setNeedsOnboarding(true);
+        }
+        setAuthError(null);
+      })
+      .catch((err) => {
+        console.error(
+          "[AuthContext] Failed to load user profile from Firestore:",
+          err,
+        );
+        setAuthError(err instanceof Error ? err.message : String(err));
+        setNeedsOnboarding(false);
+      })
+      .finally(() => setLoading(false));
+  };
+
+  const reloadProfile = () => {
+    if (firebaseUser) {
+      setLoading(true);
+      setAuthError(null);
+      loadUserProfile(firebaseUser);
+    }
+  };
+
+  useEffect(() => {
+    const auth = getFirebaseAuth();
+    if (!auth) {
+      console.error("[AuthContext] Firebase auth is not initialized");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLoading(false);
+      return;
+    }
+
+    const unsub = onAuthStateChanged(auth, (fbUser) => {
+      console.log("[AuthContext] onAuthStateChanged fired:", !!fbUser);
+      setFirebaseUser(fbUser);
+      loadUserProfile(fbUser);
+    });
+
+    return () => unsub();
+  }, []);
+
+  async function signIn(email: string, password: string) {
+    const auth = getFirebaseAuth();
+    if (!auth) throw new Error("Firebase not initialized");
+    await signInWithEmailAndPassword(auth, email, password);
+  }
+
+  async function signUp(name: string, email: string, password: string) {
+    const auth = getFirebaseAuth();
+    if (!auth) throw new Error("Firebase not initialized");
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(cred.user, { displayName: name });
+  }
+
+  async function signInWithGoogle() {
+    const auth = getFirebaseAuth();
+    if (!auth) throw new Error("Firebase not initialized");
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
+  }
+
+  async function completeOnboarding(cls: UserClass, board: UserBoard) {
+    const auth = getFirebaseAuth();
+    if (!auth || !auth.currentUser) throw new Error("Not authenticated");
+    const db = getFirestoreDb();
+    if (!db) throw new Error("Firestore not initialized");
+
+    const updated: UserProfile = {
+      uid: auth.currentUser.uid,
+      name: user?.name || firebaseUser?.displayName || "",
+      email: auth.currentUser.email || "",
+      class: cls,
+      board,
+      createdAt: user?.createdAt || Date.now(),
+    };
+
+    await setDoc(doc(db, "users", auth.currentUser.uid), updated, { merge: false });
+    setUser(updated);
+    setNeedsOnboarding(false);
+  }
+
+  async function logout() {
+    const auth = getFirebaseAuth();
+    if (!auth) return;
+    await signOut(auth);
+  }
+
+  if (process.env.NODE_ENV === "development") {
+    console.log("[AuthContext] render", {
+      loading,
+      hasFirebaseUser: !!firebaseUser,
+      hasUser: !!user,
+      needsOnboarding,
+      authError: !!authError,
+    });
+  }
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        firebaseUser,
+        loading,
+        authError,
+        needsOnboarding,
+        reloadProfile,
+        signIn,
+        signUp,
+        signInWithGoogle,
+        logout,
+        completeOnboarding,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
