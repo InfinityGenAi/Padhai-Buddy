@@ -28,6 +28,8 @@ import {
   SpeakerWaveIcon,
   SpeakerXMarkIcon,
   CheckIcon,
+  EllipsisVerticalIcon,
+  PencilSquareIcon,
 } from "@heroicons/react/24/outline";
 import type { ChatMessage, Conversation, UserPreferences } from "@/types";
 
@@ -87,6 +89,18 @@ function playReceiveSound(volume: number) {
   }
 }
 
+function getConversationTitle(title: string): string {
+  if (!title) return "New Chat";
+  if (title.length <= 30) return title;
+  return title.slice(0, 27).trimEnd() + "...";
+}
+
+function generateConversationTitle(text: string): string {
+  const cleaned = text.trim().replace(/\s+/g, " ");
+  if (cleaned.length <= 30) return cleaned;
+  return cleaned.slice(0, 27).trimEnd() + "...";
+}
+
 export default function ChatPage() {
   const { user } = useAuth();
   const [preferences, setPreferences] = useState<UserPreferences>(() => {
@@ -124,6 +138,9 @@ export default function ChatPage() {
   const [editBoardOpen, setEditBoardOpen] = useState(false);
   const [tempClass, setTempClass] = useState<string>(String(user?.class || "10"));
   const [tempBoard, setTempBoard] = useState<string>(user?.board || "CBSE");
+  const [menuConvId, setMenuConvId] = useState<string | null>(null);
+  const [renameConvId, setRenameConvId] = useState<string | null>(null);
+  const [tempTitle, setTempTitle] = useState("");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -137,6 +154,12 @@ export default function ChatPage() {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, isTyping]);
+
+  useEffect(() => {
+    const handleClickOutside = () => setMenuConvId(null);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -206,9 +229,20 @@ export default function ChatPage() {
 
   const selectConversation = useCallback((id: string) => {
     setActiveConversationId(id);
+    setMessages([]);
     setMessagesLoaded(false);
+    setMenuConvId(null);
     setSidebarOpen(false);
   }, []);
+
+  const renameConversation = async (conversationId: string, newTitle: string) => {
+    const db = getFirestoreDb();
+    if (!db || !user?.uid) return;
+    await updateDoc(doc(db, "users", user.uid, "conversations", conversationId), {
+      title: newTitle.trim() || "Untitled Chat",
+    });
+    setRenameConvId(null);
+  };
 
   const deleteConversation = async (conversationId: string) => {
     const db = getFirestoreDb();
@@ -237,7 +271,7 @@ export default function ChatPage() {
       const newConvRef = await addDoc(
         collection(db, "users", user.uid, "conversations"),
         {
-          title: input.trim().slice(0, 40) + (input.trim().length > 40 ? "..." : ""),
+          title: generateConversationTitle(input.trim()),
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           lastMessage: input.trim().slice(0, 60),
@@ -395,7 +429,9 @@ export default function ChatPage() {
               }`}
             >
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{conv.title}</p>
+                <p className="text-sm font-medium truncate">
+                  {getConversationTitle(conv.title)}
+                </p>
                 {conv.lastMessage && (
                   <p className="text-xs text-foreground/50 truncate mt-0.5">
                     {conv.lastMessage}
@@ -413,11 +449,41 @@ export default function ChatPage() {
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
-                onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(conv.id); }}
-                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-950/30 text-red-500 transition-all"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuConvId(menuConvId === conv.id ? null : conv.id);
+                }}
+                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-foreground/5 text-foreground/70 transition-all"
               >
-                <TrashIcon className="w-4 h-4" />
+                <EllipsisVerticalIcon className="w-4 h-4" />
               </motion.button>
+              {menuConvId === conv.id && (
+                <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-lg py-1 z-10 min-w-[120px]">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRenameConvId(conv.id);
+                      setTempTitle(getConversationTitle(conv.title).replace(/\.{3}$/, ""));
+                      setMenuConvId(null);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-foreground/5 transition-colors flex items-center gap-2"
+                  >
+                    <PencilSquareIcon className="w-4 h-4" />
+                    Rename
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteConfirmId(conv.id);
+                      setMenuConvId(null);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors flex items-center gap-2"
+                  >
+                    <TrashIcon className="w-4 h-4" />
+                    Delete
+                  </button>
+                </div>
+              )}
             </motion.div>
           ))}
         </AnimatePresence>
@@ -518,10 +584,19 @@ export default function ChatPage() {
         >
           {!messagesLoaded && messages.length === 0 && (
             <div className="text-center py-8 text-foreground/50">
-              <p className="mb-1">Start a conversation to ask study questions</p>
-              <p className="text-xs">
-                Padhai Buddy will help you understand step by step
-              </p>
+              {activeConversationId ? (
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  <p>Loading messages...</p>
+                </div>
+              ) : (
+                <>
+                  <p className="mb-1">Start a conversation to ask study questions</p>
+                  <p className="text-xs">
+                    Padhai Buddy will help you understand step by step
+                  </p>
+                </>
+              )}
             </div>
           )}
 
@@ -642,6 +717,56 @@ export default function ChatPage() {
                   className="px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:shadow-lg transition-shadow"
                 >
                   Delete
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Rename Conversation Modal */}
+      <AnimatePresence>
+        {renameConvId && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full shadow-2xl"
+            >
+              <h3 className="text-lg font-semibold mb-4">Rename Chat</h3>
+              <input
+                type="text"
+                value={tempTitle}
+                onChange={(e) => setTempTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    renameConversation(renameConvId, tempTitle);
+                  }
+                }}
+                className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 mb-4"
+                autoFocus
+                maxLength={60}
+              />
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setRenameConvId(null)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-foreground/5 transition-colors"
+                >
+                  Cancel
+                </button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => renameConversation(renameConvId!, tempTitle)}
+                  className="px-4 py-2 bg-gradient-to-br from-purple-500 to-indigo-600 text-white rounded-xl text-sm font-medium hover:shadow-lg transition-shadow"
+                >
+                  Save
                 </motion.button>
               </div>
             </motion.div>
