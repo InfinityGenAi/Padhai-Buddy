@@ -11,9 +11,35 @@ import {
   signOut,
   updateProfile,
 } from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
 import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebase";
-import type { UserProfile, UserBoard, UserClass } from "@/types";
+import type { UserProfile, UserBoard, UserClass, UserPreferences } from "@/types";
+
+const DEFAULT_PREFERENCES: UserPreferences = {
+  soundEnabled: true,
+  animationsEnabled: true,
+  fontSize: "medium",
+};
+
+function loadLocalPreferences(): UserPreferences {
+  if (typeof window === "undefined") return DEFAULT_PREFERENCES;
+  try {
+    const raw = localStorage.getItem("padhai-buddy-preferences");
+    if (raw) return { ...DEFAULT_PREFERENCES, ...JSON.parse(raw) };
+  } catch {
+    // ignore
+  }
+  return DEFAULT_PREFERENCES;
+}
+
+function saveLocalPreferences(prefs: UserPreferences) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem("padhai-buddy-preferences", JSON.stringify(prefs));
+  } catch {
+    // ignore
+  }
+}
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -23,14 +49,12 @@ interface AuthContextType {
   needsOnboarding: boolean;
   reloadProfile: () => void;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (
-    name: string,
-    email: string,
-    password: string,
-  ) => Promise<void>;
+  signUp: (name: string, email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   completeOnboarding: (cls: UserClass, board: UserBoard) => Promise<void>;
+  preferences: UserPreferences;
+  updatePreferences: (prefs: Partial<UserPreferences>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,9 +68,15 @@ export function useAuth() {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    const auth = getFirebaseAuth();
+    return !auth;
+  });
   const [authError, setAuthError] = useState<string | null>(null);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [preferences, setPreferences] = useState<UserPreferences>(() =>
+    loadLocalPreferences(),
+  );
 
   const loadUserProfile = (fbUser: FirebaseUser | null) => {
     if (!fbUser) {
@@ -70,8 +100,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then((snap) => {
         if (snap.exists()) {
           console.log("[AuthContext] Profile loaded (document exists)");
-          setUser(snap.data() as UserProfile);
+          const data = snap.data() as UserProfile;
+          setUser(data);
           setNeedsOnboarding(false);
+          const remotePrefs = data.preferences;
+          const localPrefs = loadLocalPreferences();
+          const merged = { ...DEFAULT_PREFERENCES, ...localPrefs, ...(remotePrefs || {}) };
+          setPreferences(merged);
+          saveLocalPreferences(merged);
         } else {
           console.log(
             "[AuthContext] Profile document not found; redirecting to onboarding",
@@ -104,8 +140,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const auth = getFirebaseAuth();
     if (!auth) {
       console.error("[AuthContext] Firebase auth is not initialized");
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLoading(false);
       return;
     }
 
@@ -158,6 +192,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setNeedsOnboarding(false);
   }
 
+  async function updatePreferences(prefs: Partial<UserPreferences>) {
+    const auth = getFirebaseAuth();
+    if (!auth || !auth.currentUser) return;
+    const db = getFirestoreDb();
+    if (!db) return;
+
+    const merged = { ...preferences, ...prefs };
+    setPreferences(merged);
+    saveLocalPreferences(merged);
+
+    try {
+      await updateDoc(doc(db, "users", auth.currentUser.uid), {
+        preferences: merged,
+      });
+    } catch {
+      // ignore sync errors
+    }
+  }
+
   async function logout() {
     const auth = getFirebaseAuth();
     if (!auth) return;
@@ -188,6 +241,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithGoogle,
         logout,
         completeOnboarding,
+        preferences,
+        updatePreferences,
       }}
     >
       {children}

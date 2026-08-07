@@ -9,6 +9,13 @@ export interface UserProfile {
   class: UserClass;
   board: UserBoard;
   createdAt: number;
+  preferences?: UserPreferences;
+}
+
+export interface UserPreferences {
+  soundEnabled: boolean;
+  animationsEnabled: boolean;
+  fontSize: "small" | "medium" | "large";
 }
 
 export interface Doubt {
@@ -22,4 +29,13 @@ export interface Doubt {
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  createdAt?: number;
+}
+
+export interface Conversation {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  lastMessage?: string;
 }

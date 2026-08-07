@@ -14,6 +14,21 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "class": "COLLECTION",
+      "queryScope": "COLLECTION",
+      "name": "users-conversations-updatedAt-desc",
+      "fields": [
+        {
+          "path": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "path": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []
