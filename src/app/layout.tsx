@@ -27,9 +27,9 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className="scroll-smooth">
+    <html lang="en" className="scroll-smooth h-full">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-background text-foreground antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} min-h-screen h-full m-0 bg-background text-foreground antialiased`}
       >
         <AuthProvider>{children}</AuthProvider>
       </body>
