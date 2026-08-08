@@ -14,6 +14,7 @@ import {
   query,
   onSnapshot,
   updateDoc,
+  getDocs,
   Timestamp,
 } from "firebase/firestore";
 import { motion, AnimatePresence } from "framer-motion";
@@ -99,6 +100,24 @@ function generateConversationTitle(text: string): string {
   const cleaned = text.trim().replace(/\s+/g, " ");
   if (cleaned.length <= 30) return cleaned;
   return cleaned.slice(0, 27).trimEnd() + "...";
+}
+
+function formatShortTime(ts: number): string {
+  const date = new Date(ts);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = diffMs / (1000 * 60);
+  const diffHours = diffMs / (1000 * 60 * 60);
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${Math.floor(diffMins)}m ago`;
+  if (diffHours < 24) return `${Math.floor(diffHours)}h ago`;
+  if (diffDays < 7) return `${Math.floor(diffDays)}d ago`;
+  return date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+  });
 }
 
 export default function ChatPage() {
@@ -248,15 +267,33 @@ export default function ChatPage() {
     const db = getFirestoreDb();
     if (!db || !user?.uid) return;
 
-    await deleteDoc(
-      doc(db, "users", user.uid, "conversations", conversationId),
-    );
+    const convRef = doc(db, "users", user.uid, "conversations", conversationId);
+    const messagesRef = collection(convRef, "messages");
+
+    try {
+      const messagesSnap = await getDocs(query(messagesRef, orderBy("createdAt", "asc")));
+      const deletePromises = messagesSnap.docs.map((d) => deleteDoc(d.ref));
+      await Promise.all(deletePromises);
+      await deleteDoc(convRef);
+    } catch (err) {
+      console.error("Failed to delete conversation:", err);
+    }
 
     if (activeConversationId === conversationId) {
       setActiveConversationId(null);
       setMessages([]);
     }
     setDeleteConfirmId(null);
+  };
+
+  const optimisticallyDeleteConversation = (conversationId: string) => {
+    setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+    if (activeConversationId === conversationId) {
+      setActiveConversationId(null);
+      setMessages([]);
+    }
+    setDeleteConfirmId(null);
+    deleteConversation(conversationId);
   };
 
   const sendMessage = async () => {
@@ -402,13 +439,13 @@ export default function ChatPage() {
           New Chat
         </motion.button>
       </div>
-      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+      <div className="flex-1 overflow-y-auto">
         {!conversationsLoaded && (
-          <div className="space-y-2 p-2">
+          <div className="space-y-1 p-2">
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="h-14 bg-foreground/5 rounded-lg animate-pulse"
+                className="h-12 bg-foreground/5 rounded-lg animate-pulse"
               />
             ))}
           </div>
@@ -422,28 +459,22 @@ export default function ChatPage() {
               exit={{ opacity: 0, x: -20, height: 0 }}
               transition={{ duration: 0.2 }}
               onClick={() => selectConversation(conv.id)}
-              className={`group relative flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${
+              className={`group relative flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-colors border-b border-transparent ${
                 activeConversationId === conv.id
-                  ? "bg-primary/10 text-primary"
-                  : "hover:bg-foreground/5 text-foreground/80"
+                  ? "bg-primary/10 border-border/50"
+                  : "hover:bg-foreground/5 border-transparent"
               }`}
             >
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">
+                <p className={`text-sm font-medium truncate ${
+                  activeConversationId === conv.id
+                    ? "text-primary"
+                    : "text-foreground/80"
+                }`}>
                   {getConversationTitle(conv.title)}
                 </p>
-                {conv.lastMessage && (
-                  <p className="text-xs text-foreground/50 truncate mt-0.5">
-                    {conv.lastMessage}
-                  </p>
-                )}
-                <p className="text-xs text-foreground/40 mt-1">
-                  {new Date(conv.updatedAt).toLocaleDateString("en-IN", {
-                    day: "numeric",
-                    month: "short",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                <p className="text-xs text-foreground/40 mt-0.5">
+                  {formatShortTime(conv.updatedAt)}
                 </p>
               </div>
               <motion.button
@@ -453,7 +484,7 @@ export default function ChatPage() {
                   e.stopPropagation();
                   setMenuConvId(menuConvId === conv.id ? null : conv.id);
                 }}
-                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-foreground/5 text-foreground/70 transition-all"
+                className="opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-foreground/5 text-foreground/60 transition-all"
               >
                 <EllipsisVerticalIcon className="w-4 h-4" />
               </motion.button>
@@ -488,7 +519,7 @@ export default function ChatPage() {
           ))}
         </AnimatePresence>
         {conversationsLoaded && conversations.length === 0 && (
-          <div className="text-center py-8 text-foreground/40 text-xs">
+          <div className="text-center py-8 text-foreground/40 text-xs px-2">
             No conversations yet
           </div>
         )}
@@ -497,7 +528,7 @@ export default function ChatPage() {
   );
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] relative">
+    <div className="flex h-full relative">
       {/* Mobile sidebar overlay */}
       <AnimatePresence>
         {sidebarOpen && (
@@ -535,7 +566,7 @@ export default function ChatPage() {
       <motion.aside
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
-        className="hidden lg:flex w-72 flex-col border-r border-border bg-card/50"
+        className="hidden lg:flex w-72 flex-col border-r border-border bg-card/50 h-full"
       >
         {sidebarContent}
       </motion.aside>
@@ -615,8 +646,8 @@ export default function ChatPage() {
                 <div
                   className={`max-w-[85%] sm:max-w-[75%] px-4 py-3 rounded-2xl whitespace-pre-wrap ${fontSizeClass} ${
                     msg.role === "user"
-                      ? "bg-gradient-to-br from-purple-500 to-indigo-600 text-white rounded-br-md"
-                      : "bg-card border border-border text-foreground rounded-bl-md"
+                      ? "bg-gradient-to-br from-purple-500 to-indigo-600 text-white rounded-br-sm"
+                      : "bg-card border border-border text-foreground rounded-bl-sm"
                   }`}
                 >
                   {msg.content}
@@ -631,7 +662,7 @@ export default function ChatPage() {
               animate={{ opacity: 1 }}
               className="flex justify-start"
             >
-              <div className="bg-card border border-border px-4 py-3 rounded-2xl rounded-bl-md">
+              <div className="bg-card border border-border px-4 py-3 rounded-2xl rounded-bl-sm">
                 <div className="flex items-center gap-1.5">
                   {[0, 1, 2].map((i) => (
                     <motion.span
@@ -713,7 +744,7 @@ export default function ChatPage() {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => deleteConversation(deleteConfirmId!)}
+                  onClick={() => optimisticallyDeleteConversation(deleteConfirmId!)}
                   className="px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:shadow-lg transition-shadow"
                 >
                   Delete

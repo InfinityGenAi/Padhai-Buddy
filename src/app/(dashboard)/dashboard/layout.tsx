@@ -19,7 +19,7 @@ export default function DashboardLayout({
     <RequireAuth>
       <ErrorBoundary>
         <HandGestureBackground subtle={true} key="dashboard-bg" />
-        <div className="flex h-full overflow-hidden relative z-10">
+        <div className="flex h-screen overflow-hidden relative z-10">
           <Sidebar />
           <div className="flex-1 flex flex-col overflow-hidden">
             <header className="hidden sm:flex items-center justify-between px-6 py-4 bg-card border-b border-border">
