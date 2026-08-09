@@ -92,22 +92,21 @@ export default function HistoryPage() {
   const deleteDoubt = async (doubtId: string) => {
     const db = getFirestoreDb();
     if (!db || !user?.uid) return;
-    try {
-      await deleteDoc(doc(db, "users", user.uid, "doubts", doubtId));
-      console.log("[HistoryPage] Deleted doubt:", doubtId);
-    } catch (err) {
-      console.error("[HistoryPage] Failed to delete doubt:", err);
-    }
-    setDeleteConfirmId(null);
+    await deleteDoc(doc(db, "users", user.uid, "doubts", doubtId));
   };
 
-  const optimisticallyDeleteDoubt = (doubtId: string) => {
-    setDoubts((prev) => prev.filter((d) => d.id !== doubtId));
-    if (expandedId === doubtId) {
-      setExpandedId(null);
-    }
+  const optimisticallyDeleteDoubt = async (doubtId: string) => {
     setDeleteConfirmId(null);
-    deleteDoubt(doubtId);
+    try {
+      await deleteDoubt(doubtId);
+      setDoubts((prev) => prev.filter((d) => d.id !== doubtId));
+      if (expandedId === doubtId) {
+        setExpandedId(null);
+      }
+    } catch (err) {
+      console.error("Failed to delete doubt:", err);
+      alert("Failed to delete history entry. Please try again.");
+    }
   };
 
   if (loading) {
@@ -166,11 +165,19 @@ export default function HistoryPage() {
               className="bg-card border border-border rounded-xl overflow-hidden"
             >
               <div className="relative">
-                <button
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() =>
                     setExpandedId(expandedId === doubt.id ? null : doubt.id)
                   }
-                  className="w-full p-4 text-left hover:bg-foreground/3 transition-colors"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setExpandedId(expandedId === doubt.id ? null : doubt.id);
+                    }
+                  }}
+                  className="w-full p-4 text-left hover:bg-foreground/3 transition-colors cursor-pointer"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -193,11 +200,9 @@ export default function HistoryPage() {
                           {formatDate(doubt.createdAt)}
                         </span>
                       </div>
-                      <p className="text-sm text-foreground/80 truncate">
-                        {doubt.question.startsWith("http")
-                          ? "Photo doubt"
-                          : doubt.question}
-                      </p>
+                       <p className="text-sm text-foreground/80 truncate">
+                         {doubt.type === "photo" ? "Photo Doubt" : doubt.question}
+                       </p>
                     </div>
                     <div className="flex items-center gap-1">
                       <motion.button
@@ -218,7 +223,7 @@ export default function HistoryPage() {
                       />
                     </div>
                   </div>
-                </button>
+                </div>
 
                 {menuDoubtId === doubt.id && (
                   <div className="absolute right-2 top-12 bg-card border border-border rounded-xl shadow-lg py-1 z-10 min-w-[120px]">

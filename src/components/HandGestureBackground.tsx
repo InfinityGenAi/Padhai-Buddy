@@ -101,7 +101,61 @@ export default function HandGestureBackground({
 
         detectHand();
       } catch {
-        if (isMounted) setCameraAvailable(false);
+        if (isMounted) {
+          setCameraAvailable(false);
+          try {
+            const vision = await FilesetResolver.forVisionTasks(
+              "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm"
+            );
+            handLandmarker = await HandLandmarker.createFromOptions(vision, {
+              baseOptions: {
+                modelAssetPath:
+                  "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+                delegate: "CPU",
+              },
+              runningMode: "VIDEO",
+              numHands: 1,
+              minHandDetectionConfidence: 0.7,
+              minTrackingConfidence: 0.7,
+            });
+            if (isMounted) {
+              setCameraAvailable(true);
+              const detectHand = () => {
+                if (!isMounted || !handLandmarker) return;
+                if (document.hidden) {
+                  animationFrameId = requestAnimationFrame(detectHand);
+                  return;
+                }
+                if (!processing) {
+                  processing = true;
+                  const video = webcamRef.current?.video;
+                  if (video && video.readyState === 4) {
+                    const now = performance.now();
+                    if (now > lastTimestamp) {
+                      lastTimestamp = now;
+                      try {
+                        const result = handLandmarker.detectForVideo(video, now);
+                        if (result.landmarks && result.landmarks.length > 0) {
+                          const landmarks = result.landmarks[0];
+                          const wrist = landmarks[0];
+                          handX.set(wrist.x);
+                          handY.set(wrist.y);
+                        }
+                      } catch {
+                        // ignore
+                      }
+                    }
+                  }
+                  processing = false;
+                }
+                animationFrameId = requestAnimationFrame(detectHand);
+              };
+              detectHand();
+            }
+          } catch {
+            // ignore fallback errors
+          }
+        }
       }
     };
 

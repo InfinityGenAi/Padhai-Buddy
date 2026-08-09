@@ -13,12 +13,19 @@ import {
 } from "firebase/auth";
 import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
 import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebase";
+import { deleteCurrentSession } from "@/lib/sessions";
 import type { UserProfile, UserBoard, UserClass, UserPreferences } from "@/types";
 
 const DEFAULT_PREFERENCES: UserPreferences = {
   soundEnabled: true,
   animationsEnabled: true,
-  fontSize: "medium",
+  theme: "light",
+  notificationsEnabled: true,
+  enterToSend: true,
+  autoScroll: true,
+  responseStyle: "balanced",
+  stepByStep: true,
+  language: "english",
 };
 
 function loadLocalPreferences(): UserPreferences {
@@ -86,10 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
-    console.log("[AuthContext] Loading profile from Firestore for uid:", fbUser.uid);
     const db = getFirestoreDb();
     if (!db) {
-      console.error("[AuthContext] Firestore db is not initialized");
       setAuthError("Firestore is not initialized");
       setUser(null);
       setNeedsOnboarding(false);
@@ -99,29 +104,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     getDoc(doc(db, "users", fbUser.uid))
       .then((snap) => {
         if (snap.exists()) {
-          console.log("[AuthContext] Profile loaded (document exists)");
           const data = snap.data() as UserProfile;
           setUser(data);
           setNeedsOnboarding(false);
           const remotePrefs = data.preferences;
           const localPrefs = loadLocalPreferences();
-          const merged = { ...DEFAULT_PREFERENCES, ...localPrefs, ...(remotePrefs || {}) };
+          const merged = { ...DEFAULT_PREFERENCES, ...localPrefs, ...(remotePrefs || { }) };
           setPreferences(merged);
           saveLocalPreferences(merged);
         } else {
-          console.log(
-            "[AuthContext] Profile document not found; redirecting to onboarding",
-          );
           setUser(null);
           setNeedsOnboarding(true);
         }
         setAuthError(null);
       })
       .catch((err) => {
-        console.error(
-          "[AuthContext] Failed to load user profile from Firestore:",
-          err,
-        );
         setAuthError(err instanceof Error ? err.message : String(err));
         setNeedsOnboarding(false);
       })
@@ -144,7 +141,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const unsub = onAuthStateChanged(auth, (fbUser) => {
-      console.log("[AuthContext] onAuthStateChanged fired:", !!fbUser);
       setFirebaseUser(fbUser);
       loadUserProfile(fbUser);
     });
@@ -214,17 +210,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function logout() {
     const auth = getFirebaseAuth();
     if (!auth) return;
+    await deleteCurrentSession();
     await signOut(auth);
-  }
-
-  if (process.env.NODE_ENV === "development") {
-    console.log("[AuthContext] render", {
-      loading,
-      hasFirebaseUser: !!firebaseUser,
-      hasUser: !!user,
-      needsOnboarding,
-      authError: !!authError,
-    });
   }
 
   return (

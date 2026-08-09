@@ -5,14 +5,33 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
 
       match /doubts/{doubtId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.type in ["text", "photo"]
+          && request.resource.data.question is string
+          && request.resource.data.answer is string;
+        allow update, delete: if request.auth != null && request.auth.uid == userId;
       }
 
       match /conversations/{conversationId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.title is string
+          && request.resource.data.createdAt is timestamp
+          && request.resource.data.updatedAt is timestamp;
+        allow update: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.title is string
+          && request.resource.data.createdAt is timestamp
+          && request.resource.data.updatedAt is timestamp;
+        allow delete: if request.auth != null && request.auth.uid == userId;
 
         match /messages/{messageId} {
-          allow read, write: if request.auth != null && request.auth.uid == userId;
+          allow read: if request.auth != null && request.auth.uid == userId;
+          allow create: if request.auth != null && request.auth.uid == userId
+            && request.resource.data.role in ["user", "assistant"]
+            && request.resource.data.content is string
+            && request.resource.data.createdAt is timestamp;
+          allow update, delete: if request.auth != null && request.auth.uid == userId;
         }
       }
     }

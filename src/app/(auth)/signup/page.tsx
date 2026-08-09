@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "framer-motion";
+import { playLogin } from "@/lib/sounds";
 import {
   EyeIcon,
   EyeSlashIcon,
@@ -55,6 +56,7 @@ export default function SignupPage() {
 
     try {
       await signUp(name, email, password);
+      playLogin();
       router.replace("/onboarding");
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -72,6 +74,7 @@ export default function SignupPage() {
     setIsSubmitting(true);
     try {
       await signInWithGoogle();
+      playLogin();
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);

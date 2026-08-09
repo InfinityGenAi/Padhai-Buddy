@@ -9,13 +9,20 @@ export interface UserProfile {
   class: UserClass;
   board: UserBoard;
   createdAt: number;
+  photoURL?: string;
   preferences?: UserPreferences;
 }
 
 export interface UserPreferences {
   soundEnabled: boolean;
   animationsEnabled: boolean;
-  fontSize: "small" | "medium" | "large";
+  theme: "light" | "dark" | "system";
+  notificationsEnabled: boolean;
+  enterToSend: boolean;
+  autoScroll: boolean;
+  responseStyle: "balanced" | "concise" | "detailed";
+  stepByStep: boolean;
+  language: "english" | "hindi" | "hinglish";
 }
 
 export interface Doubt {
@@ -27,6 +34,7 @@ export interface Doubt {
 }
 
 export interface ChatMessage {
+  id: string;
   role: "user" | "assistant";
   content: string;
   createdAt?: number;
@@ -38,4 +46,28 @@ export interface Conversation {
   createdAt: number;
   updatedAt: number;
   lastMessage?: string;
+}
+
+export interface UserSession {
+  id: string;
+  device: string;
+  browser?: string;
+  os?: string;
+  userAgent: string;
+  lastActive: number;
+  current: boolean;
+  createdAt: number;
+}
+
+export interface ReauthPayload {
+  password: string;
+}
+
+export interface ChangePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface DeleteAccountPayload {
+  password: string;
 }

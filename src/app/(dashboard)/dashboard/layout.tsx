@@ -6,15 +6,16 @@ import HandGestureBackground from "@/components/HandGestureBackground";
 import RequireAuth from "@/components/AuthWrapper";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePathname } from "next/navigation";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  if (process.env.NODE_ENV === "development") {
-    console.log("[DashboardLayout] render");
-  }
+  const pathname = usePathname();
+  const isChatPage = pathname === "/dashboard/chat";
+
   return (
     <RequireAuth>
       <ErrorBoundary>
@@ -22,11 +23,17 @@ export default function DashboardLayout({
         <div className="flex h-screen overflow-hidden relative z-10">
           <Sidebar />
           <div className="flex-1 flex flex-col overflow-hidden">
-            <header className="hidden sm:flex items-center justify-between px-6 py-4 bg-card border-b border-border">
+            <header className="hidden sm:flex items-center justify-between px-6 py-2.5 border-b border-border/60">
               <DashboardGreeting />
             </header>
             <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">
-              <div className="container mx-auto max-w-4xl px-4 sm:px-6 py-6">
+              <div
+                className={
+                  isChatPage
+                    ? "pt-2 h-full flex flex-col"
+                    : "px-4 sm:px-6 pt-2 pb-4 h-full flex flex-col"
+                }
+              >
                 {children}
               </div>
             </main>
@@ -59,3 +66,4 @@ function DashboardGreeting() {
     </>
   );
 }
+

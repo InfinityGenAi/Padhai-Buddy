@@ -18,9 +18,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const decoded = await adminAuth.verifyIdToken(token);
+    let decoded;
+    try {
+      decoded = await adminAuth.verifyIdToken(token);
+    } catch {
+      return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+    }
 
-    const { message, class: studentClass, board } = await req.json();
+    let body: {
+      message?: unknown;
+      class?: unknown;
+      board?: unknown;
+      responseStyle?: unknown;
+      stepByStep?: unknown;
+      language?: unknown;
+    };
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const { message, class: studentClass, board, responseStyle, stepByStep, language } = body;
 
     if (!message || !studentClass || !board) {
       return NextResponse.json(
@@ -29,13 +48,40 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const systemPrompt = buildSystemPrompt(String(studentClass), board);
+    const messageStr = String(message);
+    if (messageStr.length > 5000) {
+      return NextResponse.json(
+        { error: "Message exceeds maximum length" },
+        { status: 400 },
+      );
+    }
+
+    const validClasses = ["5", "6", "7", "8", "9", "10", "11", "12"];
+    const validBoards = ["CBSE", "ICSE", "State Board"];
+    if (!validClasses.includes(String(studentClass))) {
+      return NextResponse.json(
+        { error: "Invalid class value" },
+        { status: 400 },
+      );
+    }
+    if (!validBoards.includes(String(board))) {
+      return NextResponse.json(
+        { error: "Invalid board value" },
+        { status: 400 },
+      );
+    }
+
+    const systemPrompt = buildSystemPrompt(String(studentClass), String(board), {
+      responseStyle: responseStyle !== undefined ? String(responseStyle) : undefined,
+      stepByStep: stepByStep !== undefined ? Boolean(stepByStep) : undefined,
+      language: language !== undefined ? String(language) : undefined,
+    });
 
     const completion = await getGroqClient().chat.completions.create({
       model: GROQ_TEXT_MODEL,
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: message },
+        { role: "user", content: messageStr },
       ],
       temperature: 0.3,
       max_tokens: 2048,

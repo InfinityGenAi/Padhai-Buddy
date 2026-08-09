@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -8,13 +9,49 @@ import {
   PhotoIcon,
   ClockIcon,
 } from "@heroicons/react/24/outline";
+import { getFirestoreDb } from "@/lib/firebase";
+import { collection, getDocs } from "firebase/firestore";
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const [weeklyDoubts, setWeeklyDoubts] = useState(0);
+  const [totalDoubts, setTotalDoubts] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  if (process.env.NODE_ENV === "development") {
-    console.log("[DashboardPage] render, user:", user ? "present" : "null");
-  }
+  useEffect(() => {
+    const loadStats = async () => {
+      const db = getFirestoreDb();
+      if (!db || !user?.uid) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const doubtsRef = collection(db, "users", user.uid, "doubts");
+        const allSnap = await getDocs(doubtsRef);
+        const now = Date.now();
+        const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
+        let weekly = 0;
+        let total = 0;
+        allSnap.forEach((doc) => {
+          const data = doc.data();
+          total++;
+          const createdAt = data.createdAt?.toDate?.()?.getTime?.() || data.createdAt;
+          if (createdAt && createdAt >= weekAgo) {
+            weekly++;
+          }
+        });
+        setWeeklyDoubts(weekly);
+        setTotalDoubts(total);
+      } catch {
+        // ignore stats errors
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadStats();
+  }, [user?.uid]);
 
   const displayName = user?.name || "there";
   const firstName = displayName.split(" ")[0] || displayName;
@@ -22,12 +59,12 @@ export default function DashboardPage() {
   const stats = [
     {
       label: "Doubts solved this week",
-      value: "0",
+      value: loading ? "..." : String(weeklyDoubts),
       icon: ChatBubbleLeftEllipsisIcon,
     },
     {
       label: "Total doubts solved",
-      value: "0",
+      value: loading ? "..." : String(totalDoubts),
       icon: ClockIcon,
     },
   ];

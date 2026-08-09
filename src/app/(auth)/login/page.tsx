@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "framer-motion";
+import { playLogin } from "@/lib/sounds";
 import {
   EyeIcon,
   EyeSlashIcon,
@@ -57,6 +58,7 @@ export default function LoginPage() {
 
     try {
       await signIn(email, password);
+      playLogin();
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
@@ -71,6 +73,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       await signInWithGoogle();
+      playLogin();
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);

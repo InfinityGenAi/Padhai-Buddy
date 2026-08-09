@@ -14,8 +14,35 @@ export function getGroqClient(): Groq {
 }
 
 export const GROQ_TEXT_MODEL = "llama-3.3-70b-versatile";
-export const GROQ_VISION_MODEL = "llama-3.2-90b-vision-preview";
+export const GROQ_VISION_MODEL = "qwen/qwen3.6-27b";
 
-export function buildSystemPrompt(class_: string, board: string): string {
-  return `You are a friendly, patient tutor for a Class ${class_} ${board} student in India. Explain concepts clearly, step by step, using the terminology and depth appropriate for their syllabus. Keep answers focused and easy to understand.`;
+export function buildSystemPrompt(
+  class_: string,
+  board: string,
+  options?: {
+    responseStyle?: string;
+    stepByStep?: boolean;
+    language?: string;
+  }
+): string {
+  const { responseStyle = "balanced", stepByStep = true, language = "english" } = options || {};
+
+  const styleMap: Record<string, string> = {
+    balanced: "Give balanced explanations suitable for a Class student.",
+    concise: "Keep answers concise and to the point.",
+    detailed: "Give detailed, thorough explanations with examples and context.",
+  };
+
+  const stepMap: Record<number, string> = {
+    0: "You can skip step-by-step breakdowns and give more direct answers when appropriate.",
+    1: "Break down your explanations into clear, numbered steps to help the student follow along.",
+  };
+
+  const langMap: Record<string, string> = {
+    english: "Respond in English.",
+    hindi: "Respond in Hindi.",
+    hinglish: "Respond in Hinglish (a casual mix of Hindi and English).",
+  };
+
+  return `You are a friendly, patient tutor for a Class ${class_} ${board} student in India. ${langMap[language] || langMap.english} ${styleMap[responseStyle] || styleMap.balanced} ${stepMap[stepByStep ? 1 : 0]} Explain concepts clearly using the terminology and depth appropriate for their syllabus. Keep answers focused and easy to understand.`;
 }

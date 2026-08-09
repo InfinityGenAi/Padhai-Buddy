@@ -1,7 +1,6 @@
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
-import { getStorage } from "firebase-admin/storage";
 
 const requiredEnvVars = [
   "FIREBASE_ADMIN_PROJECT_ID",
@@ -36,14 +35,13 @@ if (missingEnvVars.length > 0) {
 }
 
 if (initializationError) {
-  console.error("[Firebase Admin]", initializationError);
+  console.error("[Firebase Admin] Initialization error:", initializationError);
 }
 
 const app = getApps()[0];
 
 export const adminAuth = app ? getAuth(app) : undefined;
 export const adminDb = app ? getFirestore(app) : undefined;
-export const adminStorage = app ? getStorage(app) : undefined;
 
-export const adminServices = { adminAuth, adminDb, adminStorage };
+export const adminServices = { adminAuth, adminDb };
 export { initializationError };

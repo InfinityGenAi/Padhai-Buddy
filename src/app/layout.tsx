@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 
@@ -28,6 +29,24 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className="scroll-smooth h-full">
+      <Script id="theme-init" strategy="beforeInteractive">
+        {`
+          (function() {
+            try {
+              var raw = localStorage.getItem('padhai-buddy-preferences');
+              if (raw) {
+                var prefs = JSON.parse(raw);
+                var theme = prefs.theme || 'system';
+                if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                  document.documentElement.classList.add('dark');
+                }
+              } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.classList.add('dark');
+              }
+            } catch(e) {}
+          })();
+        `}
+      </Script>
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen h-full m-0 bg-background text-foreground antialiased`}
       >

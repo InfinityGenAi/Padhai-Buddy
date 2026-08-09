@@ -3,23 +3,25 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --background: #ffffff;
-    --foreground: #171717;
-    --primary: #4f46e5;
-    --primary-dark: #4338ca;
-    --card-bg: #ffffff;
-    --border-color: #e5e7eb;
-  }
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --primary: #4f46e5;
+  --primary-dark: #4338ca;
+  --card-bg: #ffffff;
+  --border-color: #e5e7eb;
+  --sidebar-bg: #f8fafc;
+}
 
-  .dark:root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --primary: #6366f1;
-    --primary-dark: #4f46e5;
-    --card-bg: #18181b;
-    --border-color: #27272a;
-  }
+.dark:root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --primary: #6366f1;
+  --primary-dark: #4f46e5;
+  --card-bg: #18181b;
+  --border-color: #27272a;
+  --sidebar-bg: #1e1e22;
+}
 
   body {
     background: var(--background);
@@ -38,6 +40,12 @@
   }
   .bg-card {
     background-color: var(--card-bg);
+  }
+  .bg-sidebar {
+    background-color: #f8fafc;
+  }
+  .dark .bg-sidebar {
+    background-color: #1e1e22;
   }
   .border-border {
     border-color: var(--border-color);

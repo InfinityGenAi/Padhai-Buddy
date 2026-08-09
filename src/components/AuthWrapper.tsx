@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, ReactNode } from "react";
+import { useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -10,26 +10,17 @@ export default function RequireAuth({
   children: ReactNode;
 }) {
   const router = useRouter();
-  const { firebaseUser, loading, authError, needsOnboarding, reloadProfile } = useAuth();
-  const [checked, setChecked] = useState(false);
+  const { firebaseUser, loading, authError, needsOnboarding } = useAuth();
 
   useEffect(() => {
     if (!loading) {
       if (!firebaseUser) {
-        if (process.env.NODE_ENV === "development") {
-          console.log(
-            "[RequireAuth] auth resolved, no user session; redirecting to /login",
-          );
-        }
         router.replace("/login");
       } else if (needsOnboarding) {
         router.replace("/onboarding");
-      } else {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setChecked(true);
       }
     }
-  }, [firebaseUser, loading, needsOnboarding, authError, router]);
+  }, [firebaseUser, loading, needsOnboarding, router]);
 
   if (loading) {
     return (
@@ -56,17 +47,11 @@ export default function RequireAuth({
             the browser console for the full error, then try again.
           </p>
         </div>
-        <button
-          onClick={reloadProfile}
-          className="rounded-xl bg-primary px-5 py-2 text-sm font-medium text-white hover:shadow-lg transition-shadow"
-        >
-          Try again
-        </button>
       </div>
     );
   }
 
-  if (!checked) {
+  if (!firebaseUser || needsOnboarding) {
     return null;
   }
 
