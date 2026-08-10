@@ -13,31 +13,38 @@ const firebaseConfig = {
 let app: FirebaseApp | undefined;
 let auth: Auth | undefined;
 let db: Firestore | undefined;
-let persistenceSet = false;
+let initPromise: Promise<void> | undefined;
 
-function ensureInitialized() {
-  if (typeof window === "undefined") return;
-  if (!app) {
-    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-    auth = getAuth(app);
-    db = getFirestore(app);
+function ensureInitialized(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (initPromise) return initPromise;
 
-    if (!persistenceSet) {
-      persistenceSet = true;
-      setPersistence(auth, browserLocalPersistence).catch(() => {});
+  initPromise = (async () => {
+    if (!app) {
+      app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+      auth = getAuth(app);
+      db = getFirestore(app);
     }
-  }
-  return { app, auth, db };
+    if (auth) {
+      await setPersistence(auth, browserLocalPersistence).catch(() => {});
+    }
+  })();
+
+  return initPromise;
+}
+
+export async function waitForFirebaseInit(): Promise<void> {
+  return ensureInitialized();
 }
 
 export function getFirebaseApp(): FirebaseApp | undefined {
-  return ensureInitialized()?.app;
+  return app;
 }
 export function getFirebaseAuth(): Auth | undefined {
-  return ensureInitialized()?.auth;
+  return auth;
 }
 export function getFirestoreDb(): Firestore | undefined {
-  return ensureInitialized()?.db;
+  return db;
 }
 
 export { firebaseConfig };

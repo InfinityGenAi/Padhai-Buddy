@@ -12,7 +12,7 @@ import {
   updateProfile,
 } from "firebase/auth";
 import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
-import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebase";
+import { getFirebaseAuth, getFirestoreDb, waitForFirebaseInit } from "@/lib/firebase";
 import { deleteCurrentSession } from "@/lib/sessions";
 import type { UserProfile, UserBoard, UserClass, UserPreferences } from "@/types";
 
@@ -159,27 +159,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    const auth = getFirebaseAuth();
-    if (!auth) {
-      console.error("[AuthContext] Firebase auth is not initialized");
-      return;
-    }
+    let unsub: (() => void) | undefined;
 
-    const unsub = onAuthStateChanged(auth, (fbUser) => {
-      setFirebaseUser(fbUser);
-      loadUserProfile(fbUser);
-    });
+    waitForFirebaseInit()
+      .then(() => {
+        const auth = getFirebaseAuth();
+        if (!auth) {
+          console.error("[AuthContext] Firebase auth is not initialized");
+          setLoading(false);
+          return;
+        }
 
-    return () => unsub();
+        unsub = onAuthStateChanged(auth, (fbUser) => {
+          setFirebaseUser(fbUser);
+          loadUserProfile(fbUser);
+        });
+      })
+      .catch(() => {
+        setLoading(false);
+      });
+
+    return () => {
+      if (unsub) unsub();
+    };
   }, []);
 
   async function signIn(email: string, password: string) {
+    await waitForFirebaseInit();
     const auth = getFirebaseAuth();
     if (!auth) throw new Error("Firebase not initialized");
     await signInWithEmailAndPassword(auth, email, password);
   }
 
   async function signUp(name: string, email: string, password: string) {
+    await waitForFirebaseInit();
     const auth = getFirebaseAuth();
     if (!auth) throw new Error("Firebase not initialized");
     const cred = await createUserWithEmailAndPassword(auth, email, password);
@@ -187,6 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signInWithGoogle() {
+    await waitForFirebaseInit();
     const auth = getFirebaseAuth();
     if (!auth) throw new Error("Firebase not initialized");
     const provider = new GoogleAuthProvider();
@@ -194,6 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function completeOnboarding(cls: UserClass, board: UserBoard) {
+    await waitForFirebaseInit();
     const auth = getFirebaseAuth();
     if (!auth || !auth.currentUser) throw new Error("Not authenticated");
     const db = getFirestoreDb();
@@ -214,6 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function updatePreferences(prefs: Partial<UserPreferences>) {
+    await waitForFirebaseInit();
     const auth = getFirebaseAuth();
     if (!auth || !auth.currentUser) return;
     const db = getFirestoreDb();
@@ -233,6 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
+    await waitForFirebaseInit();
     const auth = getFirebaseAuth();
     if (!auth) return;
 
