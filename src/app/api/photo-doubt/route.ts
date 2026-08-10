@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, initializationError } from "@/lib/firebase-admin";
-import { adminDb } from "@/lib/firebase-admin";
+import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { getGroqClient, GROQ_VISION_MODEL, buildSystemPrompt } from "@/lib/groq";
-import { FieldValue } from "@google-cloud/firestore";
 
 const MAX_FILE_SIZE = 4 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -145,21 +143,20 @@ export async function POST(req: NextRequest) {
       completion.choices[0]?.message?.content ||
       "I couldn't analyze the image at this time. Please try again.";
 
-    if (adminDb) {
-      try {
-        await adminDb
-          .collection("users")
-          .doc(decoded.uid)
-          .collection("doubts")
-          .add({
-            question: "Photo Doubt",
-            answer,
-            type: "photo",
-            createdAt: FieldValue.serverTimestamp(),
-          });
-      } catch (firestoreError) {
-        console.error("Firestore save error:", firestoreError);
-      }
+    try {
+      if (!adminDb) throw new Error("Firestore admin is not initialized");
+      await adminDb
+        .collection("users")
+        .doc(decoded.uid)
+        .collection("doubts")
+        .add({
+          question: "Photo Doubt",
+          answer,
+          type: "photo",
+          createdAt: Date.now(),
+        });
+    } catch (dbError) {
+      console.error("Failed to save photo doubt:", dbError);
     }
 
     return NextResponse.json({

@@ -50,6 +50,10 @@ export async function POST(req: NextRequest) {
       await userRef.delete();
     } catch (err) {
       console.error("Firestore cleanup error:", err);
+      return NextResponse.json(
+        { error: "Failed to cleanup user data" },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ success: true });

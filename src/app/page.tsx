@@ -1,54 +1,104 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   ChatBubbleLeftEllipsisIcon,
   PhotoIcon,
   AcademicCapIcon,
   SparklesIcon,
+  CheckIcon,
+  BookOpenIcon,
+  LightBulbIcon,
 } from "@heroicons/react/24/outline";
-
-const LazyBackground = dynamic(() => import("@/components/HandGestureBackground"), {
-  ssr: false,
-  loading: () => <div className="fixed inset-0 -z-10 bg-gradient-to-br from-purple-100 via-blue-50 to-indigo-100 dark:from-purple-950/30 dark:via-blue-950/30 dark:to-indigo-950/30" />,
-});
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 export default function Home() {
+  const { preferences } = useAuth();
+  const reducedMotion = useReducedMotion();
+  const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
+
+  const staggerContainer = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.12,
+        delayChildren: 0.15,
+      },
+    },
+  };
+
+  const staggerItem = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.6 },
+    },
+  };
+
+  const features = [
+    {
+      icon: ChatBubbleLeftEllipsisIcon,
+      title: "Ask Anything",
+      desc: "Get instant answers to your doubts with step-by-step explanations.",
+      color: "from-purple-500 to-indigo-500",
+    },
+    {
+      icon: PhotoIcon,
+      title: "Photo Doubts",
+      desc: "Upload photos of your study material and get instant solutions.",
+      color: "from-blue-500 to-cyan-500",
+    },
+    {
+      icon: BookOpenIcon,
+      title: "All Boards Covered",
+      desc: "CBSE, ICSE, and State Board curriculum-aligned answers.",
+      color: "from-emerald-500 to-teal-500",
+    },
+    {
+      icon: LightBulbIcon,
+      title: "Step-by-Step",
+      desc: "Explanations designed to make concepts click, not just give answers.",
+      color: "from-amber-500 to-orange-500",
+    },
+  ];
+
   return (
     <div className="min-h-screen relative overflow-hidden">
-      <div className="fixed inset-0 -z-20 bg-gradient-to-br from-purple-100 via-blue-50 to-indigo-100 dark:from-purple-950/30 dark:via-blue-950/30 dark:to-indigo-950/30" />
-      <LazyBackground />
+      <AnimatedBackground animate={animationsEnabled} />
 
       <header className="relative z-10 flex items-center justify-between px-4 sm:px-6 py-4 max-w-7xl mx-auto">
         <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.1 }}
+          initial={animationsEnabled ? { opacity: 0, x: -20 } : false}
+          animate={animationsEnabled ? { opacity: 1, x: 0 } : false}
+          transition={{ duration: 0.6, ease: "easeOut" }}
         >
           <h1 className="text-2xl font-bold text-primary">Padhai Buddy</h1>
         </motion.div>
 
         <motion.div
-          className="flex items-center gap-4"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.1 }}
+          className="flex items-center gap-3"
+          initial={animationsEnabled ? { opacity: 0, x: 20 } : false}
+          animate={animationsEnabled ? { opacity: 1, x: 0 } : false}
+          transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
         >
           <Link href="/login">
             <motion.button
-              className="px-5 py-2 text-sm font-medium text-foreground/70 hover:text-foreground transition-colors"
-              whileHover={{ scale: 1.05 }}
+              className="px-5 py-2 text-sm font-medium text-foreground/70 hover:text-foreground transition-colors rounded-xl"
+              whileHover={animationsEnabled ? { scale: 1.03 } : undefined}
+              whileTap={animationsEnabled ? { scale: 0.97 } : undefined}
             >
               Login
             </motion.button>
           </Link>
           <Link href="/signup">
             <motion.button
-              className="px-6 py-2.5 bg-gradient-to-br from-purple-500 to-indigo-600 text-white rounded-xl font-medium text-sm hover:shadow-lg transition-shadow"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.98 }}
+              className="px-6 py-2.5 btn-primary rounded-xl font-medium text-sm"
+              whileHover={animationsEnabled ? { scale: 1.03 } : undefined}
+              whileTap={animationsEnabled ? { scale: 0.97 } : undefined}
             >
               Get Started
             </motion.button>
@@ -56,20 +106,23 @@ export default function Home() {
         </motion.div>
       </header>
 
-      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pt-12 sm:pt-20 pb-24">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-24">
+        <motion.div
+          variants={animationsEnabled ? staggerContainer : undefined}
+          initial={animationsEnabled ? "hidden" : false}
+          animate={animationsEnabled ? "visible" : false}
+          className="grid lg:grid-cols-2 gap-16 items-center"
+        >
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="space-y-6"
+            variants={animationsEnabled ? staggerItem : undefined}
+            className="space-y-8"
           >
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full text-sm font-medium text-primary">
               <SparklesIcon className="w-4 h-4" />
-              AI-powered, curriculum-aware for Indian students
+              <span>AI-powered, curriculum-aware for Indian students</span>
             </div>
 
-            <h2 className="text-4xl sm:text-5xl font-bold leading-tight">
+            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight">
               <span className="text-foreground">Your AI study buddy for </span>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-indigo-600">
                 every doubt, every subject, every board
@@ -80,12 +133,15 @@ export default function Home() {
               Stuck on a math problem? Need help with a science concept? Padhai Buddy explains everything step by step, tailored to your class and board — CBSE, ICSE, or State Board.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 pt-2">
+            <motion.div
+              variants={animationsEnabled ? staggerItem : undefined}
+              className="flex flex-col sm:flex-row gap-4 pt-2"
+            >
               <Link href="/signup">
                 <motion.button
-                  className="px-8 py-3 bg-gradient-to-br from-purple-500 to-indigo-600 text-white rounded-xl font-semibold text-lg hover:shadow-lg transition-shadow flex items-center justify-center gap-2"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  className="px-8 py-3.5 btn-primary rounded-xl font-semibold text-lg flex items-center justify-center gap-2"
+                  whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
+                  whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
                 >
                   <AcademicCapIcon className="w-5 h-5" />
                   Get Started
@@ -93,34 +149,38 @@ export default function Home() {
               </Link>
               <Link href="/login">
                 <motion.button
-                  className="px-8 py-3 border border-border rounded-xl font-semibold text-lg hover:bg-foreground/5 transition-colors flex items-center justify-center gap-2"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  className="px-8 py-3.5 border border-border rounded-xl font-semibold text-lg hover:bg-foreground/5 transition-colors flex items-center justify-center gap-2"
+                  whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
+                  whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
                 >
                   Already have an account? Login
                 </motion.button>
               </Link>
-            </div>
+            </motion.div>
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3, type: "spring" }}
+            variants={animationsEnabled ? staggerItem : undefined}
             className="relative"
           >
-            <div className="bg-card border border-border rounded-2xl shadow-xl overflow-hidden max-w-md mx-auto">
-              <div className="p-4 border-b border-border flex items-center gap-2">
-                <div className="w-3 h-3 bg-red-400 rounded-full"></div>
-                <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+            <motion.div
+              animate={animationsEnabled ? { y: [0, -14, 0] } : undefined}
+              transition={animationsEnabled ? { duration: 6, repeat: Infinity, ease: "easeInOut" } : undefined}
+              className="glass card-subtle rounded-2xl shadow-xl overflow-hidden max-w-md mx-auto"
+            >
+              <div className="p-4 border-b border-border/50 flex items-center gap-2">
+                <div className="flex gap-1.5">
+                  <div className="w-3 h-3 bg-red-400 rounded-full" />
+                  <div className="w-3 h-3 bg-yellow-400 rounded-full" />
+                  <div className="w-3 h-3 bg-green-400 rounded-full" />
+                </div>
                 <span className="text-xs text-foreground/50 ml-auto">AI Tutor</span>
               </div>
               <div className="p-6 space-y-4">
                 <motion.div
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.5 }}
+                  initial={animationsEnabled ? { opacity: 0, x: -10 } : false}
+                  animate={animationsEnabled ? { opacity: 1, x: 0 } : false}
+                  transition={animationsEnabled ? { delay: 0.7, duration: 0.5 } : undefined}
                   className="bg-background rounded-xl p-3 text-sm"
                 >
                   <p className="font-medium mb-1 text-foreground/70">You:</p>
@@ -129,9 +189,9 @@ export default function Home() {
                   </p>
                 </motion.div>
                 <motion.div
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.7 }}
+                  initial={animationsEnabled ? { opacity: 0, x: 10 } : false}
+                  animate={animationsEnabled ? { opacity: 1, x: 0 } : false}
+                  transition={animationsEnabled ? { delay: 0.9, duration: 0.5 } : undefined}
                   className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 border border-primary/20 rounded-xl p-4 text-sm"
                 >
                   <p className="font-medium text-primary mb-2">Padhai Buddy:</p>
@@ -139,20 +199,20 @@ export default function Home() {
                     The Pythagorean theorem states that in a right-angled triangle, the square of the hypotenuse (the longest side) equals the sum of squares of the other two sides.
                   </p>
                   <p className="text-foreground/90 mt-2 leading-relaxed">
-                    Formula: a² + b² = c², where {"'"}c{"'"} is the hypotenuse.
+                    Formula: a² + b² = c², where c is the hypotenuse.
                   </p>
                   <p className="text-foreground/70 mt-2 text-xs">
                     — Explained for Class 10 CBSE Mathematics
                   </p>
                 </motion.div>
               </div>
-            </div>
+            </motion.div>
 
             <motion.div
-              className="absolute -bottom-4 -right-4 bg-card border border-border rounded-xl p-4 shadow-lg"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
+              initial={animationsEnabled ? { opacity: 0, y: 20 } : false}
+              animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
+              transition={animationsEnabled ? { delay: 1.1, duration: 0.5 } : undefined}
+              className="absolute -bottom-6 -right-6 glass card-subtle border border-border rounded-xl p-4 shadow-lg"
             >
               <div className="flex gap-2">
                 <div className="p-2 bg-primary/10 rounded-lg">
@@ -165,10 +225,75 @@ export default function Home() {
               <p className="text-xs text-foreground/50 mt-1">Text & Photo Doubts</p>
             </motion.div>
           </motion.div>
-        </div>
+        </motion.div>
+
+        {/* Feature Cards */}
+        <motion.div
+          variants={animationsEnabled ? staggerContainer : undefined}
+          initial={animationsEnabled ? "hidden" : false}
+          animate={animationsEnabled ? "visible" : false}
+          className="mt-20 sm:mt-28"
+        >
+          <motion.div
+            variants={animationsEnabled ? staggerItem : undefined}
+            className="text-center mb-10"
+          >
+            <h3 className="text-2xl font-bold text-foreground mb-2">
+              Everything you need to study smarter
+            </h3>
+            <p className="text-foreground/60 text-sm max-w-md mx-auto">
+              One AI study buddy for all your subjects, classes, and boards.
+            </p>
+          </motion.div>
+
+          <motion.div
+            variants={animationsEnabled ? staggerContainer : undefined}
+            className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6"
+          >
+            {features.map((feature) => (
+              <motion.div
+                key={feature.title}
+                variants={animationsEnabled ? staggerItem : undefined}
+                className="glass card-subtle rounded-2xl p-6 text-center"
+                whileHover={animationsEnabled ? { y: -6, scale: 1.02 } : undefined}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              >
+                <div className="flex justify-center mb-4">
+                  <div
+                    className={`p-3 rounded-xl bg-gradient-to-br ${feature.color} shadow-md`}
+                  >
+                    <feature.icon className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+                <h4 className="font-semibold text-foreground mb-2">{feature.title}</h4>
+                <p className="text-sm text-foreground/60 leading-relaxed">{feature.desc}</p>
+              </motion.div>
+            ))}
+          </motion.div>
+
+          <motion.div
+            variants={animationsEnabled ? staggerItem : undefined}
+            className="mt-12 text-center"
+          >
+            <div className="flex items-center justify-center gap-6 text-sm text-foreground/50">
+              <span className="flex items-center gap-1">
+                <CheckIcon className="w-4 h-4 text-green-500" />
+                No signup fees
+              </span>
+              <span className="flex items-center gap-1">
+                <CheckIcon className="w-4 h-4 text-green-500" />
+                CBSE, ICSE, State Board
+              </span>
+              <span className="flex items-center gap-1">
+                <CheckIcon className="w-4 h-4 text-green-500" />
+                Instant answers
+              </span>
+            </div>
+          </motion.div>
+        </motion.div>
       </main>
 
-      <footer className="relative z-10 text-center py-8 text-sm text-foreground/50 border-t border-border/50">
+      <footer className="relative z-10 text-center py-8 text-sm text-foreground/50 border-t border-border/30">
         <p>© {new Date().getFullYear()} Padhai Buddy. Made with ❤️ for Indian students.</p>
       </footer>
     </div>

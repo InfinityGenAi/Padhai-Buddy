@@ -3,8 +3,8 @@
 ## Commands
 
 ### Development
-- `npm run dev` — Start the Next.js dev server (use `--webpack` on Windows with Turbopack issues)
-- `npm run build` — Build for production (use `--webpack` on Windows with Turbopack issues)
+- `npm run dev` — Start the Next.js dev server
+- `npm run build` — Build for production
 - `npm run lint` — Run ESLint and Next.js lint checks
 - `npx tsc --noEmit` — Run TypeScript type checking
 
@@ -13,7 +13,7 @@
 - ESLint must pass with no errors or warnings
 - The project uses Tailwind CSS v3 (not v4) to avoid native binary issues on Windows
 - Tailwind CSS v3 uses `@tailwind base; @tailwind components; @tailwind utilities;` in `globals.css`
-- Build uses Webpack (not Turbopack) on Windows due to native binding issues
+- Builds use Turbopack by default (verified working on Windows)
 
 ## Environment Variables
 Copy `.env.local.example` to `.env.local` and fill in:

@@ -19,7 +19,7 @@ import type { UserProfile, UserBoard, UserClass, UserPreferences } from "@/types
 const DEFAULT_PREFERENCES: UserPreferences = {
   soundEnabled: true,
   animationsEnabled: true,
-  theme: "light",
+  theme: "system",
   notificationsEnabled: true,
   enterToSend: true,
   autoScroll: true,
@@ -75,15 +75,40 @@ export function useAuth() {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(() => {
-    const auth = getFirebaseAuth();
-    return !auth;
-  });
+  const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [preferences, setPreferences] = useState<UserPreferences>(() =>
     loadLocalPreferences(),
   );
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const isDark =
+      preferences.theme === "dark" ||
+      (preferences.theme === "system" &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches);
+    if (isDark) {
+      root.classList.add("dark");
+    } else {
+      root.classList.remove("dark");
+    }
+  }, [preferences.theme]);
+
+  useEffect(() => {
+    if (preferences.theme !== "system") return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = () => {
+      const root = document.documentElement;
+      if (media.matches) {
+        root.classList.add("dark");
+      } else {
+        root.classList.remove("dark");
+      }
+    };
+    media.addEventListener("change", handler);
+    return () => media.removeEventListener("change", handler);
+  }, [preferences.theme]);
 
   const loadUserProfile = (fbUser: FirebaseUser | null) => {
     if (!fbUser) {
@@ -183,7 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       createdAt: user?.createdAt || Date.now(),
     };
 
-    await setDoc(doc(db, "users", auth.currentUser.uid), updated, { merge: false });
+    await setDoc(doc(db, "users", auth.currentUser.uid), updated, { merge: true });
     setUser(updated);
     setNeedsOnboarding(false);
   }
@@ -210,8 +235,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function logout() {
     const auth = getFirebaseAuth();
     if (!auth) return;
-    await deleteCurrentSession();
-    await signOut(auth);
+
+    if (auth.currentUser) {
+      try {
+        await deleteCurrentSession();
+      } catch (err) {
+        console.error("[AuthContext] Session deletion error:", err);
+      }
+    }
+
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error("[AuthContext] Firebase signOut error:", err);
+    }
+
+    setUser(null);
+    setFirebaseUser(null);
+    setNeedsOnboarding(false);
   }
 
   return (

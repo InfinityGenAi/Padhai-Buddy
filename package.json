@@ -29,6 +29,7 @@
     "tsconfig-paths": "^4.2.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

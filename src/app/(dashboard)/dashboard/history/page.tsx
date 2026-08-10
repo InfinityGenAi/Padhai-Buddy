@@ -120,7 +120,7 @@ export default function HistoryPage() {
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="bg-card border border-border rounded-xl p-4 animate-pulse"
+              className="glass card-subtle rounded-xl p-4 animate-pulse"
             >
               <div className="h-4 bg-foreground/10 rounded w-3/4 mb-2"></div>
               <div className="h-3 bg-foreground/10 rounded w-1/2"></div>
@@ -150,7 +150,7 @@ export default function HistoryPage() {
         >
           <ClockIcon className="w-12 h-12 text-foreground/20 mx-auto mb-3" />
           <p className="text-foreground/60">
-            You haven{"'"}t solved any doubts yet. Start a chat or upload a photo
+            You haven&apos;t solved any doubts yet. Start a chat or upload a photo
             to begin!
           </p>
         </motion.div>
@@ -162,7 +162,7 @@ export default function HistoryPage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="bg-card border border-border rounded-xl overflow-hidden"
+              className="glass card-subtle rounded-xl overflow-hidden"
             >
               <div className="relative">
                 <div
@@ -201,8 +201,8 @@ export default function HistoryPage() {
                         </span>
                       </div>
                        <p className="text-sm text-foreground/80 truncate">
-                         {doubt.type === "photo" ? "Photo Doubt" : doubt.question}
-                       </p>
+                        {doubt.type === "photo" ? "Photo Doubt" : doubt.question}
+                      </p>
                     </div>
                     <div className="flex items-center gap-1">
                       <motion.button

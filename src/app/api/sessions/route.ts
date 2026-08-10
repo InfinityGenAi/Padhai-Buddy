@@ -95,6 +95,10 @@ export async function POST(req: NextRequest) {
       .doc(sessionId);
     const sessionSnap = await sessionRef.get();
 
+    const createdAt = sessionSnap.exists
+      ? sessionSnap.data()?.createdAt || Date.now()
+      : Date.now();
+
     const sessionData = {
       device: String(body.device || "Unknown Device"),
       browser: body.browser ? String(body.browser) : null,
@@ -102,10 +106,20 @@ export async function POST(req: NextRequest) {
       userAgent: String(body.userAgent || ""),
       lastActive: Date.now(),
       current: true,
-      createdAt: sessionSnap.exists ? sessionSnap.data()?.createdAt || Date.now() : Date.now(),
+      createdAt,
     };
 
     await sessionRef.set(sessionData, { merge: true });
+
+    const sessionsRef = adminDb
+      .collection("users")
+      .doc(uid)
+      .collection("sessions");
+    const allSnap = await sessionsRef.get();
+    const otherUpdates = allSnap.docs
+      .filter((d) => d.id !== sessionId && d.data().current === true)
+      .map((d) => d.ref.update({ current: false }));
+    await Promise.all(otherUpdates);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

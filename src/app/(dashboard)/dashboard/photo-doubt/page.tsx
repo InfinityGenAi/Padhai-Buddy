@@ -3,8 +3,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getFirebaseIdToken } from "@/lib/auth-utils";
-import { getFirestoreDb } from "@/lib/firebase";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   PhotoIcon,
@@ -101,16 +99,6 @@ export default function PhotoDoubtPage() {
       if (!res.ok) throw new Error(data.error || "Failed to get response");
 
       setAnswer(data.answer);
-
-      const db = getFirestoreDb();
-      if (db) {
-        await addDoc(collection(db, "users", user.uid, "doubts"), {
-          question: "Photo Doubt",
-          answer: data.answer,
-          type: "photo",
-          createdAt: serverTimestamp(),
-        });
-      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -234,7 +222,7 @@ export default function PhotoDoubtPage() {
             {!loading && (
               <motion.button
                 onClick={handleSubmit}
-                className="mt-4 w-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white py-3 rounded-xl font-medium hover:shadow-lg transition-shadow flex items-center justify-center gap-2"
+                className="mt-4 w-full btn-primary py-3 rounded-xl font-medium flex items-center justify-center gap-2"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
@@ -265,14 +253,14 @@ export default function PhotoDoubtPage() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="mt-4 bg-card border border-border rounded-xl p-6"
+            className="mt-4 glass card-subtle rounded-2xl p-6"
           >
             <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
               {answer}
             </div>
             <motion.button
               onClick={resetUpload}
-              className="mt-6 w-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white py-2 rounded-xl font-medium hover:shadow-lg transition-shadow"
+              className="mt-6 w-full btn-primary py-2 rounded-xl font-medium"
               whileHover={{ scale: 1.02 }}
             >
               Ask Another

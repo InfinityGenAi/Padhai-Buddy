@@ -26,14 +26,23 @@ export async function POST(req: NextRequest) {
 
     const uid = decoded.uid;
 
-    const sessionsRef = adminDb.collection("users").doc(uid).collection("sessions");
-    const q = sessionsRef.where("current", "==", false);
-    const snapshot = await q.get();
+    let sessionId: string | null = null;
+    try {
+      const body = await req.json();
+      sessionId = String(body.sessionId || "");
+    } catch {
+      // no body
+    }
 
-    const deletePromises = snapshot.docs.map((d) => d.ref.delete());
+    const sessionsRef = adminDb.collection("users").doc(uid).collection("sessions");
+    const snapshot = await sessionsRef.get();
+
+    const deletePromises = snapshot.docs
+      .filter((d) => d.id !== sessionId)
+      .map((d) => d.ref.delete());
     await Promise.all(deletePromises);
 
-    return NextResponse.json({ success: true, revoked: snapshot.docs.length });
+    return NextResponse.json({ success: true, revoked: deletePromises.length });
   } catch (error: unknown) {
     console.error("Bulk revoke error:", error);
     if (error instanceof Error) {

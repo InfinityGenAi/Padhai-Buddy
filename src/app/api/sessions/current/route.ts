@@ -25,14 +25,28 @@ export async function DELETE(req: NextRequest) {
     }
 
     const uid = decoded.uid;
-    const sessionsRef = adminDb.collection("users").doc(uid).collection("sessions");
-    const q = sessionsRef.where("current", "==", true);
-    const snapshot = await q.get();
 
-    const deletes = snapshot.docs.map((d) => d.ref.delete());
-    await Promise.all(deletes);
+    let sessionId: string | null = null;
+    try {
+      const body = await req.json();
+      sessionId = String(body.sessionId || "");
+    } catch {
+      // no body
+    }
 
-    return NextResponse.json({ success: true, deleted: snapshot.docs.length });
+    if (!sessionId) {
+      return NextResponse.json({ error: "sessionId is required" }, { status: 400 });
+    }
+
+    const sessionRef = adminDb
+      .collection("users")
+      .doc(uid)
+      .collection("sessions")
+      .doc(sessionId);
+
+    await sessionRef.delete();
+
+    return NextResponse.json({ success: true });
   } catch (error: unknown) {
     console.error("Delete current session error:", error);
     if (error instanceof Error) {

@@ -3,10 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
 import { useAuth } from "@/contexts/AuthContext";
-import { motion } from "framer-motion";
-import { playLogin } from "@/lib/sounds";
+import { motion, useReducedMotion } from "framer-motion";
+import { playSignup } from "@/lib/sounds";
 import {
   EyeIcon,
   EyeSlashIcon,
@@ -14,10 +13,7 @@ import {
   LockClosedIcon,
   EnvelopeIcon,
 } from "@heroicons/react/24/outline";
-
-const LazyBackground = dynamic(() => import("@/components/HandGestureBackground"), {
-  ssr: false,
-});
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 const GoogleIcon = () => (
   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -28,6 +24,23 @@ const GoogleIcon = () => (
   </svg>
 );
 
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08, delayChildren: 0.2 },
+  },
+};
+
+const staggerItem = {
+  hidden: { opacity: 0, y: 16 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.5 },
+  },
+};
+
 export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -35,8 +48,11 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { signUp, signInWithGoogle, firebaseUser, loading } = useAuth();
+  const { signUp, signInWithGoogle, firebaseUser, loading, preferences } = useAuth();
   const router = useRouter();
+
+  const reducedMotion = useReducedMotion();
+  const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
 
   useEffect(() => {
     if (!loading && firebaseUser) {
@@ -56,7 +72,7 @@ export default function SignupPage() {
 
     try {
       await signUp(name, email, password);
-      playLogin();
+      playSignup();
       router.replace("/onboarding");
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -74,7 +90,7 @@ export default function SignupPage() {
     setIsSubmitting(true);
     try {
       await signInWithGoogle();
-      playLogin();
+      playSignup();
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
@@ -86,22 +102,27 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      <div className="fixed inset-0 -z-10">
-        <LazyBackground />
-      </div>
+      <AnimatedBackground animate={animationsEnabled} />
       <div className="relative z-10 w-full max-w-md mx-auto p-6">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-card border border-border rounded-2xl p-8 shadow-lg"
+          variants={animationsEnabled ? staggerContainer : undefined}
+          initial={animationsEnabled ? "hidden" : false}
+          animate={animationsEnabled ? "visible" : false}
+          className="glass-strong card-subtle rounded-2xl p-8 shadow-xl"
         >
           <div className="text-center mb-6">
-            <h1 className="text-3xl font-bold text-primary mb-1">
+            <motion.h1
+              variants={animationsEnabled ? staggerItem : undefined}
+              className="text-3xl font-bold text-primary mb-1"
+            >
               Create Account
-            </h1>
-            <p className="text-sm text-foreground/60">
+            </motion.h1>
+            <motion.p
+              variants={animationsEnabled ? staggerItem : undefined}
+              className="text-sm text-foreground/60"
+            >
               Join Padhai Buddy and start solving doubts today
-            </p>
+            </motion.p>
           </div>
 
           {error && (
@@ -116,7 +137,9 @@ export default function SignupPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <>
-              <div>
+              <motion.div
+                variants={animationsEnabled ? staggerItem : undefined}
+              >
                 <label className="block text-sm font-medium mb-1.5">
                   Full Name
                 </label>
@@ -127,13 +150,15 @@ export default function SignupPage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Enter your name"
-                    className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    className="w-full pl-10 pr-4 py-2.5 input-field"
                     required
                   />
                 </div>
-              </div>
+              </motion.div>
 
-              <div>
+              <motion.div
+                variants={animationsEnabled ? staggerItem : undefined}
+              >
                 <label className="block text-sm font-medium mb-1.5">
                   Email
                 </label>
@@ -144,13 +169,15 @@ export default function SignupPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
-                    className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    className="w-full pl-10 pr-4 py-2.5 input-field"
                     required
                   />
                 </div>
-              </div>
+              </motion.div>
 
-              <div>
+              <motion.div
+                variants={animationsEnabled ? staggerItem : undefined}
+              >
                 <label className="block text-sm font-medium mb-1.5">
                   Password
                 </label>
@@ -160,15 +187,15 @@ export default function SignupPage() {
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="• • • • • •"
-                    className="w-full pl-10 pr-12 py-2.5 bg-background border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    placeholder="••••••••"
+                    className="w-full pl-10 pr-12 py-2.5 input-field"
                     required
                     minLength={6}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40 hover:text-foreground"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40 hover:text-foreground transition-colors"
                   >
                     {showPassword ? (
                       <EyeSlashIcon className="w-5 h-5" />
@@ -177,15 +204,18 @@ export default function SignupPage() {
                     )}
                   </button>
                 </div>
-              </div>
+              </motion.div>
 
-              <button
+              <motion.button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white py-2.5 rounded-xl font-medium hover:shadow-lg transition-shadow disabled:opacity-50"
+                className="w-full btn-primary py-2.5 rounded-xl font-medium"
+                whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
+                whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
+                variants={animationsEnabled ? staggerItem : undefined}
               >
                 {isSubmitting ? "Creating..." : "Create Account"}
-              </button>
+              </motion.button>
             </>
           </form>
 
@@ -195,16 +225,22 @@ export default function SignupPage() {
             <div className="flex-1 border-t border-border"></div>
           </div>
 
-            <button
+          <motion.button
             onClick={handleGoogle}
             disabled={isSubmitting}
-            className="w-full border border-border rounded-xl py-2.5 font-medium flex items-center justify-center gap-2 hover:bg-foreground/5 transition-colors disabled:opacity-50"
+            className="w-full glass card-subtle border border-border rounded-xl py-2.5 font-medium flex items-center justify-center gap-2 hover:bg-foreground/5 transition-colors disabled:opacity-50"
+            whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
+            whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
+            variants={animationsEnabled ? staggerItem : undefined}
           >
             <GoogleIcon />
             Sign up with Google
-          </button>
+          </motion.button>
 
-          <p className="text-center text-sm text-foreground/60 mt-6">
+          <motion.p
+            className="text-center text-sm text-foreground/60 mt-6"
+            variants={animationsEnabled ? staggerItem : undefined}
+          >
             Already have an account?{" "}
             <Link
               href="/login"
@@ -212,7 +248,7 @@ export default function SignupPage() {
             >
               Login
             </Link>
-          </p>
+          </motion.p>
         </motion.div>
       </div>
     </div>

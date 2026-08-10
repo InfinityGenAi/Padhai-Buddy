@@ -84,6 +84,33 @@ export async function registerSession(): Promise<void> {
   }
 }
 
+export async function heartbeatSession(): Promise<void> {
+  const auth = getFirebaseAuth();
+  const user = auth?.currentUser;
+  if (!user) return;
+
+  const sessionId = getOrCreateSessionId();
+  const device = detectDevice();
+
+  try {
+    const token = await user.getIdToken();
+    await fetch("/api/sessions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        sessionId,
+        device: device.device,
+        userAgent: device.userAgent,
+      }),
+    });
+  } catch {
+    // ignore heartbeat errors
+  }
+}
+
 export async function fetchSessions(): Promise<UserSession[]> {
   const auth = getFirebaseAuth();
   const user = auth?.currentUser;
@@ -110,7 +137,11 @@ export async function revokeSession(sessionId: string): Promise<void> {
   const token = await user.getIdToken();
   const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ sessionId: getOrCreateSessionId() }),
   });
 
   if (!res.ok) {
@@ -127,7 +158,11 @@ export async function revokeAllOtherSessions(): Promise<void> {
   const token = await user.getIdToken();
   const res = await fetch("/api/sessions/bulk-revoke", {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ sessionId: getOrCreateSessionId() }),
   });
 
   if (!res.ok) {
@@ -206,7 +241,11 @@ export async function deleteCurrentSession(): Promise<void> {
     const token = await user.getIdToken();
     await fetch("/api/sessions/current", {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ sessionId: getOrCreateSessionId() }),
     });
   } catch {
     // ignore cleanup errors

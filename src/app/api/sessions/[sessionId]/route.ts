@@ -30,6 +30,21 @@ export async function DELETE(
     const uid = decoded.uid;
     const { sessionId } = await context.params;
 
+    let requesterSessionId = "";
+    try {
+      const body = await req.json();
+      requesterSessionId = String(body.sessionId || "");
+    } catch {
+      // no body
+    }
+
+    if (sessionId === requesterSessionId) {
+      return NextResponse.json(
+        { error: "Cannot revoke the current device session" },
+        { status: 400 },
+      );
+    }
+
     const sessionRef = adminDb
       .collection("users")
       .doc(uid)
@@ -39,14 +54,6 @@ export async function DELETE(
 
     if (!sessionSnap.exists) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
-    }
-
-    const sessionData = sessionSnap.data();
-    if (sessionData?.current) {
-      return NextResponse.json(
-        { error: "Cannot revoke the current session" },
-        { status: 400 },
-      );
     }
 
     await sessionRef.delete();
