@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -15,9 +17,29 @@ import {
 import AnimatedBackground from "@/components/AnimatedBackground";
 
 export default function Home() {
-  const { preferences } = useAuth();
+  const { firebaseUser, loading, preferences } = useAuth();
+  const router = useRouter();
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
+
+  useEffect(() => {
+    if (!loading && firebaseUser) {
+      router.replace("/dashboard");
+    }
+  }, [firebaseUser, loading, router]);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center gap-3 bg-background">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <span className="text-sm text-foreground/60">Loading…</span>
+      </div>
+    );
+  }
+
+  if (firebaseUser) {
+    return null;
+  }
 
   const staggerContainer = {
     hidden: { opacity: 0 },

@@ -9,45 +9,34 @@ import {
   PhotoIcon,
   ClockIcon,
   LightBulbIcon,
-  QuestionMarkCircleIcon,
   PlusIcon,
   CalendarIcon,
 } from "@heroicons/react/24/outline";
 import { getFirestoreDb } from "@/lib/firebase";
-import { collection, getDocs, addDoc, updateDoc, doc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, getDocs, addDoc, updateDoc, doc, onSnapshot, query, orderBy, deleteDoc } from "firebase/firestore";
 import type { Doubt, StudyPlan } from "@/types";
 
-function StudyTimeIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  );
-}
+function buildSafeChartPath(dailyCounts: number[]): { pathD: string; areaD: string; points: { x: number; y: number; val: number }[] } {
+  const points = dailyCounts.map((val, idx) => ({
+    x: (idx / 6) * 100,
+    y: val > 0 ? 100 - (val / Math.max(...dailyCounts, 1)) * 80 - 10 : 50,
+    val,
+  }));
 
-function AccuracyIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-      <polyline points="22 4 12 14.01 9 11.01" />
-    </svg>
-  );
-}
-
-function FlameIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2.4 4.9 4 6.5 2 2 2.5 3.5 2.5 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
-    </svg>
-  );
-}
-
-function buildSmoothPath(points: { x: number; y: number }[]): string {
-  if (points.length === 0) return "";
-  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+  if (points.length === 0 || dailyCounts.every((v) => v === 0)) {
+    return { pathD: "", areaD: "", points: [] };
+  }
 
   let d = `M ${points[0].x} ${points[0].y}`;
+
+  if (points.length === 1) {
+    d += ` L ${points[0].x + 5} ${points[0].y}`;
+    return {
+      pathD: d,
+      areaD: `${d} L ${points[0].x + 5} 100 L ${points[0].x} 100 Z`,
+      points,
+    };
+  }
 
   for (let i = 0; i < points.length - 1; i++) {
     const p0 = points[Math.max(0, i - 1)];
@@ -63,7 +52,75 @@ function buildSmoothPath(points: { x: number; y: number }[]): string {
     d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
   }
 
-  return d;
+  return {
+    pathD: d,
+    areaD: `${d} L 100 100 L 0 100 Z`,
+    points,
+  };
+}
+
+async function handleTogglePlan(uid: string | undefined, plan: StudyPlan) {
+  const db = getFirestoreDb();
+  if (!db || !uid) return;
+  await updateDoc(doc(db, "users", uid, "studyPlans", plan.id), {
+    completed: !plan.completed,
+    updatedAt: Date.now(),
+  });
+}
+
+async function handleDeletePlan(
+  uid: string | undefined,
+  planId: string,
+  setDeletingPlanId: (id: string | null) => void,
+) {
+  const db = getFirestoreDb();
+  if (!db || !uid) return;
+  setDeletingPlanId(planId);
+  try {
+    await deleteDoc(doc(db, "users", uid, "studyPlans", planId));
+  } catch {
+    alert("Failed to delete task. Please try again.");
+  } finally {
+    setDeletingPlanId(null);
+  }
+}
+
+async function handleAddPlan(
+  uid: string | undefined,
+  newPlanTitle: string,
+  newPlanSubject: string,
+  newPlanDuration: number,
+  today: string,
+  setNewPlanTitle: (v: string) => void,
+  setNewPlanSubject: (v: string) => void,
+  setNewPlanDuration: (v: number) => void,
+  setShowAddPlan: (v: boolean) => void,
+  setAddingPlan: (v: boolean) => void,
+) {
+  if (!newPlanTitle.trim() || !uid) return;
+  const db = getFirestoreDb();
+  if (!db) return;
+
+  setAddingPlan(true);
+  try {
+    await addDoc(collection(db, "users", uid, "studyPlans"), {
+      title: newPlanTitle.trim(),
+      subject: newPlanSubject.trim() || "General",
+      durationMinutes: newPlanDuration,
+      plannedDate: today,
+      completed: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    setNewPlanTitle("");
+    setNewPlanSubject("");
+    setNewPlanDuration(30);
+    setShowAddPlan(false);
+  } catch {
+    alert("Failed to add task. Please try again.");
+  } finally {
+    setAddingPlan(false);
+  }
 }
 
 export default function DashboardPage() {
@@ -85,6 +142,7 @@ export default function DashboardPage() {
   const [newPlanSubject, setNewPlanSubject] = useState("");
   const [newPlanDuration, setNewPlanDuration] = useState(30);
   const [addingPlan, setAddingPlan] = useState(false);
+  const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
 
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
@@ -178,43 +236,6 @@ export default function DashboardPage() {
   const completedToday = todayPlans.filter((p) => p.completed).length;
   const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / todayPlans.length) * 100) : 0;
 
-  const handleTogglePlan = async (plan: StudyPlan) => {
-    const db = getFirestoreDb();
-    if (!db || !user?.uid) return;
-    await updateDoc(doc(db, "users", user.uid, "studyPlans", plan.id), {
-      completed: !plan.completed,
-      updatedAt: Date.now(),
-    });
-  };
-
-  const handleAddPlan = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPlanTitle.trim() || !user?.uid) return;
-    const db = getFirestoreDb();
-    if (!db) return;
-
-    setAddingPlan(true);
-    try {
-      await addDoc(collection(db, "users", user.uid, "studyPlans"), {
-        title: newPlanTitle.trim(),
-        subject: newPlanSubject.trim() || "General",
-        durationMinutes: newPlanDuration,
-        plannedDate: today,
-        completed: false,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      });
-      setNewPlanTitle("");
-      setNewPlanSubject("");
-      setNewPlanDuration(30);
-      setShowAddPlan(false);
-    } catch {
-      alert("Failed to add task. Please try again.");
-    } finally {
-      setAddingPlan(false);
-    }
-  };
-
   useEffect(() => {
     if (pathRef.current) {
       const length = pathRef.current.getTotalLength();
@@ -222,54 +243,40 @@ export default function DashboardPage() {
     }
   }, [weeklyChartData]);
 
+  const { pathD, areaD, points: chartPoints } = buildSafeChartPath(weeklyChartData);
+  const hasChartData = weeklyChartData.some((v) => v > 0);
+  const avgPerDay = weeklyDoubts > 0 ? (weeklyDoubts / 7).toFixed(1) : "0";
+
   const displayName = user?.name || "there";
   const firstName = displayName.split(" ")[0] || displayName;
 
   const stats = [
     {
-      label: "Study Time",
-      value: "\u2014",
-      sublabel: "Today",
-      change: null,
-      icon: StudyTimeIcon,
-      colorClass: "text-accent-blue",
-      bgClass: "bg-accent-blue/10",
-    },
-    {
       label: "Doubts Solved",
-      value: loading ? "\u2026" : String(totalDoubts),
-      sublabel: "Today",
-      change: "+" + Math.min(totalDoubts, 99) + "%",
+      value: loading ? "…" : String(totalDoubts),
+      sublabel: "All Time",
+      change: null,
       icon: ChatBubbleLeftEllipsisIcon,
       colorClass: "text-accent-purple",
       bgClass: "bg-purple-500/10",
     },
     {
-      label: "Questions Asked",
-      value: loading ? "\u2026" : String(weeklyDoubts),
-      sublabel: "Today",
-      change: "+" + Math.min(weeklyDoubts, 99) + "%",
-      icon: QuestionMarkCircleIcon,
+      label: "This Week",
+      value: loading ? "…" : String(weeklyDoubts),
+      sublabel: "Doubts",
+      change: null,
+      icon: ClockIcon,
       colorClass: "text-accent-green",
       bgClass: "bg-accent-green/10",
     },
     {
-      label: "Accuracy",
-      value: "\u2014",
+      label: "Average / Day",
+      value: loading ? "…" : avgPerDay,
       sublabel: "This Week",
       change: null,
-      icon: AccuracyIcon,
-      colorClass: "text-accent-orange",
-      bgClass: "bg-accent-orange/10",
-    },
-    {
-      label: "Streak",
-      value: "\u2014",
-      sublabel: "Days",
-      change: null,
-      icon: FlameIcon,
-      colorClass: "text-accent-pink",
-      bgClass: "bg-accent-pink/10",
+      icon: LightBulbIcon,
+      colorClass: "text-accent-blue",
+      bgClass: "bg-accent-blue/10",
     },
   ];
 
@@ -318,36 +325,6 @@ export default function DashboardPage() {
     );
   };
 
-  const maxChartValue = Math.max(...weeklyChartData, 1);
-  const chartPoints = weeklyChartData.map((val, _idx) => ({
-    x: (_idx / 6) * 100,
-    y: 100 - (val / maxChartValue) * 80 - 10,
-    val,
-  }));
-
-  const chartPathD = buildSmoothPath(chartPoints);
-  const chartAreaD = chartPathD + ` L 100 100 L 0 100 Z`;
-
-  const subjectProgress = [
-    { name: "Mathematics", percent: 90 },
-    { name: "Physics", percent: 80 },
-    { name: "Chemistry", percent: 75 },
-    { name: "English", percent: 85 },
-    { name: "Computer Science", percent: 88 },
-  ];
-
-  const overallPercent = Math.round(subjectProgress.reduce((sum, s) => sum + s.percent, 0) / subjectProgress.length);
-
-  const subjectColorMap: Record<string, { dot: string; bar: string }> = {
-    Mathematics: { dot: "bg-purple-500", bar: "subject-bar-math" },
-    Physics: { dot: "bg-blue-500", bar: "subject-bar-physics" },
-    Chemistry: { dot: "bg-green-500", bar: "subject-bar-chemistry" },
-    English: { dot: "bg-orange-500", bar: "subject-bar-english" },
-    "Computer Science": { dot: "bg-indigo-500", bar: "subject-bar-cs" },
-  };
-
-  const defaultSubjectColor = { dot: "bg-gray-400", bar: "bg-gray-400" };
-
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
     if (!svgRef.current || chartPoints.length === 0) return;
     const rect = svgRef.current.getBoundingClientRect();
@@ -362,8 +339,6 @@ export default function DashboardPage() {
       setHoveredPoint(null);
     }
   };
-
-  const avgPerDay = weeklyDoubts > 0 ? (weeklyDoubts / 7).toFixed(1) : "0";
 
   return (
     <motion.div
@@ -393,7 +368,7 @@ export default function DashboardPage() {
 
       {/* Stats Cards */}
       <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {stats.map((stat) => (
             <div
               key={stat.label}
@@ -452,7 +427,7 @@ export default function DashboardPage() {
                       }`}
                     >
                       <button
-                        onClick={() => handleTogglePlan(item)}
+                        onClick={() => handleTogglePlan(user?.uid, item)}
                         className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
                           item.completed
                             ? "bg-primary border-primary"
@@ -471,6 +446,17 @@ export default function DashboardPage() {
                         </p>
                       </div>
                       <span className="text-xs text-foreground/40 flex-shrink-0">{item.durationMinutes} min</span>
+                      <button
+                        onClick={() => handleDeletePlan(user?.uid, item.id, setDeletingPlanId)}
+                        disabled={deletingPlanId === item.id}
+                        className="p-1 rounded-md text-foreground/30 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors disabled:opacity-50"
+                        title="Delete task"
+                      >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -528,7 +514,7 @@ export default function DashboardPage() {
 
             {/* Chart */}
             <div className="relative w-full" style={{ height: "220px" }} ref={containerRef}>
-              {weeklyChartData.some((v) => v > 0) ? (
+              {hasChartData && pathD ? (
                 <>
                   {hoveredPoint !== null && chartPoints[hoveredPoint] && (
                     <div
@@ -567,11 +553,11 @@ export default function DashboardPage() {
                       />
                     ))}
                     {/* Area fill */}
-                    <path d={chartAreaD} fill="url(#chartGradient)" className="chart-area-fill" />
+                    <path d={areaD} fill="url(#chartGradient)" className="chart-area-fill" />
                     {/* Line */}
                     <path
                       ref={pathRef}
-                      d={chartPathD}
+                      d={pathD}
                       fill="none"
                       stroke="var(--primary)"
                       strokeWidth="2"
@@ -605,74 +591,14 @@ export default function DashboardPage() {
                   <div className="w-12 h-12 rounded-full bg-foreground/5 flex items-center justify-center mb-3">
                     <ClockIcon className="w-6 h-6 text-foreground/25" />
                   </div>
-                  <p className="text-sm text-foreground/50 mb-1">No activity this week</p>
-                  <p className="text-xs text-foreground/35">Your chart will appear once you start solving doubts.</p>
+                  <p className="text-sm text-foreground/50 mb-1">No study activity this week</p>
+                  <p className="text-xs text-foreground/35">Start with your first doubt or study session.</p>
                 </div>
               )}
             </div>
           </div>
         </motion.div>
       </div>
-
-      {/* Subjects Progress */}
-      <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
-        <div className="subtle-card rounded-2xl p-5 sm:p-6">
-          <h2 className="text-base font-semibold text-foreground/75 mb-5">Subjects Progress</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 items-center">
-            {/* Donut */}
-            <div className="flex flex-col items-center justify-center">
-              <div className="relative w-36 h-36 sm:w-44 sm:h-44">
-                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                  <defs>
-                    <linearGradient id="donutGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#8b5cf6" />
-                      <stop offset="50%" stopColor="#ec4899" />
-                      <stop offset="100%" stopColor="#10b981" />
-                    </linearGradient>
-                  </defs>
-                  <circle cx="50" cy="50" r="40" fill="none" className="donut-bg" strokeWidth="8" />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="none"
-                    stroke="url(#donutGradient)"
-                    strokeWidth="8"
-                    strokeLinecap="round"
-                    strokeDasharray={`${2 * Math.PI * 40}`}
-                    strokeDashoffset={`${2 * Math.PI * 40 * (1 - overallPercent / 100)}`}
-                  />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">{overallPercent}%</span>
-                  <span className="text-[11px] sm:text-xs text-foreground/50 font-medium mt-0.5">Overall</span>
-                </div>
-              </div>
-            </div>
-            {/* Subject rows */}
-            <div className="space-y-2.5">
-              {subjectProgress.map((subject) => {
-                const colors = subjectColorMap[subject.name] || defaultSubjectColor;
-                return (
-                  <div key={subject.name} className="subject-row flex items-center gap-3 p-2 rounded-xl">
-                    <div className="w-5 h-5 rounded-full bg-foreground/5 flex items-center justify-center flex-shrink-0">
-                      <span className={`w-2.5 h-2.5 rounded-full ${colors.dot}`} />
-                    </div>
-                    <span className="text-sm text-foreground/70 w-28 sm:w-36 flex-shrink-0 truncate">{subject.name}</span>
-                    <div className="flex-1 h-1.5 bg-foreground/5 rounded-full overflow-hidden">
-                      <div
-                        className={`subject-bar h-full rounded-full ${colors.bar}`}
-                        style={{ width: `${subject.percent}%` }}
-                      />
-                    </div>
-                    <span className="text-xs font-medium text-foreground/60 w-8 text-right">{subject.percent}%</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </motion.div>
 
       {/* Study Insight */}
       <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
@@ -788,7 +714,7 @@ export default function DashboardPage() {
               className="subtle-card rounded-2xl p-6 max-w-sm w-full shadow-2xl"
             >
               <h3 className="text-lg font-semibold mb-4">Add Study Task</h3>
-              <form onSubmit={handleAddPlan} className="space-y-3">
+              <form onSubmit={() => handleAddPlan(user?.uid, newPlanTitle, newPlanSubject, newPlanDuration, today, setNewPlanTitle, setNewPlanSubject, setNewPlanDuration, setShowAddPlan, setAddingPlan)} className="space-y-3">
                 <div>
                   <label className="text-xs text-foreground/60 mb-1 block">Subject</label>
                   <input

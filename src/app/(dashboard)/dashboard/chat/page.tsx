@@ -383,8 +383,6 @@ export default function ChatPage() {
       const aiMsgRef = doc(messagesCol);
       const convRef = doc(db, "users", user.uid, "conversations", conversationId!);
 
-      console.log("[CHAT] conversation reference created");
-
       const batch = writeBatch(db);
 
       if (!activeConversationId) {
@@ -404,9 +402,6 @@ export default function ChatPage() {
       });
 
       await batch.commit();
-      console.log("[CHAT] user message saved");
-      console.log("[CHAT] assistant message saved");
-      console.log("[CHAT] sending response to client");
       setActiveConversationId(conversationId!);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));

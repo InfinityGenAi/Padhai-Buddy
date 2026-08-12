@@ -32,7 +32,7 @@ const mainNavItems = [
   { name: "Notes", href: "#", icon: DocumentTextIcon, available: false },
   { name: "Study Planner", href: "#", icon: CalendarIcon, available: false },
   { name: "Study Timer", href: "#", icon: ClockIcon, available: false },
-  { name: "Progress", href: "/dashboard/history", icon: ChartBarIcon, available: true },
+  { name: "Progress", href: "#", icon: ChartBarIcon, available: false },
   { name: "History", href: "/dashboard/history", icon: ClockIcon, available: true },
   { name: "Resources", href: "#", icon: SpeakerWaveIcon, available: false },
   { name: "Leaderboard", href: "#", icon: TrophyIcon, available: false },

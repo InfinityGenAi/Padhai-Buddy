@@ -54,14 +54,24 @@ export default function LoginPage() {
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
 
   useEffect(() => {
-    if (!loading && firebaseUser) {
-      if (user && user.class && user.board) {
-        router.replace("/dashboard");
-      } else {
-        router.replace("/onboarding");
-      }
+    if (!firebaseUser) {
+      return;
     }
-  }, [firebaseUser, user, loading, router]);
+    if (user && user.class && user.board) {
+      router.replace("/dashboard");
+    } else {
+      router.replace("/onboarding");
+    }
+  }, [firebaseUser, user, router]);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center gap-3 bg-background">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <span className="text-sm text-foreground/60">Loading…</span>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,5 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
+import { Firestore } from "firebase-admin/firestore";
+
+async function deleteCollection(db: Firestore, path: string): Promise<void> {
+  const collectionRef = db.collection(path);
+  const snapshot = await collectionRef.get();
+  const deletes = snapshot.docs.map((d) => d.ref.delete());
+  await Promise.all(deletes);
+}
+
+async function deleteNestedCollection(db: Firestore, parentPath: string, nestedCol: string): Promise<void> {
+  const parentCol = db.collection(parentPath);
+  const snapshot = await parentCol.get();
+
+  const nestedDeletes = snapshot.docs.map(async (d) => {
+    const nestedRef = d.ref.collection(nestedCol);
+    const nestedSnap = await nestedRef.get();
+    const msgDeletes = nestedSnap.docs.map((m) => m.ref.delete());
+    await Promise.all(msgDeletes);
+    return d.ref.delete();
+  });
+
+  await Promise.all(nestedDeletes);
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,31 +50,26 @@ export async function POST(req: NextRequest) {
     const uid = decoded.uid;
 
     try {
-      await adminAuth.deleteUser(uid);
+      await deleteCollection(adminDb, `users/${uid}/studyPlans`);
+      await deleteCollection(adminDb, `users/${uid}/doubts`);
+      await deleteCollection(adminDb, `users/${uid}/sessions`);
+      await deleteNestedCollection(adminDb, `users/${uid}/conversations`, "messages");
+      await deleteCollection(adminDb, `users/${uid}/conversations`);
+      await adminDb.collection("users").doc(uid).delete();
     } catch (err) {
-      console.error("Admin delete user error:", err);
+      console.error("Firestore cleanup error:", err);
       return NextResponse.json(
-        { error: "Failed to delete user account" },
+        { error: "Failed to cleanup user data" },
         { status: 500 },
       );
     }
 
     try {
-      const userRef = adminDb.collection("users").doc(uid);
-      const subcollections = ["conversations", "doubts", "sessions"];
-
-      for (const subcol of subcollections) {
-        const colRef = userRef.collection(subcol);
-        const snap = await colRef.get();
-        const deletes = snap.docs.map((d) => d.ref.delete());
-        await Promise.all(deletes);
-      }
-
-      await userRef.delete();
+      await adminAuth.deleteUser(uid);
     } catch (err) {
-      console.error("Firestore cleanup error:", err);
+      console.error("Admin delete user error:", err);
       return NextResponse.json(
-        { error: "Failed to cleanup user data" },
+        { error: "Failed to delete user account" },
         { status: 500 },
       );
     }

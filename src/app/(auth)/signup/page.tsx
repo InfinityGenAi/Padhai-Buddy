@@ -55,10 +55,19 @@ export default function SignupPage() {
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
 
   useEffect(() => {
-    if (!loading && firebaseUser) {
+    if (firebaseUser) {
       router.replace("/onboarding");
     }
-  }, [firebaseUser, loading, router]);
+  }, [firebaseUser, router]);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center gap-3 bg-background">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <span className="text-sm text-foreground/60">Loading…</span>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

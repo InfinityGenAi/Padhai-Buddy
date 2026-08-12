@@ -143,6 +143,7 @@ export async function POST(req: NextRequest) {
       completion.choices[0]?.message?.content ||
       "I couldn't analyze the image at this time. Please try again.";
 
+    let saveError: string | null = null;
     try {
       if (!adminDb) throw new Error("Firestore admin is not initialized");
       await adminDb
@@ -157,6 +158,14 @@ export async function POST(req: NextRequest) {
         });
     } catch (dbError) {
       console.error("Failed to save photo doubt:", dbError);
+      saveError = dbError instanceof Error ? dbError.message : "Failed to save photo doubt";
+    }
+
+    if (saveError) {
+      return NextResponse.json(
+        { error: "Answer generated, but doubt could not be saved. Please try again.", _dev: process.env.NODE_ENV === "development" ? saveError : undefined },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({

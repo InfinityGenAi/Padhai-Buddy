@@ -10,9 +10,7 @@ import {
   onSnapshot,
   deleteDoc,
   doc,
-  getDoc,
-  DocumentData,
-  QueryDocumentSnapshot,
+  getDocs,
 } from "firebase/firestore";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -33,6 +31,8 @@ export default function HistoryPage() {
   const [menuDoubtId, setMenuDoubtId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -46,14 +46,14 @@ export default function HistoryPage() {
 
     const unsub = onSnapshot(q, (snapshot) => {
       const items: Doubt[] = [];
-      snapshot.forEach((doc: QueryDocumentSnapshot<DocumentData>) => {
+      snapshot.forEach((doc) => {
         const data = doc.data();
         items.push({
           id: doc.id,
           question: data.question,
           answer: data.answer,
           type: data.type,
-          createdAt: data.createdAt?.toDate?.()?.getTime() || data.createdAt,
+          createdAt: data.createdAt?.toDate?.()?.getTime?.() || data.createdAt,
         });
       });
       setDoubts(items);
@@ -96,10 +96,6 @@ export default function HistoryPage() {
     if (!db || !user?.uid) throw new Error("Missing database or user");
     const ref = doc(db, "users", user.uid, "doubts", doubtId);
     await deleteDoc(ref);
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      throw new Error("Document still exists after delete");
-    }
   };
 
   const optimisticallyDeleteDoubt = async (doubtId: string) => {
@@ -116,6 +112,29 @@ export default function HistoryPage() {
       alert(err instanceof Error ? err.message : "Failed to delete history entry. Please try again.");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const deleteAllHistory = async () => {
+    const db = getFirestoreDb();
+    if (!db || !user?.uid) return;
+
+    setDeletingAll(true);
+    try {
+      const q = query(
+        collection(db, "users", user.uid, "doubts"),
+        orderBy("createdAt", "desc"),
+      );
+      const snapshot = await getDocs(q);
+      const deletePromises = snapshot.docs.map((d) => deleteDoc(d.ref));
+      await Promise.all(deletePromises);
+      setDoubts([]);
+      setDeleteAllOpen(false);
+    } catch (err) {
+      console.error("Failed to delete all history:", err);
+      alert(err instanceof Error ? err.message : "Failed to clear history. Please try again.");
+    } finally {
+      setDeletingAll(false);
     }
   };
 
@@ -146,10 +165,20 @@ export default function HistoryPage() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-4 flex items-center gap-2"
+        className="mb-4 flex items-center justify-between"
       >
-        <ClockIcon className="w-6 h-6 text-primary" />
-        <h1 className="text-xl font-semibold">Doubt History</h1>
+        <div className="flex items-center gap-2">
+          <ClockIcon className="w-6 h-6 text-primary" />
+          <h1 className="text-xl font-semibold">Doubt History</h1>
+        </div>
+        {doubts.length > 0 && (
+          <button
+            onClick={() => setDeleteAllOpen(true)}
+            className="text-xs font-medium text-red-500 hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+          >
+            Delete All
+          </button>
+        )}
       </motion.div>
 
       {doubts.length === 0 ? (
@@ -269,7 +298,7 @@ export default function HistoryPage() {
         </AnimatePresence>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Single Confirmation Modal */}
       <AnimatePresence>
         {deleteConfirmId && (
           <motion.div
@@ -307,6 +336,48 @@ export default function HistoryPage() {
                   className="px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:shadow-lg transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {deletingId === deleteConfirmId ? "Deleting..." : "Delete"}
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete All Confirmation Modal */}
+      <AnimatePresence>
+        {deleteAllOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full shadow-2xl"
+            >
+              <h3 className="text-lg font-semibold mb-2">Delete All History</h3>
+              <p className="text-sm text-foreground/70 mb-4">
+                This will permanently delete all your doubt history. This action cannot be undone.
+              </p>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setDeleteAllOpen(false)}
+                  disabled={deletingAll}
+                  className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-foreground/5 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <motion.button
+                  whileHover={{ scale: deletingAll ? 1 : 1.05 }}
+                  whileTap={{ scale: deletingAll ? 1 : 0.95 }}
+                  onClick={deleteAllHistory}
+                  disabled={deletingAll}
+                  className="px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:shadow-lg transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {deletingAll ? "Deleting..." : "Delete All"}
                 </motion.button>
               </div>
             </motion.div>

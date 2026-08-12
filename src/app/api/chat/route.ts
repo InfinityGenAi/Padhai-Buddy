@@ -4,8 +4,6 @@ import { getGroqClient, GROQ_TEXT_MODEL, buildSystemPrompt } from "@/lib/groq";
 
 export async function POST(req: NextRequest) {
   try {
-    console.log("[CHAT] request received");
-
     if (!adminAuth || initializationError) {
       console.error("[CHAT] Firebase Admin not initialized:", initializationError);
       return NextResponse.json(
@@ -18,16 +16,13 @@ export async function POST(req: NextRequest) {
     const token = authHeader.replace("Bearer ", "");
 
     if (!token) {
-      console.warn("[CHAT] missing authorization token");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     let decoded;
     try {
       decoded = await adminAuth.verifyIdToken(token);
-      console.log("[CHAT] auth verified uid:", decoded.uid);
-    } catch (authError) {
-      console.error("[CHAT] token verification failed:", authError);
+    } catch {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
 
@@ -83,7 +78,6 @@ export async function POST(req: NextRequest) {
       language: language !== undefined ? String(language) : undefined,
     });
 
-    console.log("[CHAT] sending request to Groq model:", GROQ_TEXT_MODEL);
     let completion;
     try {
       completion = await getGroqClient().chat.completions.create({
@@ -96,27 +90,18 @@ export async function POST(req: NextRequest) {
         max_tokens: 2048,
       });
     } catch (groqError) {
-      console.error("[CHAT] Groq request failed:", groqError);
-      const status = groqError instanceof Error && groqError.message.includes("401")
-        ? 502
-        : 502;
       return NextResponse.json(
         {
           error: "AI service temporarily unavailable. Please try again in a moment.",
           _dev: process.env.NODE_ENV === "development" ? (groqError instanceof Error ? groqError.message : String(groqError)) : undefined,
         },
-        { status },
+        { status: 502 },
       );
     }
-
-    console.log("[CHAT] Groq response received");
 
     const answer =
       completion.choices[0]?.message?.content ||
       "I couldn't generate an answer at this time. Please try again.";
-
-    console.log("[CHAT] response content extracted length:", answer.length);
-    console.log("[CHAT] sending response to client");
 
     return NextResponse.json({
       answer,
