@@ -13,7 +13,7 @@ export function getGroqClient(): Groq {
   return client;
 }
 
-export const GROQ_TEXT_MODEL = "openai/gpt-oss-120b";
+export const GROQ_TEXT_MODEL = "llama-3.3-70b-versatile";
 export const GROQ_VISION_MODEL = "qwen/qwen3.6-27b";
 
 export function buildSystemPrompt(

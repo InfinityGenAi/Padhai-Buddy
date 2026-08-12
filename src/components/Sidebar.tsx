@@ -9,22 +9,39 @@ import {
   HomeIcon,
   Cog6ToothIcon,
   ArrowLeftOnRectangleIcon,
+  BookOpenIcon,
+  SparklesIcon,
+  DocumentTextIcon,
+  CalendarIcon,
+  ChartBarIcon,
+  SpeakerWaveIcon,
+  TrophyIcon,
+  Squares2X2Icon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettingsModal } from "@/contexts/SettingsModalContext";
 import { motion, useReducedMotion } from "framer-motion";
 import { playLogout, playSettings } from "@/lib/sounds";
 
-const navItems = [
-  { name: "Dashboard", href: "/dashboard", icon: HomeIcon },
-  { name: "Chat Doubt", href: "/dashboard/chat", icon: ChatBubbleLeftEllipsisIcon },
-  { name: "Photo Doubt", href: "/dashboard/photo-doubt", icon: PhotoIcon },
-  { name: "History", href: "/dashboard/history", icon: ClockIcon },
+const mainNavItems = [
+  { name: "Dashboard", href: "/dashboard", icon: HomeIcon, available: true },
+  { name: "Chat Doubt", href: "/dashboard/chat", icon: ChatBubbleLeftEllipsisIcon, available: true },
+  { name: "Photo Doubt", href: "/dashboard/photo-doubt", icon: PhotoIcon, available: true },
+  { name: "Quick Quiz", href: "#", icon: BookOpenIcon, available: false },
+  { name: "Flashcards", href: "#", icon: SparklesIcon, available: false },
+  { name: "Notes", href: "#", icon: DocumentTextIcon, available: false },
+  { name: "Study Planner", href: "#", icon: CalendarIcon, available: false },
+  { name: "Study Timer", href: "#", icon: ClockIcon, available: false },
+  { name: "Progress", href: "/dashboard/history", icon: ChartBarIcon, available: true },
+  { name: "History", href: "/dashboard/history", icon: ClockIcon, available: true },
+  { name: "Resources", href: "#", icon: SpeakerWaveIcon, available: false },
+  { name: "Leaderboard", href: "#", icon: TrophyIcon, available: false },
+  { name: "More", href: "#", icon: Squares2X2Icon, available: false },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { user, logout, preferences } = useAuth();
+  const { logout, preferences } = useAuth();
   const { open } = useSettingsModal();
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
@@ -34,69 +51,64 @@ export default function Sidebar() {
       <div className="flex flex-col h-full">
         {/* Logo */}
         <div className="flex items-center gap-3 px-6 pt-6 pb-5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-md">
-            <SparklesIcon className="w-5 h-5 text-white" />
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-md flex-shrink-0">
+            <LogoIcon className="w-5 h-5 text-white" />
           </div>
           <h2 className="text-lg font-bold text-primary tracking-tight">Padhai Buddy</h2>
         </div>
 
-        {/* User mini profile */}
-        {user && (
-          <div className="px-4 pb-4">
-            <div className="glass rounded-xl p-3 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
-                {user.name?.charAt(0).toUpperCase() || "U"}
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">
-                  {user.name || "Student"}
-                </p>
-                <p className="text-xs text-foreground/50 truncate">
-                  Class {user.class} — {user.board}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <nav className="flex-1 px-2 space-y-1">
-          {navItems.map((item) => {
+        <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
+          {mainNavItems.map((item) => {
             const isActive = pathname === item.href;
+
             return (
-              <Link key={item.name} href={item.href}>
-                <motion.div
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all relative ${
-                    isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
-                  }`}
-                  whileHover={animationsEnabled ? { x: isActive ? 0 : 3 } : undefined}
-                >
-                  <item.icon className="w-5 h-5 flex-shrink-0" />
-                  <span className="truncate">{item.name}</span>
-                  {isActive && (
+              <div key={item.name} className="relative">
+                {item.available ? (
+                  <Link href={item.href}>
                     <motion.div
-                      layoutId="sidebar-indicator"
-                      className="ml-auto w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(124,58,237,0.5)]"
-                    />
-                  )}
-                </motion.div>
-              </Link>
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all relative focus-ring ${
+                        isActive
+                          ? "bg-primary/10 text-primary"
+                          : "text-foreground/65 hover:bg-foreground-subtle-hover hover:text-foreground"
+                      }`}
+                      whileHover={animationsEnabled ? { x: isActive ? 0 : 2 } : undefined}
+                    >
+                      <item.icon className="w-[18px] h-[18px] flex-shrink-0" />
+                      <span className="truncate">{item.name}</span>
+                      {isActive && (
+                        <motion.div
+                          layoutId="sidebar-indicator"
+                          className="ml-auto w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_6px_rgba(124,58,237,0.45)]"
+                        />
+                      )}
+                    </motion.div>
+                  </Link>
+                ) : (
+                  <div
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-foreground/40 cursor-default"
+                    title="Coming soon"
+                  >
+                    <item.icon className="w-[18px] h-[18px] flex-shrink-0 opacity-60" />
+                    <span className="truncate flex-1">{item.name}</span>
+                    <span className="coming-soon-badge flex-shrink-0">Soon</span>
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>
 
-        <div className="border-t border-border/60 pt-3 pb-4 px-2 space-y-1">
+        <div className="border-t border-border/50 pt-3 pb-4 px-3 space-y-0.5 mt-auto">
           <motion.button
             onClick={() => {
               playSettings();
               open();
             }}
-            whileHover={animationsEnabled ? { x: 3 } : undefined}
+            whileHover={animationsEnabled ? { x: 2 } : undefined}
             whileTap={animationsEnabled ? { scale: 0.97 } : undefined}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-foreground/70 hover:bg-foreground/5 hover:text-foreground transition-all w-full"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-foreground/65 hover:bg-foreground-subtle-hover hover:text-foreground transition-all w-full focus-ring"
           >
-            <Cog6ToothIcon className="w-5 h-5 flex-shrink-0" />
+            <Cog6ToothIcon className="w-[18px] h-[18px] flex-shrink-0" />
             <span>Settings</span>
           </motion.button>
           <motion.button
@@ -104,11 +116,11 @@ export default function Sidebar() {
               playLogout();
               logout();
             }}
-            whileHover={animationsEnabled ? { x: 3 } : undefined}
+            whileHover={animationsEnabled ? { x: 2 } : undefined}
             whileTap={animationsEnabled ? { scale: 0.97 } : undefined}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-foreground/70 hover:bg-foreground/5 hover:text-foreground transition-all w-full"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-foreground/65 hover:bg-foreground-subtle-hover hover:text-foreground transition-all w-full focus-ring"
           >
-            <ArrowLeftOnRectangleIcon className="w-5 h-5 flex-shrink-0" />
+            <ArrowLeftOnRectangleIcon className="w-[18px] h-[18px] flex-shrink-0" />
             <span>Logout</span>
           </motion.button>
         </div>
@@ -117,7 +129,7 @@ export default function Sidebar() {
   );
 }
 
-function SparklesIcon({ className }: { className?: string }) {
+function LogoIcon({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"

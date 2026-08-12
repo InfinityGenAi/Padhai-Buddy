@@ -11,6 +11,7 @@ module.exports = {
       colors: {
         primary: "#4f46e5",
         "primary-dark": "#4338ca",
+        foreground: "var(--foreground)",
       },
       fontFamily: {
         sans: ["var(--font-geist-sans)", "Segoe UI", "Helvetica Neue", "Arial", "sans-serif"],

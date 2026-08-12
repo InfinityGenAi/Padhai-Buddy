@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { flushSync } from "react-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useSettingsModal } from "@/contexts/SettingsModalContext";
 import { useSearchParams, useRouter } from "next/navigation";
 import { getFirebaseIdToken } from "@/lib/auth-utils";
 import { getFirestoreDb } from "@/lib/firebase";
@@ -30,9 +29,8 @@ import {
   Bars3Icon,
   PencilSquareIcon,
   DocumentDuplicateIcon,
-  Cog6ToothIcon,
 } from "@heroicons/react/24/outline";
-import { playSend, playReceive, playCopy, playError, playSettings } from "@/lib/sounds";
+import { playSend, playReceive, playCopy, playError } from "@/lib/sounds";
 import type { ChatMessage, Conversation } from "@/types";
 
 function getTimestampMs(ts: unknown): number {
@@ -127,7 +125,6 @@ function ChatEmptyState() {
 
 export default function ChatPage() {
   const { user, preferences } = useAuth();
-  const { open: openSettings } = useSettingsModal();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -381,9 +378,12 @@ export default function ChatPage() {
         playReceive();
       }
 
-      const userMsgRef = doc(db, "users", user.uid, "conversations", conversationId!, "messages");
-      const aiMsgRef = doc(db, "users", user.uid, "conversations", conversationId!, "messages");
+      const messagesCol = collection(db, "users", user.uid, "conversations", conversationId!, "messages");
+      const userMsgRef = doc(messagesCol);
+      const aiMsgRef = doc(messagesCol);
       const convRef = doc(db, "users", user.uid, "conversations", conversationId!);
+
+      console.log("[CHAT] conversation reference created");
 
       const batch = writeBatch(db);
 
@@ -404,17 +404,31 @@ export default function ChatPage() {
       });
 
       await batch.commit();
+      console.log("[CHAT] user message saved");
+      console.log("[CHAT] assistant message saved");
+      console.log("[CHAT] sending response to client");
       setActiveConversationId(conversationId!);
-    } catch {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
       if (preferences.soundEnabled) {
         playError();
       }
       pendingMessages.current.clear();
+      if (process.env.NODE_ENV === "development") {
+        console.error("[CHAT CLIENT] sendMessage failed:", error);
+      }
+      const isFirestoreError = error.message.includes("Invalid document reference") || error.message.includes("permission") || error.message.includes("firestore");
       const errorMsg: ChatMessage = {
         id: generateId(),
         role: "assistant",
         content:
-          "Sorry, I couldn't connect to the AI service. Please check your connection and try again.",
+          process.env.NODE_ENV === "development"
+            ? isFirestoreError
+              ? `Save error: ${error.message}`
+              : `Error: ${error.message}`
+            : isFirestoreError
+              ? "Failed to save your chat. Please try again."
+              : "Sorry, I couldn't connect to the AI service. Please check your connection and try again.",
         createdAt: Date.now(),
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -626,19 +640,6 @@ export default function ChatPage() {
               title="New Chat"
             >
               <PlusIcon className="w-5 h-5" />
-            </motion.button>
-            <motion.button
-              whileHover={animationsEnabled ? { scale: 1.1 } : undefined}
-              whileTap={animationsEnabled ? { scale: 0.9 } : undefined}
-              onClick={() => {
-                playSettings();
-                openSettings();
-              }}
-              className="p-2 rounded-lg hover:bg-foreground/5 text-foreground/70 hover:text-foreground transition-colors"
-              aria-label="Chat settings"
-              title="Chat settings"
-            >
-              <Cog6ToothIcon className="w-5 h-5" />
             </motion.button>
           </div>
         </motion.div>

@@ -2,6 +2,17 @@ export type UserBoard = "CBSE" | "ICSE" | "State Board";
 export type UserClass = 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 export type DoubtType = "text" | "photo";
 
+export interface StudyPlan {
+  id: string;
+  title: string;
+  subject: string;
+  durationMinutes: number;
+  plannedDate: string;
+  completed: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface UserProfile {
   uid: string;
   name: string;

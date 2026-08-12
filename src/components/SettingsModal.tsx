@@ -10,18 +10,15 @@ import {
   SpeakerWaveIcon,
   SpeakerXMarkIcon,
   SparklesIcon,
-  BellIcon,
-  ArrowRightIcon,
-  ArrowDownIcon,
   ChatBubbleLeftRightIcon,
   ListBulletIcon,
   GlobeAltIcon,
-  ShieldCheckIcon,
-  LockClosedIcon,
   TrashIcon,
   CheckIcon,
   DevicePhoneMobileIcon,
   ComputerDesktopIcon,
+  BookOpenIcon,
+  DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import {
   revokeSession,
@@ -252,7 +249,7 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
             initial={{ scale: 0.95, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 20 }}
-            className="glass-strong rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] flex flex-col"
+            className="glass-strong rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col"
           >
             <div className="flex items-center justify-between p-6 pb-4 flex-shrink-0">
               <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -268,18 +265,18 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-6">
-              {/* GENERAL */}
-              <div>
+            <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-4">
+              {/* APPEARANCE */}
+              <div className="subtle-card rounded-xl p-4">
                 <h4 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40 mb-3">
-                  General
+                  Appearance
                 </h4>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
                       <SunIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
                       <div className="min-w-0">
-                        <p className="text-sm font-medium">Appearance</p>
+                        <p className="text-sm font-medium">Theme</p>
                         <p className="text-xs text-foreground/50 truncate">
                           Choose how Padhai Buddy looks
                         </p>
@@ -300,38 +297,6 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                         </button>
                       ))}
                     </div>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {preferences.soundEnabled ? (
-                        <SpeakerWaveIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
-                      ) : (
-                        <SpeakerXMarkIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
-                      )}
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">Sound Effects</p>
-                        <p className="text-xs text-foreground/50 truncate">
-                          Play sounds for chat actions
-                        </p>
-                      </div>
-                    </div>
-                    <motion.button
-                      role="switch"
-                      aria-checked={preferences.soundEnabled}
-                      aria-label="Sound Effects"
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => handleUpdate({ soundEnabled: !preferences.soundEnabled })}
-                      className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
-                        preferences.soundEnabled ? "bg-primary" : "bg-foreground/20"
-                      }`}
-                    >
-                      <motion.div
-                        animate={{ x: preferences.soundEnabled ? 20 : 2 }}
-                        transition={{ type: "spring", damping: 15, stiffness: 200 }}
-                        className="w-5 h-5 bg-white rounded-full shadow-md absolute top-0.5"
-                      />
-                    </motion.button>
                   </div>
 
                   <div className="flex items-center justify-between gap-4">
@@ -364,28 +329,30 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
 
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
-                      <BellIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
+                      {preferences.soundEnabled ? (
+                        <SpeakerWaveIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
+                      ) : (
+                        <SpeakerXMarkIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
+                      )}
                       <div className="min-w-0">
-                        <p className="text-sm font-medium">Notifications</p>
+                        <p className="text-sm font-medium">Sounds</p>
                         <p className="text-xs text-foreground/50 truncate">
-                          Show in-app notifications
+                          Play sounds for chat actions
                         </p>
                       </div>
                     </div>
                     <motion.button
                       role="switch"
-                      aria-checked={preferences.notificationsEnabled}
-                      aria-label="Notifications"
+                      aria-checked={preferences.soundEnabled}
+                      aria-label="Sound Effects"
                       whileTap={{ scale: 0.95 }}
-                      onClick={() =>
-                        handleUpdate({ notificationsEnabled: !preferences.notificationsEnabled })
-                      }
+                      onClick={() => handleUpdate({ soundEnabled: !preferences.soundEnabled })}
                       className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
-                        preferences.notificationsEnabled ? "bg-primary" : "bg-foreground/20"
+                        preferences.soundEnabled ? "bg-primary" : "bg-foreground/20"
                       }`}
                     >
                       <motion.div
-                        animate={{ x: preferences.notificationsEnabled ? 20 : 2 }}
+                        animate={{ x: preferences.soundEnabled ? 20 : 2 }}
                         transition={{ type: "spring", damping: 15, stiffness: 200 }}
                         className="w-5 h-5 bg-white rounded-full shadow-md absolute top-0.5"
                       />
@@ -394,64 +361,34 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                 </div>
               </div>
 
-              <div className="border-t border-border" />
-
-              {/* CHAT */}
-              <div>
+              {/* STUDY PREFERENCES */}
+              <div className="subtle-card rounded-xl p-4">
                 <h4 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40 mb-3">
-                  Chat
+                  Study Preferences
                 </h4>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
-                      <ArrowRightIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
+                      <ListBulletIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
                       <div className="min-w-0">
-                        <p className="text-sm font-medium">Enter to Send</p>
+                        <p className="text-sm font-medium">Step-by-Step Explanations</p>
                         <p className="text-xs text-foreground/50 truncate">
-                          Press Enter to send, Shift+Enter for new line
+                          Prefer step-by-step educational answers
                         </p>
                       </div>
                     </div>
                     <motion.button
                       role="switch"
-                      aria-checked={preferences.enterToSend}
-                      aria-label="Enter to Send"
+                      aria-checked={preferences.stepByStep}
+                      aria-label="Step-by-Step Explanations"
                       whileTap={{ scale: 0.95 }}
-                      onClick={() => handleUpdate({ enterToSend: !preferences.enterToSend })}
+                      onClick={() => handleUpdate({ stepByStep: !preferences.stepByStep })}
                       className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
-                        preferences.enterToSend ? "bg-primary" : "bg-foreground/20"
+                        preferences.stepByStep ? "bg-primary" : "bg-foreground/20"
                       }`}
                     >
                       <motion.div
-                        animate={{ x: preferences.enterToSend ? 20 : 2 }}
-                        transition={{ type: "spring", damping: 15, stiffness: 200 }}
-                        className="w-5 h-5 bg-white rounded-full shadow-md absolute top-0.5"
-                      />
-                    </motion.button>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <ArrowDownIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">Auto Scroll</p>
-                        <p className="text-xs text-foreground/50 truncate">
-                          Automatically scroll to new messages
-                        </p>
-                      </div>
-                    </div>
-                    <motion.button
-                      role="switch"
-                      aria-checked={preferences.autoScroll}
-                      aria-label="Auto Scroll"
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => handleUpdate({ autoScroll: !preferences.autoScroll })}
-                      className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
-                        preferences.autoScroll ? "bg-primary" : "bg-foreground/20"
-                      }`}
-                    >
-                      <motion.div
-                        animate={{ x: preferences.autoScroll ? 20 : 2 }}
+                        animate={{ x: preferences.stepByStep ? 20 : 2 }}
                         transition={{ type: "spring", damping: 15, stiffness: 200 }}
                         className="w-5 h-5 bg-white rounded-full shadow-md absolute top-0.5"
                       />
@@ -487,199 +424,177 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
 
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
-                      <ListBulletIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
+                      <GlobeAltIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
                       <div className="min-w-0">
-                        <p className="text-sm font-medium">Step-by-Step Explanations</p>
+                        <p className="text-sm font-medium">Preferred Language</p>
                         <p className="text-xs text-foreground/50 truncate">
-                          Prefer step-by-step educational answers
+                          Response language
                         </p>
                       </div>
                     </div>
-                    <motion.button
-                      role="switch"
-                      aria-checked={preferences.stepByStep}
-                      aria-label="Step-by-Step Explanations"
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => handleUpdate({ stepByStep: !preferences.stepByStep })}
-                      className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
-                        preferences.stepByStep ? "bg-primary" : "bg-foreground/20"
-                      }`}
-                    >
-                      <motion.div
-                        animate={{ x: preferences.stepByStep ? 20 : 2 }}
-                        transition={{ type: "spring", damping: 15, stiffness: 200 }}
-                        className="w-5 h-5 bg-white rounded-full shadow-md absolute top-0.5"
-                      />
-                    </motion.button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-border" />
-
-              {/* LANGUAGE */}
-              <div>
-                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40 mb-3">
-                  Language
-                </h4>
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <GlobeAltIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">Language</p>
-                      <p className="text-xs text-foreground/50 truncate">
-                        Preferred response language
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-1 bg-foreground/5 rounded-lg p-1 flex-shrink-0">
-                    {(["english", "hindi", "hinglish"] as const).map((opt) => (
-                      <button
-                        key={opt}
-                        onClick={() => handleUpdate({ language: opt })}
-                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors capitalize ${
-                          preferences.language === opt
-                            ? "bg-primary text-white"
-                            : "text-foreground/60 hover:text-foreground"
-                        }`}
-                      >
-                        {opt}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-border" />
-
-              {/* PROFILE */}
-              <div>
-                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40 mb-3">
-                  Your Profile
-                </h4>
-                <div className="bg-foreground/5 rounded-xl p-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-lg font-semibold flex-shrink-0 overflow-hidden">
-                      {user?.photoURL ? (
-                        <div
-                          className="w-full h-full bg-cover bg-center"
-                          style={{ backgroundImage: `url(${user.photoURL})` }}
-                        />
-                      ) : (
-                        user?.name?.charAt(0)?.toUpperCase() || "U"
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{user?.name}</p>
-                      <p className="text-xs text-foreground/50 truncate">{user?.email}</p>
-                      <p className="text-xs text-foreground/50">
-                        Class {user?.class} — {user?.board}
-                      </p>
-                    </div>
-                    <button
-                      onClick={openEditProfile}
-                      className="text-xs text-primary hover:text-primary/80 font-medium px-3 py-1.5 rounded-lg hover:bg-primary/10 transition-colors flex-shrink-0"
-                    >
-                      Edit Profile
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-border" />
-
-              {/* SECURITY */}
-              <div>
-                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40 mb-3">
-                  Security
-                </h4>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <ShieldCheckIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">Where you&apos;re logged in</p>
-                        <p className="text-xs text-foreground/50 truncate">
-                          Manage your active sessions and devices
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={refreshSessions}
-                      className="text-xs text-primary hover:text-primary/80 font-medium px-3 py-1.5 rounded-lg hover:bg-primary/10 transition-colors flex-shrink-0"
-                    >
-                      Refresh
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    {sessionsLoading && sessions.length === 0 ? (
-                      <div className="space-y-2">
-                        {[1, 2].map((i) => (
-                          <div
-                            key={i}
-                            className="h-12 bg-foreground/5 rounded-lg animate-pulse"
-                          />
-                        ))}
-                      </div>
-                    ) : sessions.length === 0 ? (
-                      <p className="text-xs text-foreground/50 py-2">
-                        No active sessions found
-                      </p>
-                    ) : (
-                      sessions.map((session) => (
-                        <div
-                          key={session.id}
-                          className={`flex items-center justify-between gap-3 p-3 rounded-xl border ${
-                            session.id === currentSessionId
-                              ? "border-primary/30 bg-primary/5"
-                              : "border-border bg-foreground/5"
+                    <div className="flex gap-1 bg-foreground/5 rounded-lg p-1 flex-shrink-0">
+                      {(["english", "hindi", "hinglish"] as const).map((opt) => (
+                        <button
+                          key={opt}
+                          onClick={() => handleUpdate({ language: opt })}
+                          className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors capitalize ${
+                            preferences.language === opt
+                              ? "bg-primary text-white"
+                              : "text-foreground/60 hover:text-foreground"
                           }`}
                         >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="flex-shrink-0">
-                              {session.device === "Mobile" || session.device === "Tablet" ? (
-                                <DevicePhoneMobileIcon className="w-5 h-5 text-foreground/60" />
-                              ) : (
-                                <ComputerDesktopIcon className="w-5 h-5 text-foreground/60" />
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                       <div className="flex items-center gap-2">
-                                 <p className="text-sm font-medium truncate">
-                                   {session.device}
-                                   {session.id === currentSessionId && (
-                                     <span className="text-[10px] text-primary font-medium ml-1">
-                                       Current
-                                     </span>
-                                   )}
-                                 </p>
-                               </div>
-                               <p className="text-xs text-foreground/50 truncate">
-                                 {[session.os, session.browser].filter(Boolean).join(" · ") || "Unknown browser"}
-                               </p>
-                               <p className="text-[11px] text-foreground/40">
-                                 Last active:{" "}
-                                 {new Date(session.lastActive).toLocaleString("en-IN", {
-                                   day: "numeric",
-                                   month: "short",
-                                   hour: "2-digit",
-                                   minute: "2-digit",
-                                 })}
-                               </p>
-                             </div>
-                           </div>
-                           {session.id !== currentSessionId && (
-                             <button
-                               onClick={() => handleRevokeSession(session.id)}
-                               className="text-xs text-red-500 hover:text-red-600 font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors flex-shrink-0"
-                             >
-                               Log out
-                             </button>
-                           )}
-                        </div>
-                      ))
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <BookOpenIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">Class</p>
+                        <p className="text-xs text-foreground/50 truncate">
+                          Your current class
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-medium text-foreground/60 bg-foreground/5 px-2.5 py-1 rounded-lg">
+                      Class {user?.class || "—"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <DocumentTextIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">Board</p>
+                        <p className="text-xs text-foreground/50 truncate">
+                          Your education board
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-medium text-foreground/60 bg-foreground/5 px-2.5 py-1 rounded-lg">
+                      {user?.board || "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ACCOUNT */}
+              <div className="subtle-card rounded-xl p-4">
+                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40 mb-3">
+                  Account
+                </h4>
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-lg font-semibold flex-shrink-0 overflow-hidden">
+                    {user?.photoURL ? (
+                      <div
+                        className="w-full h-full bg-cover bg-center"
+                        style={{ backgroundImage: `url(${user.photoURL})` }}
+                      />
+                    ) : (
+                      user?.name?.charAt(0)?.toUpperCase() || "U"
                     )}
                   </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{user?.name}</p>
+                    <p className="text-xs text-foreground/50 truncate">{user?.email}</p>
+                    <p className="text-xs text-foreground/50">
+                      Class {user?.class} — {user?.board}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
+                  <button
+                    onClick={openEditProfile}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-foreground/70 hover:bg-foreground/5 transition-colors"
+                  >
+                    Edit Profile
+                  </button>
+                  <button
+                    onClick={() => setChangePasswordOpen(true)}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-foreground/70 hover:bg-foreground/5 transition-colors"
+                  >
+                    Change Password
+                  </button>
+                  <button
+                    onClick={refreshSessions}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-foreground/70 hover:bg-foreground/5 transition-colors"
+                  >
+                    Sessions
+                  </button>
+                </div>
+
+                {/* Sessions list */}
+                <div className="space-y-2">
+                  {sessionsLoading && sessions.length === 0 ? (
+                    <div className="space-y-2">
+                      {[1, 2].map((i) => (
+                        <div
+                          key={i}
+                          className="h-12 bg-foreground/5 rounded-lg animate-pulse"
+                        />
+                      ))}
+                    </div>
+                  ) : sessions.length === 0 ? (
+                    <p className="text-xs text-foreground/50 py-2">
+                      No active sessions found
+                    </p>
+                  ) : (
+                    sessions.map((session) => (
+                      <div
+                        key={session.id}
+                        className={`flex items-center justify-between gap-3 p-3 rounded-xl border ${
+                          session.id === currentSessionId
+                            ? "border-primary/30 bg-primary/5"
+                            : "border-border bg-foreground/5"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex-shrink-0">
+                            {session.device === "Mobile" || session.device === "Tablet" ? (
+                              <DevicePhoneMobileIcon className="w-5 h-5 text-foreground/60" />
+                            ) : (
+                              <ComputerDesktopIcon className="w-5 h-5 text-foreground/60" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium truncate">
+                                {session.device}
+                                {session.id === currentSessionId && (
+                                  <span className="text-[10px] text-primary font-medium ml-1">
+                                    Current
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                            <p className="text-xs text-foreground/50 truncate">
+                              {[session.os, session.browser].filter(Boolean).join(" · ") || "Unknown browser"}
+                            </p>
+                            <p className="text-[11px] text-foreground/40">
+                              Last active:{" "}
+                              {new Date(session.lastActive).toLocaleString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                        {session.id !== currentSessionId && (
+                          <button
+                            onClick={() => handleRevokeSession(session.id)}
+                            className="text-xs text-red-500 hover:text-red-600 font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors flex-shrink-0"
+                          >
+                            Log out
+                          </button>
+                        )}
+                      </div>
+                    ))
+                  )}
                   {sessions.some((s) => s.id !== currentSessionId) && (
                     <button
                       onClick={handleRevokeAllOtherSessions}
@@ -692,30 +607,8 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                 </div>
               </div>
 
-              <div className="border-t border-border" />
-
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  <LockClosedIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">Change Password</p>
-                    <p className="text-xs text-foreground/50 truncate">
-                      Update your account password
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setChangePasswordOpen(true)}
-                  className="text-xs text-primary hover:text-primary/80 font-medium px-3 py-1.5 rounded-lg hover:bg-primary/10 transition-colors flex-shrink-0"
-                >
-                  Change
-                </button>
-              </div>
-
-              <div className="border-t border-border" />
-
               {/* DANGER ZONE */}
-              <div>
+              <div className="subtle-card rounded-xl p-4 border-red-200 dark:border-red-900/30">
                 <h4 className="text-[11px] font-semibold uppercase tracking-wider text-red-500 mb-3">
                   Danger Zone
                 </h4>

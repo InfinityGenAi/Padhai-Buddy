@@ -11,14 +11,11 @@ const ROUTES = [
   "/dashboard/photo-doubt",
 ];
 
-
-
 async function getPbStates(page: Page) {
   return page.evaluate(() => {
     const selectors = [
       '[data-pb="ambient-light"]',
       '[data-pb="study-decoration"]',
-      '[data-pb="scan-line"]',
     ];
     const states: { tag: string; opacity: string; transform: string }[] = [];
     selectors.forEach((sel) => {
@@ -85,27 +82,27 @@ test.describe("Background Animation Audit", () => {
       // Get element state at T=0
       const s0 = await getPbStates(page);
 
-      // Wait ~6s and capture T=6
-      await waitForIdle(page, 6000);
-      const s6 = await getPbStates(page);
+      // Wait ~5s and capture T=5
+      await waitForIdle(page, 5000);
+      const s5 = await getPbStates(page);
 
       // Verify something changed (opacity or transform)
       let changed = false;
-      for (let i = 0; i < Math.min(s0.length, s6.length); i++) {
-        if (s0[i].opacity !== s6[i].opacity || s0[i].transform !== s6[i].transform) {
+      for (let i = 0; i < Math.min(s0.length, s5.length); i++) {
+        if (s0[i].opacity !== s5[i].opacity || s0[i].transform !== s5[i].transform) {
           changed = true;
           break;
         }
       }
       expect(changed).toBe(true);
 
-      // Wait 4 more seconds → T=10
-      await waitForIdle(page, 4000);
+      // Wait 5 more seconds → T=10
+      await waitForIdle(page, 5000);
       const s10 = await getPbStates(page);
 
       let changedAgain = false;
-      for (let i = 0; i < Math.min(s6.length, s10.length); i++) {
-        if (s6[i].opacity !== s10[i].opacity || s6[i].transform !== s10[i].transform) {
+      for (let i = 0; i < Math.min(s5.length, s10.length); i++) {
+        if (s5[i].opacity !== s10[i].opacity || s5[i].transform !== s10[i].transform) {
           changedAgain = true;
           break;
         }
@@ -136,6 +133,10 @@ test.describe("Background Animation Audit", () => {
       await page.mouse.move(100, 100);
       await waitForIdle(page, 1500);
       const tl = await getParallaxStates(page);
+
+      // Move mouse to center
+      await page.mouse.move(700, 450);
+      await waitForIdle(page, 1500);
 
       // Move mouse to bottom-right
       await page.mouse.move(1400, 800);
@@ -183,6 +184,43 @@ test.describe("Background Animation Audit", () => {
         }
       }
       expect(changed).toBe(true);
+    });
+
+    test(`prefers-reduced-motion freezes background on ${route}`, async ({ page }) => {
+      const consoleErrors: string[] = [];
+      page.on("console", (msg) => {
+        if (msg.type() === "error") consoleErrors.push(msg.text());
+      });
+      page.on("pageerror", (err) => consoleErrors.push(err.message));
+
+      // Set reduced motion preference before loading
+      await page.emulateMedia({ reducedMotion: "reduce" });
+
+      await page.goto(`http://localhost:3000${route}`);
+      await page.waitForLoadState("networkidle");
+      await page.waitForSelector('[data-pb="background"]', { timeout: 10000 });
+
+      // Verify background container still exists
+      const bg = page.locator('[data-pb="background"]').first();
+      await expect(bg).toBeAttached();
+
+      // Get element state at T=0
+      const s0 = await getPbStates(page);
+      expect(s0.length).toBeGreaterThan(0);
+
+      // Wait 5s and capture T=5
+      await waitForIdle(page, 5000);
+      const s5 = await getPbStates(page);
+
+      // With reduced motion, states should NOT change
+      let changed = false;
+      for (let i = 0; i < Math.min(s0.length, s5.length); i++) {
+        if (s0[i].opacity !== s5[i].opacity || s0[i].transform !== s5[i].transform) {
+          changed = true;
+          break;
+        }
+      }
+      expect(changed).toBe(false);
     });
   }
 });

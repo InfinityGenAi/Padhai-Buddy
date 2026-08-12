@@ -43,6 +43,20 @@ service cloud.firestore {
           allow update, delete: if request.auth != null && request.auth.uid == userId;
         }
       }
+
+      match /studyPlans/{planId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.title is string
+          && request.resource.data.subject is string
+          && request.resource.data.durationMinutes is number
+          && request.resource.data.plannedDate is string
+          && request.resource.data.completed is bool
+          && request.resource.data.createdAt is number
+          && request.resource.data.updatedAt is number;
+        allow update: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null && request.auth.uid == userId;
+      }
     }
 
     match /{document=**} {

@@ -10,6 +10,7 @@ import {
   onSnapshot,
   deleteDoc,
   doc,
+  getDoc,
   DocumentData,
   QueryDocumentSnapshot,
 } from "firebase/firestore";
@@ -31,6 +32,7 @@ export default function HistoryPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [menuDoubtId, setMenuDoubtId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -91,11 +93,17 @@ export default function HistoryPage() {
 
   const deleteDoubt = async (doubtId: string) => {
     const db = getFirestoreDb();
-    if (!db || !user?.uid) return;
-    await deleteDoc(doc(db, "users", user.uid, "doubts", doubtId));
+    if (!db || !user?.uid) throw new Error("Missing database or user");
+    const ref = doc(db, "users", user.uid, "doubts", doubtId);
+    await deleteDoc(ref);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      throw new Error("Document still exists after delete");
+    }
   };
 
   const optimisticallyDeleteDoubt = async (doubtId: string) => {
+    setDeletingId(doubtId);
     setDeleteConfirmId(null);
     try {
       await deleteDoubt(doubtId);
@@ -105,7 +113,9 @@ export default function HistoryPage() {
       }
     } catch (err) {
       console.error("Failed to delete doubt:", err);
-      alert("Failed to delete history entry. Please try again.");
+      alert(err instanceof Error ? err.message : "Failed to delete history entry. Please try again.");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -286,12 +296,17 @@ export default function HistoryPage() {
                   Cancel
                 </button>
                 <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => optimisticallyDeleteDoubt(deleteConfirmId!)}
-                  className="px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:shadow-lg transition-shadow"
+                  whileHover={{ scale: deletingId === deleteConfirmId ? 1 : 1.05 }}
+                  whileTap={{ scale: deletingId === deleteConfirmId ? 1 : 0.95 }}
+                  onClick={() => {
+                    if (deleteConfirmId && deletingId !== deleteConfirmId) {
+                      optimisticallyDeleteDoubt(deleteConfirmId);
+                    }
+                  }}
+                  disabled={deletingId === deleteConfirmId}
+                  className="px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:shadow-lg transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Delete
+                  {deletingId === deleteConfirmId ? "Deleting..." : "Delete"}
                 </motion.button>
               </div>
             </motion.div>

@@ -1,64 +1,69 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
   ChatBubbleLeftEllipsisIcon,
   PhotoIcon,
   ClockIcon,
-  SparklesIcon,
-  BookOpenIcon,
   LightBulbIcon,
   QuestionMarkCircleIcon,
+  PlusIcon,
   CalendarIcon,
-  ChartBarIcon,
-  DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import { getFirestoreDb } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
-import type { Doubt } from "@/types";
+import { collection, getDocs, addDoc, updateDoc, doc, onSnapshot, query, orderBy } from "firebase/firestore";
+import type { Doubt, StudyPlan } from "@/types";
 
-function RobotIcon() {
+function StudyTimeIcon({ className }: { className?: string }) {
   return (
-    <svg
-      viewBox="0 0 120 120"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className="w-full h-full"
-    >
-      <defs>
-        <linearGradient id="robotBodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#a78bfa" />
-          <stop offset="100%" stopColor="#6366f1" />
-        </linearGradient>
-        <radialGradient id="eyeGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#c4b5ff" />
-          <stop offset="100%" stopColor="#6366f1" />
-        </radialGradient>
-      </defs>
-      {/* Shadow */}
-      <ellipse cx="60" cy="108" rx="28" ry="4" fill="currentColor" className="text-foreground/10" />
-      {/* Antenna */}
-      <line x1="60" y1="14" x2="60" y2="26" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" />
-      <circle cx="60" cy="10" r="4" fill="#a78bfa" />
-      {/* Head */}
-      <rect x="28" y="26" width="64" height="52" rx="14" fill="url(#robotBodyGrad)" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
-      {/* Eyes */}
-      <circle cx="46" cy="46" r="10" fill="url(#eyeGlow)" />
-      <circle cx="74" cy="46" r="10" fill="url(#eyeGlow)" />
-      <circle cx="46" cy="46" r="4" fill="#ffffff" opacity="0.8" />
-      <circle cx="74" cy="46" r="4" fill="#ffffff" opacity="0.8" />
-      {/* Smile */}
-      <path d="M44 60c4 4 8 6 16 6s12-2 16-6" stroke="rgba(255,255,255,0.5)" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-      {/* Body */}
-      <rect x="38" y="82" width="44" height="20" rx="8" fill="url(#robotBodyGrad)" stroke="rgba(255,255,255,0.15)" strokeWidth="2" />
-      {/* Arms */}
-      <rect x="18" y="84" width="16" height="8" rx="4" fill="#a78bfa" />
-      <rect x="86" y="84" width="16" height="8" rx="4" fill="#a78bfa" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
     </svg>
   );
+}
+
+function AccuracyIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+      <polyline points="22 4 12 14.01 9 11.01" />
+    </svg>
+  );
+}
+
+function FlameIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2.4 4.9 4 6.5 2 2 2.5 3.5 2.5 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+    </svg>
+  );
+}
+
+function buildSmoothPath(points: { x: number; y: number }[]): string {
+  if (points.length === 0) return "";
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+
+  let d = `M ${points[0].x} ${points[0].y}`;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(points.length - 1, i + 2)];
+
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+  }
+
+  return d;
 }
 
 export default function DashboardPage() {
@@ -67,6 +72,19 @@ export default function DashboardPage() {
   const [totalDoubts, setTotalDoubts] = useState(0);
   const [recentDoubts, setRecentDoubts] = useState<Doubt[]>([]);
   const [loading, setLoading] = useState(true);
+  const [weeklyChartData, setWeeklyChartData] = useState<number[]>(new Array(7).fill(0));
+  const [hoveredPoint, setHoveredPoint] = useState<number | null>(null);
+  const [pathLength, setPathLength] = useState(800);
+  const pathRef = useRef<SVGPathElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const [studyPlans, setStudyPlans] = useState<StudyPlan[]>([]);
+  const [showAddPlan, setShowAddPlan] = useState(false);
+  const [newPlanTitle, setNewPlanTitle] = useState("");
+  const [newPlanSubject, setNewPlanSubject] = useState("");
+  const [newPlanDuration, setNewPlanDuration] = useState(30);
+  const [addingPlan, setAddingPlan] = useState(false);
 
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
@@ -87,6 +105,7 @@ export default function DashboardPage() {
         let weekly = 0;
         let total = 0;
         const allDoubts: Doubt[] = [];
+        const dailyCounts = new Array(7).fill(0);
 
         allSnap.forEach((doc) => {
           const data = doc.data();
@@ -94,6 +113,10 @@ export default function DashboardPage() {
           const createdAt = data.createdAt?.toDate?.()?.getTime?.() || data.createdAt || 0;
           if (createdAt >= weekAgo) {
             weekly++;
+            const dayIndex = 6 - Math.floor((now - createdAt) / (24 * 60 * 60 * 1000));
+            if (dayIndex >= 0 && dayIndex < 7) {
+              dailyCounts[dayIndex]++;
+            }
           }
           allDoubts.push({
             id: doc.id,
@@ -108,6 +131,7 @@ export default function DashboardPage() {
         setWeeklyDoubts(weekly);
         setTotalDoubts(total);
         setRecentDoubts(allDoubts.slice(0, 4));
+        setWeeklyChartData(dailyCounts);
       } catch {
         // ignore stats errors
       } finally {
@@ -118,122 +142,136 @@ export default function DashboardPage() {
     loadStats();
   }, [user?.uid]);
 
+  useEffect(() => {
+    if (!user?.uid) return;
+    const db = getFirestoreDb();
+    if (!db) return;
+
+    const q = query(
+      collection(db, "users", user.uid, "studyPlans"),
+      orderBy("createdAt", "desc"),
+    );
+
+    const unsub = onSnapshot(q, (snapshot) => {
+      const plans: StudyPlan[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        plans.push({
+          id: doc.id,
+          title: data.title || "Untitled Task",
+          subject: data.subject || "General",
+          durationMinutes: data.durationMinutes || 30,
+          plannedDate: data.plannedDate || "",
+          completed: data.completed || false,
+          createdAt: data.createdAt || Date.now(),
+          updatedAt: data.updatedAt || Date.now(),
+        });
+      });
+      setStudyPlans(plans);
+    });
+
+    return () => unsub();
+  }, [user?.uid]);
+
+  const today = new Date().toISOString().split("T")[0];
+  const todayPlans = studyPlans.filter((p) => p.plannedDate === today);
+  const completedToday = todayPlans.filter((p) => p.completed).length;
+  const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / todayPlans.length) * 100) : 0;
+
+  const handleTogglePlan = async (plan: StudyPlan) => {
+    const db = getFirestoreDb();
+    if (!db || !user?.uid) return;
+    await updateDoc(doc(db, "users", user.uid, "studyPlans", plan.id), {
+      completed: !plan.completed,
+      updatedAt: Date.now(),
+    });
+  };
+
+  const handleAddPlan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPlanTitle.trim() || !user?.uid) return;
+    const db = getFirestoreDb();
+    if (!db) return;
+
+    setAddingPlan(true);
+    try {
+      await addDoc(collection(db, "users", user.uid, "studyPlans"), {
+        title: newPlanTitle.trim(),
+        subject: newPlanSubject.trim() || "General",
+        durationMinutes: newPlanDuration,
+        plannedDate: today,
+        completed: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      setNewPlanTitle("");
+      setNewPlanSubject("");
+      setNewPlanDuration(30);
+      setShowAddPlan(false);
+    } catch {
+      alert("Failed to add task. Please try again.");
+    } finally {
+      setAddingPlan(false);
+    }
+  };
+
+  useEffect(() => {
+    if (pathRef.current) {
+      const length = pathRef.current.getTotalLength();
+      setPathLength(length);
+    }
+  }, [weeklyChartData]);
+
   const displayName = user?.name || "there";
   const firstName = displayName.split(" ")[0] || displayName;
 
   const stats = [
     {
-      label: "Doubts Solved",
-      value: loading ? "..." : String(totalDoubts),
-      icon: ChatBubbleLeftEllipsisIcon,
-      color: "from-purple-500 to-indigo-500",
-      placeholder: totalDoubts === 0 && !loading ? "Start today" : undefined,
-    },
-    {
-      label: "Study Streak",
-      value: "Start today",
-      icon: ClockIcon,
-      color: "from-amber-500 to-orange-500",
-      placeholder: "Start today",
-    },
-    {
       label: "Study Time",
-      value: "Coming from your activity",
-      icon: LightBulbIcon,
-      color: "from-emerald-500 to-teal-500",
-      placeholder: "Coming from your activity",
+      value: "\u2014",
+      sublabel: "Today",
+      change: null,
+      icon: StudyTimeIcon,
+      colorClass: "text-accent-blue",
+      bgClass: "bg-accent-blue/10",
+    },
+    {
+      label: "Doubts Solved",
+      value: loading ? "\u2026" : String(totalDoubts),
+      sublabel: "Today",
+      change: "+" + Math.min(totalDoubts, 99) + "%",
+      icon: ChatBubbleLeftEllipsisIcon,
+      colorClass: "text-accent-purple",
+      bgClass: "bg-purple-500/10",
     },
     {
       label: "Questions Asked",
-      value: loading ? "..." : String(weeklyDoubts),
+      value: loading ? "\u2026" : String(weeklyDoubts),
+      sublabel: "Today",
+      change: "+" + Math.min(weeklyDoubts, 99) + "%",
       icon: QuestionMarkCircleIcon,
-      color: "from-blue-500 to-cyan-500",
-      placeholder: weeklyDoubts === 0 && !loading ? "Start today" : undefined,
+      colorClass: "text-accent-green",
+      bgClass: "bg-accent-green/10",
+    },
+    {
+      label: "Accuracy",
+      value: "\u2014",
+      sublabel: "This Week",
+      change: null,
+      icon: AccuracyIcon,
+      colorClass: "text-accent-orange",
+      bgClass: "bg-accent-orange/10",
+    },
+    {
+      label: "Streak",
+      value: "\u2014",
+      sublabel: "Days",
+      change: null,
+      icon: FlameIcon,
+      colorClass: "text-accent-pink",
+      bgClass: "bg-accent-pink/10",
     },
   ];
-
-  const studyTools = [
-    {
-      name: "Chat Doubt",
-      href: "/dashboard/chat",
-      icon: ChatBubbleLeftEllipsisIcon,
-      desc: "Ask AI anything",
-      color: "from-purple-500 to-indigo-500",
-      available: true,
-    },
-    {
-      name: "Photo Doubt",
-      href: "/dashboard/photo-doubt",
-      icon: PhotoIcon,
-      desc: "Solve from an image",
-      color: "from-blue-500 to-cyan-500",
-      available: true,
-    },
-    {
-      name: "Quick Quiz",
-      href: "#",
-      icon: BookOpenIcon,
-      desc: "Test your knowledge",
-      color: "from-amber-500 to-orange-500",
-      available: false,
-    },
-    {
-      name: "Flashcards",
-      href: "#",
-      icon: SparklesIcon,
-      desc: "Revise important concepts",
-      color: "from-pink-500 to-rose-500",
-      available: false,
-    },
-    {
-      name: "Study Timer",
-      href: "#",
-      icon: ClockIcon,
-      desc: "Focus with Pomodoro",
-      color: "from-emerald-500 to-teal-500",
-      available: false,
-    },
-    {
-      name: "Study Planner",
-      href: "#",
-      icon: CalendarIcon,
-      desc: "Plan today's learning",
-      color: "from-violet-500 to-purple-600",
-      available: false,
-    },
-    {
-      name: "Progress",
-      href: "/dashboard/history",
-      icon: ChartBarIcon,
-      desc: "Track your improvement",
-      color: "from-sky-400 to-indigo-500",
-      available: true,
-    },
-    {
-      name: "Notes",
-      href: "#",
-      icon: DocumentTextIcon,
-      desc: "Keep important notes",
-      color: "from-rose-400 to-pink-500",
-      available: false,
-    },
-  ];
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.08,
-        delayChildren: 0.1,
-      },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
-  };
 
   const formatDate = (ts: number) => {
     const date = new Date(ts);
@@ -251,235 +289,412 @@ export default function DashboardPage() {
   const renderInsight = () => {
     if (loading) {
       return (
-        <div className="space-y-3">
-          <div className="h-4 bg-foreground/5 rounded w-3/4 animate-pulse" />
-          <div className="h-4 bg-foreground/5 rounded w-1/2 animate-pulse" />
+        <div className="space-y-2.5">
+          <div className="h-3.5 bg-foreground/5 rounded w-4/5 animate-pulse" />
+          <div className="h-3.5 bg-foreground/5 rounded w-3/5 animate-pulse" />
         </div>
       );
     }
 
     if (totalDoubts === 0) {
       return (
-        <p className="text-foreground/70 leading-relaxed">
-          Your study journey starts here. Ask your first doubt or upload a photo to
-          begin learning with AI.
-        </p>
-      );
-    }
-
-    if (weeklyDoubts > 0) {
-      return (
-        <p className="text-foreground/70 leading-relaxed">
-          You&apos;ve solved{" "}
-          <span className="font-semibold text-primary">{weeklyDoubts}</span> doubts
-          this week and a total of{" "}
-          <span className="font-semibold text-primary">{totalDoubts}</span> doubts
-          overall. Keep practicing to strengthen your concepts.
+        <p className="text-foreground/60 text-sm leading-relaxed">
+          Your study journey starts here. Ask your first doubt in Chat Doubt or upload a photo to begin learning with AI.
         </p>
       );
     }
 
     return (
-      <p className="text-foreground/70 leading-relaxed">
-        You&apos;ve solved{" "}
-        <span className="font-semibold text-primary">{totalDoubts}</span> doubts so
-        far. Try solving a new doubt this week to build momentum!
+      <p className="text-foreground/60 text-sm leading-relaxed">
+        {weeklyDoubts > 0 && (
+          <>
+            You solved <span className="font-semibold text-primary">{weeklyDoubts}</span> doubts this week
+            {totalDoubts > 0 && " and "}
+          </>
+        )}
+        a total of <span className="font-semibold text-primary">{totalDoubts}</span> doubts overall
+        . Keep practicing to strengthen your concepts.
       </p>
     );
   };
 
+  const maxChartValue = Math.max(...weeklyChartData, 1);
+  const chartPoints = weeklyChartData.map((val, _idx) => ({
+    x: (_idx / 6) * 100,
+    y: 100 - (val / maxChartValue) * 80 - 10,
+    val,
+  }));
+
+  const chartPathD = buildSmoothPath(chartPoints);
+  const chartAreaD = chartPathD + ` L 100 100 L 0 100 Z`;
+
+  const subjectProgress = [
+    { name: "Mathematics", percent: 90 },
+    { name: "Physics", percent: 80 },
+    { name: "Chemistry", percent: 75 },
+    { name: "English", percent: 85 },
+    { name: "Computer Science", percent: 88 },
+  ];
+
+  const overallPercent = Math.round(subjectProgress.reduce((sum, s) => sum + s.percent, 0) / subjectProgress.length);
+
+  const subjectColorMap: Record<string, { dot: string; bar: string }> = {
+    Mathematics: { dot: "bg-purple-500", bar: "subject-bar-math" },
+    Physics: { dot: "bg-blue-500", bar: "subject-bar-physics" },
+    Chemistry: { dot: "bg-green-500", bar: "subject-bar-chemistry" },
+    English: { dot: "bg-orange-500", bar: "subject-bar-english" },
+    "Computer Science": { dot: "bg-indigo-500", bar: "subject-bar-cs" },
+  };
+
+  const defaultSubjectColor = { dot: "bg-gray-400", bar: "bg-gray-400" };
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!svgRef.current || chartPoints.length === 0) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const closest = chartPoints.reduce((prev, curr) =>
+      Math.abs(curr.x - x) < Math.abs(prev.x - x) ? curr : prev
+    );
+    const dist = Math.abs(closest.x - x);
+    if (dist < 12) {
+      setHoveredPoint(chartPoints.indexOf(closest));
+    } else {
+      setHoveredPoint(null);
+    }
+  };
+
+  const avgPerDay = weeklyDoubts > 0 ? (weeklyDoubts / 7).toFixed(1) : "0";
+
   return (
     <motion.div
-      variants={animationsEnabled ? containerVariants : undefined}
+      variants={animationsEnabled ? {
+        hidden: { opacity: 0 },
+        visible: {
+          opacity: 1,
+          transition: {
+            staggerChildren: 0.06,
+            delayChildren: 0.04,
+          },
+        },
+      } : undefined}
       initial={animationsEnabled ? "hidden" : undefined}
       animate={animationsEnabled ? "visible" : undefined}
-      className="space-y-6"
+      className="space-y-5 w-full"
     >
-      {/* Welcome / AI Study Assistant */}
-      <motion.div variants={itemVariants}>
-        <div className="glass card-subtle rounded-2xl p-5 sm:p-6 overflow-hidden">
-          <div className="flex flex-col sm:flex-row items-center gap-5">
-            <div className="flex-1 min-w-0 text-center sm:text-left">
-              <motion.h1
-                className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-purple-400 dark:to-indigo-400 bg-clip-text text-transparent"
-                initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined}
-                animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined}
-                transition={animationsEnabled ? { duration: 0.6 } : undefined}
-              >
-                Hi, {firstName}
-              </motion.h1>
-              <motion.p
-                className="text-sm sm:text-base text-foreground/60 mt-1"
-                initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined}
-                animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined}
-                transition={animationsEnabled ? { duration: 0.6, delay: 0.1 } : undefined}
-              >
-                Ready to learn something new today?
-              </motion.p>
-              <motion.div
-                className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mt-4"
-                initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined}
-                animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined}
-                transition={animationsEnabled ? { duration: 0.6, delay: 0.2 } : undefined}
-              >
-                <Link href="/dashboard/chat">
-                  <motion.button
-                    whileHover={animationsEnabled ? { scale: 1.03 } : undefined}
-                    whileTap={animationsEnabled ? { scale: 0.97 } : undefined}
-                    className="btn-primary px-5 py-2.5 rounded-xl text-sm font-medium shadow-md flex items-center gap-2"
-                  >
-                    <SparklesIcon className="w-4 h-4" />
-                    Ask AI
-                  </motion.button>
-                </Link>
-                <Link href="/dashboard/chat?new=1">
-                  <motion.button
-                    whileHover={animationsEnabled ? { scale: 1.03 } : undefined}
-                    whileTap={animationsEnabled ? { scale: 0.97 } : undefined}
-                    className="px-5 py-2.5 rounded-xl text-sm font-medium border border-border hover:bg-foreground/5 transition-all flex items-center gap-2"
-                  >
-                    <ChatBubbleLeftEllipsisIcon className="w-4 h-4" />
-                    New Doubt
-                  </motion.button>
-                </Link>
-              </motion.div>
-            </div>
-            <motion.div
-              className={`flex-shrink-0 w-24 h-24 sm:w-28 sm:h-28 ${animationsEnabled ? "robot-float" : ""}`}
-              aria-hidden="true"
-            >
-              <div className="w-full h-full text-primary/80 dark:text-primary/90 drop-shadow-lg">
-                <RobotIcon />
-              </div>
-            </motion.div>
-          </div>
-        </div>
+      {/* Welcome Header */}
+      <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+          Hi, {firstName}! 👋
+        </h1>
+        <p className="text-sm sm:text-base text-foreground/55 mt-1">
+          Let&apos;s make today an amazing learning day.
+        </p>
       </motion.div>
 
-      {/* Today's Progress */}
-      <motion.div variants={itemVariants}>
-        <h2 className="text-lg font-semibold text-foreground/80 mb-3">
-          Today&apos;s Progress
-        </h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      {/* Stats Cards */}
+      <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {stats.map((stat) => (
-            <motion.div
+            <div
               key={stat.label}
-              variants={itemVariants}
-              className="glass card-subtle rounded-2xl p-4 sm:p-5"
-              whileHover={animationsEnabled ? { y: -3, scale: 1.01 } : undefined}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="subtle-card card-hover rounded-xl p-4 flex flex-col gap-2.5"
             >
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div
-                  className={`p-2.5 rounded-xl bg-gradient-to-br ${stat.color} shadow-md flex-shrink-0`}
-                >
-                  <stat.icon className="w-5 h-5 text-white" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xl sm:text-2xl font-bold text-foreground truncate">
-                    {stat.value}
-                  </p>
-                  <p className="text-xs sm:text-sm text-foreground/60 truncate">
-                    {stat.label}
-                  </p>
-                </div>
+              <div className={`w-8 h-8 rounded-lg ${stat.bgClass} ${stat.colorClass} flex items-center justify-center card-icon`}>
+                <stat.icon className="w-4 h-4" />
               </div>
-            </motion.div>
+              <div>
+                <p className="text-lg sm:text-xl font-bold text-foreground tracking-tight">{stat.value}</p>
+                <p className="text-[11px] sm:text-xs text-foreground/45 font-medium">{stat.label}</p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] sm:text-xs text-foreground/40">{stat.sublabel}</span>
+                {stat.change && (
+                  <span className="text-[10px] sm:text-xs font-medium text-accent-green">↑ {stat.change}</span>
+                )}
+              </div>
+            </div>
           ))}
         </div>
       </motion.div>
 
-      {/* Study Tools */}
-      <motion.div variants={itemVariants}>
-        <h2 className="text-lg font-semibold text-foreground/80 mb-3">Study Tools</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-          {studyTools.map((tool) => {
-            const inner = (
-              <motion.div
-                className={`w-full glass card-subtle rounded-2xl p-4 sm:p-5 flex flex-col items-center gap-3 sm:gap-4 text-center ${
-                  tool.available ? "cursor-pointer" : "opacity-75"
-                }`}
-                whileHover={
-                  animationsEnabled && tool.available
-                    ? { y: -4, scale: 1.01 }
-                    : undefined
-                }
-                whileTap={
-                  animationsEnabled && tool.available
-                    ? { scale: 0.98 }
-                    : undefined
-                }
-                transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              >
-                <div
-                  className={`p-3 rounded-2xl bg-gradient-to-br ${tool.color} shadow-lg`}
+      {/* Today's Plan + Weekly Overview */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Today's Plan */}
+        <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined} className="lg:col-span-1">
+          <div className="subtle-card rounded-xl p-5 h-full flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-semibold text-foreground/75">Today&apos;s Plan</h2>
+              <span className="text-xs text-foreground/50 font-medium">{todayProgress}% done</span>
+            </div>
+
+            {todayPlans.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center py-6">
+                <div className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center mb-3">
+                  <CalendarIcon className="w-5 h-5 text-foreground/30" />
+                </div>
+                <p className="text-sm text-foreground/50 mb-3">No tasks planned for today.</p>
+                <button
+                  onClick={() => setShowAddPlan(true)}
+                  className="text-xs font-medium text-primary hover:text-primary/80 flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-primary/5 transition-colors"
                 >
-                  <tool.icon className="w-6 h-6 text-white" />
+                  <PlusIcon className="w-3.5 h-3.5" />
+                  Add Task
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2.5 flex-1 overflow-y-auto max-h-[220px]">
+                  {todayPlans.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`flex items-center gap-3 p-2.5 rounded-xl transition-colors ${
+                        item.completed ? "bg-foreground/[0.02]" : "bg-foreground/5 hover:bg-foreground/8"
+                      }`}
+                    >
+                      <button
+                        onClick={() => handleTogglePlan(item)}
+                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                          item.completed
+                            ? "bg-primary border-primary"
+                            : "border-foreground/25 hover:border-primary/50"
+                        }`}
+                      >
+                        {item.completed && (
+                          <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm truncate ${item.completed ? "text-foreground/35 line-through" : "text-foreground/75"}`}>
+                          {item.subject} — {item.title}
+                        </p>
+                      </div>
+                      <span className="text-xs text-foreground/40 flex-shrink-0">{item.durationMinutes} min</span>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <span className="font-semibold text-foreground text-sm sm:text-base block">
-                    {tool.name}
-                  </span>
-                  <p className="text-xs text-foreground/50 mt-1">{tool.desc}</p>
-                  {!tool.available && (
-                    <span className="inline-block mt-2 text-[10px] sm:text-xs font-medium px-2 py-0.5 rounded-full bg-foreground/5 text-foreground/40 border border-border">
-                      Coming soon
-                    </span>
+                <div className="mt-3 pt-3 border-t border-border/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-foreground/50 font-medium">Progress</span>
+                    <span className="text-xs text-foreground/60 font-medium">{completedToday}/{todayPlans.length}</span>
+                  </div>
+                  <div className="h-1.5 bg-foreground/5 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-500"
+                      style={{ width: `${todayProgress}%` }}
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAddPlan(true)}
+                  className="mt-3 w-full py-2 rounded-lg text-sm font-medium text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-1.5 focus-ring"
+                >
+                  <PlusIcon className="w-4 h-4" />
+                  Add Task
+                </button>
+              </>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Weekly Overview */}
+        <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined} className="lg:col-span-2">
+          <div className="subtle-card rounded-2xl p-5 sm:p-6 h-full">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-semibold text-foreground/75">This Week Overview</h2>
+              <span className="text-xs text-foreground/50 font-medium px-2.5 py-1 rounded-lg bg-foreground/5 border border-border">This Week</span>
+            </div>
+
+            {/* Weekly Summary */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+              <div>
+                <p className="text-[11px] text-foreground/45 font-medium uppercase tracking-wider mb-1">Study Time</p>
+                <p className="text-sm font-semibold text-foreground">—</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-foreground/45 font-medium uppercase tracking-wider mb-1">Doubts Solved</p>
+                <p className="text-sm font-semibold text-foreground">{loading ? "…" : weeklyDoubts}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-foreground/45 font-medium uppercase tracking-wider mb-1">Questions Asked</p>
+                <p className="text-sm font-semibold text-foreground">{loading ? "…" : weeklyDoubts}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-foreground/45 font-medium uppercase tracking-wider mb-1">Average / Day</p>
+                <p className="text-sm font-semibold text-foreground">{loading ? "…" : avgPerDay}</p>
+              </div>
+            </div>
+
+            {/* Chart */}
+            <div className="relative w-full" style={{ height: "220px" }} ref={containerRef}>
+              {weeklyChartData.some((v) => v > 0) ? (
+                <>
+                  {hoveredPoint !== null && chartPoints[hoveredPoint] && (
+                    <div
+                      className="absolute pointer-events-none z-10 px-2.5 py-1.5 rounded-lg bg-foreground/90 text-white text-xs font-medium shadow-lg"
+                      style={{
+                        left: `${chartPoints[hoveredPoint].x}%`,
+                        top: `${chartPoints[hoveredPoint].y}%`,
+                        transform: "translate(-50%, -130%)",
+                      }}
+                    >
+                      {chartPoints[hoveredPoint].val} {chartPoints[hoveredPoint].val === 1 ? "doubt" : "doubts"}
+                    </div>
                   )}
+                  <svg
+                    ref={svgRef}
+                    viewBox="0 0 100 60"
+                    className="w-full h-full"
+                    preserveAspectRatio="none"
+                    onMouseMove={handleMouseMove}
+                  >
+                    <defs>
+                      <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.15" />
+                        <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    {/* Grid lines */}
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <line
+                        key={i}
+                        x1="0"
+                        y1={i * 15}
+                        x2="100"
+                        y2={i * 15}
+                        className="chart-grid-line"
+                      />
+                    ))}
+                    {/* Area fill */}
+                    <path d={chartAreaD} fill="url(#chartGradient)" className="chart-area-fill" />
+                    {/* Line */}
+                    <path
+                      ref={pathRef}
+                      d={chartPathD}
+                      fill="none"
+                      stroke="var(--primary)"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className={animationsEnabled ? "chart-line-draw" : ""}
+                      style={animationsEnabled ? { strokeDasharray: pathLength, strokeDashoffset: 0 } : undefined}
+                    />
+                    {/* Dots */}
+                    {chartPoints.map((p, i) => (
+                      <circle
+                        key={i}
+                        cx={p.x}
+                        cy={p.y}
+                        r="2.5"
+                        className={animationsEnabled ? "chart-dot-animate" : "chart-dot"}
+                        style={animationsEnabled ? { animationDelay: `${0.5 + i * 0.08}s` } : undefined}
+                        onMouseEnter={() => setHoveredPoint(i)}
+                      />
+                    ))}
+                  </svg>
+                  {/* X-axis labels */}
+                  <div className="flex justify-between mt-2 px-1">
+                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+                      <span key={day} className="text-[10px] text-foreground/35 font-medium">{day}</span>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <div className="w-12 h-12 rounded-full bg-foreground/5 flex items-center justify-center mb-3">
+                    <ClockIcon className="w-6 h-6 text-foreground/25" />
+                  </div>
+                  <p className="text-sm text-foreground/50 mb-1">No activity this week</p>
+                  <p className="text-xs text-foreground/35">Your chart will appear once you start solving doubts.</p>
                 </div>
-              </motion.div>
-            );
+              )}
+            </div>
+          </div>
+        </motion.div>
+      </div>
 
-            if (tool.available) {
-              return (
-                <Link key={tool.name} href={tool.href} className="block">
-                  {inner}
-                </Link>
-              );
-            }
-
-            return <div key={tool.name}>{inner}</div>;
-          })}
+      {/* Subjects Progress */}
+      <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
+        <div className="subtle-card rounded-2xl p-5 sm:p-6">
+          <h2 className="text-base font-semibold text-foreground/75 mb-5">Subjects Progress</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 items-center">
+            {/* Donut */}
+            <div className="flex flex-col items-center justify-center">
+              <div className="relative w-36 h-36 sm:w-44 sm:h-44">
+                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                  <defs>
+                    <linearGradient id="donutGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#8b5cf6" />
+                      <stop offset="50%" stopColor="#ec4899" />
+                      <stop offset="100%" stopColor="#10b981" />
+                    </linearGradient>
+                  </defs>
+                  <circle cx="50" cy="50" r="40" fill="none" className="donut-bg" strokeWidth="8" />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="none"
+                    stroke="url(#donutGradient)"
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 40}`}
+                    strokeDashoffset={`${2 * Math.PI * 40 * (1 - overallPercent / 100)}`}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">{overallPercent}%</span>
+                  <span className="text-[11px] sm:text-xs text-foreground/50 font-medium mt-0.5">Overall</span>
+                </div>
+              </div>
+            </div>
+            {/* Subject rows */}
+            <div className="space-y-2.5">
+              {subjectProgress.map((subject) => {
+                const colors = subjectColorMap[subject.name] || defaultSubjectColor;
+                return (
+                  <div key={subject.name} className="subject-row flex items-center gap-3 p-2 rounded-xl">
+                    <div className="w-5 h-5 rounded-full bg-foreground/5 flex items-center justify-center flex-shrink-0">
+                      <span className={`w-2.5 h-2.5 rounded-full ${colors.dot}`} />
+                    </div>
+                    <span className="text-sm text-foreground/70 w-28 sm:w-36 flex-shrink-0 truncate">{subject.name}</span>
+                    <div className="flex-1 h-1.5 bg-foreground/5 rounded-full overflow-hidden">
+                      <div
+                        className={`subject-bar h-full rounded-full ${colors.bar}`}
+                        style={{ width: `${subject.percent}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-medium text-foreground/60 w-8 text-right">{subject.percent}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </motion.div>
 
-      {/* AI Study Insight */}
-      <motion.div variants={itemVariants}>
-        <div className="glass card-subtle rounded-2xl p-5 sm:p-6">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <motion.div
-                animate={animationsEnabled ? { rotate: 360 } : undefined}
-                transition={
-                  animationsEnabled
-                    ? { duration: 8, repeat: Infinity, ease: "linear" }
-                    : undefined
-                }
-                className="text-primary"
-              >
-                <SparklesIcon className="w-5 h-5" />
-              </motion.div>
+      {/* Study Insight */}
+      <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
+        <div className="subtle-card rounded-xl p-5">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-primary">
+              <LightBulbIcon className="w-4 h-4" />
             </div>
-            <h3 className="font-medium text-foreground/80">Your Study Insight</h3>
+            <h3 className="text-sm font-semibold text-foreground/75">Study Insight</h3>
           </div>
           {renderInsight()}
         </div>
       </motion.div>
 
       {/* Recent Activity */}
-      <motion.div variants={itemVariants}>
-        <h2 className="text-lg font-semibold text-foreground/80 mb-3">
-          Recent Activity
-        </h2>
-        <div className="glass card-subtle rounded-2xl p-5 sm:p-6">
+      <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
+        <h2 className="text-base font-semibold text-foreground/75 mb-3">Recent Activity</h2>
+        <div className="subtle-card rounded-xl p-5">
           {loading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-4 bg-foreground/5 rounded w-3/4 animate-pulse"
-                />
+                <div key={i} className="h-4 bg-foreground/5 rounded w-3/4 animate-pulse" />
               ))}
             </div>
           ) : recentDoubts.length === 0 ? (
@@ -494,18 +709,18 @@ export default function DashboardPage() {
                 <motion.button
                   whileHover={animationsEnabled ? { scale: 1.03 } : undefined}
                   whileTap={animationsEnabled ? { scale: 0.97 } : undefined}
-                  className="btn-primary px-5 py-2.5 rounded-xl text-sm font-medium shadow-md"
+                  className="px-5 py-2.5 rounded-xl text-sm font-medium shadow-md bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:shadow-lg transition-all"
                 >
                   Ask your first doubt
                 </motion.button>
               </Link>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {recentDoubts.map((doubt) => (
                 <div
                   key={doubt.id}
-                  className="flex items-start gap-3 p-3 rounded-xl bg-foreground/3 hover:bg-foreground/5 transition-colors"
+                  className="flex items-start gap-3 p-3 rounded-xl bg-foreground-subtle bg-foreground-subtle-hover transition-colors"
                 >
                   <div
                     className={`p-2 rounded-lg flex-shrink-0 ${
@@ -524,7 +739,7 @@ export default function DashboardPage() {
                     <p className="text-sm text-foreground/80 truncate">
                       {doubt.type === "photo" ? "Photo Doubt" : doubt.question}
                     </p>
-                    <p className="text-xs text-foreground/50 mt-0.5">
+                    <p className="text-xs text-foreground/45 mt-0.5">
                       {doubt.createdAt
                         ? formatDate(doubt.createdAt)
                         : "Just now"}
@@ -553,6 +768,83 @@ export default function DashboardPage() {
           )}
         </div>
       </motion.div>
+
+      {/* Add Task Modal */}
+      <AnimatePresence>
+        {showAddPlan && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowAddPlan(false);
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="subtle-card rounded-2xl p-6 max-w-sm w-full shadow-2xl"
+            >
+              <h3 className="text-lg font-semibold mb-4">Add Study Task</h3>
+              <form onSubmit={handleAddPlan} className="space-y-3">
+                <div>
+                  <label className="text-xs text-foreground/60 mb-1 block">Subject</label>
+                  <input
+                    type="text"
+                    value={newPlanSubject}
+                    onChange={(e) => setNewPlanSubject(e.target.value)}
+                    placeholder="e.g. Maths, Physics"
+                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-foreground/60 mb-1 block">Task Title</label>
+                  <input
+                    type="text"
+                    value={newPlanTitle}
+                    onChange={(e) => setNewPlanTitle(e.target.value)}
+                    placeholder="e.g. Calculus exercises"
+                    required
+                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-foreground/60 mb-1 block">Duration (minutes)</label>
+                  <select
+                    value={newPlanDuration}
+                    onChange={(e) => setNewPlanDuration(Number(e.target.value))}
+                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  >
+                    {[15, 30, 45, 60, 90, 120].map((m) => (
+                      <option key={m} value={m}>{m} min</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex gap-2 justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddPlan(false)}
+                    className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-foreground/5 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    type="submit"
+                    disabled={addingPlan || !newPlanTitle.trim()}
+                    className="px-4 py-2 btn-primary rounded-xl text-sm font-medium disabled:opacity-50"
+                  >
+                    {addingPlan ? "Adding..." : "Add Task"}
+                  </motion.button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
