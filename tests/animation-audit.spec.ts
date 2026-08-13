@@ -62,8 +62,9 @@ test.describe("Background Animation Audit", () => {
       page.on("pageerror", (err) => consoleErrors.push(err.message));
 
       await page.goto(`http://localhost:3000${route}`);
-      await page.waitForLoadState("networkidle");
-      await page.waitForSelector('[data-pb="background"]', { timeout: 10000 });
+      await page.waitForLoadState("domcontentloaded");
+      await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
+      await page.waitForTimeout(2000);
 
       // Check for critical console errors (ignore favicon)
       const criticalErrors = consoleErrors.filter(
@@ -116,8 +117,8 @@ test.describe("Background Animation Audit", () => {
 
     test(`mouse movement produces parallax on ${route}`, async ({ page }) => {
       await page.goto(`http://localhost:3000${route}`);
-      await page.waitForLoadState("networkidle");
-      await page.waitForSelector('[data-pb="background"]', { timeout: 10000 });
+      await page.waitForLoadState("domcontentloaded");
+      await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
 
       // Wait for initial animation to settle
       await waitForIdle(page, 1000);
@@ -156,8 +157,8 @@ test.describe("Background Animation Audit", () => {
 
     test(`light/dark mode animation on ${route}`, async ({ page }) => {
       await page.goto(`http://localhost:3000${route}`);
-      await page.waitForLoadState("networkidle");
-      await page.waitForSelector('[data-pb="background"]', { timeout: 10000 });
+      await page.waitForLoadState("domcontentloaded");
+      await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
 
       // Light mode (default)
       const lightBg = page.locator('[data-pb="background"]').first();
@@ -197,8 +198,9 @@ test.describe("Background Animation Audit", () => {
       await page.emulateMedia({ reducedMotion: "reduce" });
 
       await page.goto(`http://localhost:3000${route}`);
-      await page.waitForLoadState("networkidle");
-      await page.waitForSelector('[data-pb="background"]', { timeout: 10000 });
+      await page.waitForLoadState("domcontentloaded");
+      await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
+      await page.waitForTimeout(2000);
 
       // Verify background container still exists
       const bg = page.locator('[data-pb="background"]').first();

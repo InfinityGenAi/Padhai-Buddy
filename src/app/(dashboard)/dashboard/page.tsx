@@ -17,9 +17,10 @@ import { collection, getDocs, addDoc, updateDoc, doc, onSnapshot, query, orderBy
 import type { Doubt, StudyPlan } from "@/types";
 
 function buildSafeChartPath(dailyCounts: number[]): { pathD: string; areaD: string; points: { x: number; y: number; val: number }[] } {
+  const maxVal = Math.max(...dailyCounts, 1);
   const points = dailyCounts.map((val, idx) => ({
     x: (idx / 6) * 100,
-    y: val > 0 ? 100 - (val / Math.max(...dailyCounts, 1)) * 80 - 10 : 50,
+    y: val > 0 ? 100 - (val / maxVal) * 75 - 10 : 50,
     val,
   }));
 
@@ -30,10 +31,10 @@ function buildSafeChartPath(dailyCounts: number[]): { pathD: string; areaD: stri
   let d = `M ${points[0].x} ${points[0].y}`;
 
   if (points.length === 1) {
-    d += ` L ${points[0].x + 5} ${points[0].y}`;
+    d += ` C ${points[0].x + 10} ${points[0].y}, ${points[0].x + 15} ${points[0].y}, ${points[0].x + 20} ${points[0].y}`;
     return {
       pathD: d,
-      areaD: `${d} L ${points[0].x + 5} 100 L ${points[0].x} 100 Z`,
+      areaD: `${d} L ${points[0].x + 20} 100 L ${points[0].x} 100 Z`,
       points,
     };
   }
@@ -72,6 +73,7 @@ async function handleDeletePlan(
   uid: string | undefined,
   planId: string,
   setDeletingPlanId: (id: string | null) => void,
+  setPlanError: (msg: string | null) => void,
 ) {
   const db = getFirestoreDb();
   if (!db || !uid) return;
@@ -79,7 +81,8 @@ async function handleDeletePlan(
   try {
     await deleteDoc(doc(db, "users", uid, "studyPlans", planId));
   } catch {
-    alert("Failed to delete task. Please try again.");
+    setPlanError("Failed to delete task. Please try again.");
+    setTimeout(() => setPlanError(null), 4000);
   } finally {
     setDeletingPlanId(null);
   }
@@ -96,12 +99,14 @@ async function handleAddPlan(
   setNewPlanDuration: (v: number) => void,
   setShowAddPlan: (v: boolean) => void,
   setAddingPlan: (v: boolean) => void,
+  setPlanError: (msg: string | null) => void,
 ) {
   if (!newPlanTitle.trim() || !uid) return;
   const db = getFirestoreDb();
   if (!db) return;
 
   setAddingPlan(true);
+  setPlanError(null);
   try {
     await addDoc(collection(db, "users", uid, "studyPlans"), {
       title: newPlanTitle.trim(),
@@ -117,7 +122,8 @@ async function handleAddPlan(
     setNewPlanDuration(30);
     setShowAddPlan(false);
   } catch {
-    alert("Failed to add task. Please try again.");
+    setPlanError("Failed to add task. Please try again.");
+    setTimeout(() => setPlanError(null), 4000);
   } finally {
     setAddingPlan(false);
   }
@@ -143,6 +149,7 @@ export default function DashboardPage() {
   const [newPlanDuration, setNewPlanDuration] = useState(30);
   const [addingPlan, setAddingPlan] = useState(false);
   const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
+  const [planError, setPlanError] = useState<string | null>(null);
 
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
@@ -261,22 +268,22 @@ export default function DashboardPage() {
       bgClass: "bg-purple-500/10",
     },
     {
-      label: "This Week",
-      value: loading ? "…" : String(weeklyDoubts),
-      sublabel: "Doubts",
+      label: "Study Plans Completed",
+      value: loading ? "…" : String(studyPlans.filter(p => p.completed).length),
+      sublabel: `${studyPlans.length} total`,
       change: null,
-      icon: ClockIcon,
-      colorClass: "text-accent-green",
-      bgClass: "bg-accent-green/10",
+      icon: CalendarIcon,
+      colorClass: "text-accent-emerald",
+      bgClass: "bg-emerald-500/10",
     },
     {
-      label: "Average / Day",
-      value: loading ? "…" : avgPerDay,
+      label: "Avg / Day",
+      value: loading ? "…" : (weeklyDoubts > 0 ? avgPerDay : "—"),
       sublabel: "This Week",
       change: null,
       icon: LightBulbIcon,
-      colorClass: "text-accent-blue",
-      bgClass: "bg-accent-blue/10",
+      colorClass: "text-accent-amber",
+      bgClass: "bg-amber-500/10",
     },
   ];
 
@@ -402,6 +409,16 @@ export default function DashboardPage() {
               <span className="text-xs text-foreground/50 font-medium">{todayProgress}% done</span>
             </div>
 
+            {planError && (
+              <motion.div
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-3 p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-xs"
+              >
+                {planError}
+              </motion.div>
+            )}
+
             {todayPlans.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center py-6">
                 <div className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center mb-3">
@@ -447,7 +464,7 @@ export default function DashboardPage() {
                       </div>
                       <span className="text-xs text-foreground/40 flex-shrink-0">{item.durationMinutes} min</span>
                       <button
-                        onClick={() => handleDeletePlan(user?.uid, item.id, setDeletingPlanId)}
+                        onClick={() => handleDeletePlan(user?.uid, item.id, setDeletingPlanId, setPlanError)}
                         disabled={deletingPlanId === item.id}
                         className="p-1 rounded-md text-foreground/30 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors disabled:opacity-50"
                         title="Delete task"
@@ -488,12 +505,15 @@ export default function DashboardPage() {
         <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined} className="lg:col-span-2">
           <div className="subtle-card rounded-2xl p-5 sm:p-6 h-full">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base font-semibold text-foreground/75">This Week Overview</h2>
+              <div>
+                <h2 className="text-base font-semibold text-foreground/75">This Week Overview</h2>
+                <p className="text-xs text-foreground/45 mt-0.5">Your learning activity this week</p>
+              </div>
               <span className="text-xs text-foreground/50 font-medium px-2.5 py-1 rounded-lg bg-foreground/5 border border-border">This Week</span>
             </div>
 
             {/* Weekly Summary */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
               <div>
                 <p className="text-[11px] text-foreground/45 font-medium uppercase tracking-wider mb-1">Study Time</p>
                 <p className="text-sm font-semibold text-foreground">—</p>
@@ -503,91 +523,88 @@ export default function DashboardPage() {
                 <p className="text-sm font-semibold text-foreground">{loading ? "…" : weeklyDoubts}</p>
               </div>
               <div>
-                <p className="text-[11px] text-foreground/45 font-medium uppercase tracking-wider mb-1">Questions Asked</p>
-                <p className="text-sm font-semibold text-foreground">{loading ? "…" : weeklyDoubts}</p>
-              </div>
-              <div>
-                <p className="text-[11px] text-foreground/45 font-medium uppercase tracking-wider mb-1">Average / Day</p>
+                <p className="text-[11px] text-foreground/45 font-medium uppercase tracking-wider mb-1">Avg / Day</p>
                 <p className="text-sm font-semibold text-foreground">{loading ? "…" : avgPerDay}</p>
               </div>
             </div>
 
             {/* Chart */}
             <div className="relative w-full" style={{ height: "220px" }} ref={containerRef}>
-              {hasChartData && pathD ? (
-                <>
-                  {hoveredPoint !== null && chartPoints[hoveredPoint] && (
-                    <div
-                      className="absolute pointer-events-none z-10 px-2.5 py-1.5 rounded-lg bg-foreground/90 text-white text-xs font-medium shadow-lg"
-                      style={{
-                        left: `${chartPoints[hoveredPoint].x}%`,
-                        top: `${chartPoints[hoveredPoint].y}%`,
-                        transform: "translate(-50%, -130%)",
-                      }}
-                    >
-                      {chartPoints[hoveredPoint].val} {chartPoints[hoveredPoint].val === 1 ? "doubt" : "doubts"}
-                    </div>
-                  )}
-                  <svg
-                    ref={svgRef}
-                    viewBox="0 0 100 60"
-                    className="w-full h-full"
-                    preserveAspectRatio="none"
-                    onMouseMove={handleMouseMove}
-                  >
-                    <defs>
-                      <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.15" />
-                        <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                    {/* Grid lines */}
-                    {[0, 1, 2, 3, 4].map((i) => (
-                      <line
-                        key={i}
-                        x1="0"
-                        y1={i * 15}
-                        x2="100"
-                        y2={i * 15}
-                        className="chart-grid-line"
-                      />
-                    ))}
-                    {/* Area fill */}
-                    <path d={areaD} fill="url(#chartGradient)" className="chart-area-fill" />
-                    {/* Line */}
-                    <path
-                      ref={pathRef}
-                      d={pathD}
-                      fill="none"
-                      stroke="var(--primary)"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className={animationsEnabled ? "chart-line-draw" : ""}
-                      style={animationsEnabled ? { strokeDasharray: pathLength, strokeDashoffset: 0 } : undefined}
-                    />
-                    {/* Dots */}
-                    {chartPoints.map((p, i) => (
-                      <circle
-                        key={i}
-                        cx={p.x}
-                        cy={p.y}
-                        r="2.5"
-                        className={animationsEnabled ? "chart-dot-animate" : "chart-dot"}
-                        style={animationsEnabled ? { animationDelay: `${0.5 + i * 0.08}s` } : undefined}
-                        onMouseEnter={() => setHoveredPoint(i)}
-                      />
-                    ))}
-                  </svg>
-                  {/* X-axis labels */}
-                  <div className="flex justify-between mt-2 px-1">
-                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-                      <span key={day} className="text-[10px] text-foreground/35 font-medium">{day}</span>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center">
+              {hoveredPoint !== null && hasChartData && chartPoints[hoveredPoint] && (
+                <div
+                  className="absolute pointer-events-none z-10 px-2.5 py-1.5 rounded-lg bg-foreground/90 text-white text-xs font-medium shadow-lg"
+                  style={{
+                    left: `${chartPoints[hoveredPoint].x}%`,
+                    top: `${chartPoints[hoveredPoint].y}%`,
+                    transform: "translate(-50%, -130%)",
+                  }}
+                >
+                  <div className="font-semibold">{chartPoints[hoveredPoint].val} {chartPoints[hoveredPoint].val === 1 ? "doubt" : "doubts"}</div>
+                  <div className="text-[10px] text-white/70">{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][hoveredPoint]}</div>
+                </div>
+              )}
+              <svg
+                ref={svgRef}
+                viewBox="0 0 100 60"
+                className="w-full h-full"
+                preserveAspectRatio="none"
+                onMouseMove={handleMouseMove}
+                onMouseLeave={() => setHoveredPoint(null)}
+              >
+                <defs>
+                  <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.2" />
+                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.02" />
+                  </linearGradient>
+                </defs>
+                {/* Grid lines */}
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <line
+                    key={i}
+                    x1="0"
+                    y1={i * 15}
+                    x2="100"
+                    y2={i * 15}
+                    className="chart-grid-line"
+                  />
+                ))}
+                {/* Area fill */}
+                {hasChartData && <path d={areaD} fill="url(#chartGradient)" className="chart-area-fill" />}
+                {/* Line */}
+                {hasChartData && (
+                  <path
+                    ref={pathRef}
+                    d={pathD}
+                    fill="none"
+                    stroke="var(--primary)"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={animationsEnabled ? "chart-line-draw" : ""}
+                    style={animationsEnabled ? { strokeDasharray: pathLength, strokeDashoffset: 0 } : undefined}
+                  />
+                )}
+                {/* Dots */}
+                {chartPoints.map((p, i) => (
+                  <circle
+                    key={i}
+                    cx={p.x}
+                    cy={p.y}
+                    r={hasChartData && p.val > 0 ? "2.5" : "0"}
+                    className={animationsEnabled && hasChartData ? "chart-dot-animate" : "chart-dot"}
+                    style={animationsEnabled && hasChartData ? { animationDelay: `${0.5 + i * 0.08}s` } : undefined}
+                    onMouseEnter={hasChartData ? () => setHoveredPoint(i) : undefined}
+                  />
+                ))}
+              </svg>
+              {/* X-axis labels */}
+              <div className="flex justify-between mt-2 px-1">
+                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+                  <span key={day} className="text-[10px] text-foreground/35 font-medium">{day}</span>
+                ))}
+              </div>
+              {!hasChartData && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center h-full text-center bg-card/70">
                   <div className="w-12 h-12 rounded-full bg-foreground/5 flex items-center justify-center mb-3">
                     <ClockIcon className="w-6 h-6 text-foreground/25" />
                   </div>
@@ -714,7 +731,7 @@ export default function DashboardPage() {
               className="subtle-card rounded-2xl p-6 max-w-sm w-full shadow-2xl"
             >
               <h3 className="text-lg font-semibold mb-4">Add Study Task</h3>
-              <form onSubmit={() => handleAddPlan(user?.uid, newPlanTitle, newPlanSubject, newPlanDuration, today, setNewPlanTitle, setNewPlanSubject, setNewPlanDuration, setShowAddPlan, setAddingPlan)} className="space-y-3">
+              <form onSubmit={() => handleAddPlan(user?.uid, newPlanTitle, newPlanSubject, newPlanDuration, today, setNewPlanTitle, setNewPlanSubject, setNewPlanDuration, setShowAddPlan, setAddingPlan, setPlanError)} className="space-y-3">
                 <div>
                   <label className="text-xs text-foreground/60 mb-1 block">Subject</label>
                   <input

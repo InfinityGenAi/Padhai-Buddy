@@ -137,10 +137,15 @@ export default function ChatPage() {
   const [renameConvId, setRenameConvId] = useState<string | null>(null);
   const [tempTitle, setTempTitle] = useState("");
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const [chatError, setChatError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingMessages = useRef<Map<string, ChatMessage>>(new Map());
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
+  const isInitialLoadRef = useRef(false);
+  const userScrolledUpRef = useRef(false);
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -155,12 +160,39 @@ export default function ChatPage() {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   }, []);
 
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior });
+    }
+  }, []);
+
+  const checkIfNearBottom = useCallback(() => {
+    const container = chatContainerRef.current;
+    if (!container) return true;
+    const threshold = 80;
+    return container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+  }, []);
+
+  useEffect(() => {
+    const container = chatContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const nearBottom = checkIfNearBottom();
+      userScrolledUpRef.current = !nearBottom;
+      shouldAutoScrollRef.current = nearBottom;
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, [checkIfNearBottom]);
+
   useEffect(() => {
     if (!preferences.autoScroll) return;
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    if (shouldAutoScrollRef.current) {
+      scrollToBottom("smooth");
     }
-  }, [messages, isTyping, preferences.autoScroll]);
+  }, [messages, isTyping, preferences.autoScroll, scrollToBottom]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -231,10 +263,16 @@ export default function ChatPage() {
 
       setMessages(merged);
       setMessagesLoaded(true);
+
+      if (isInitialLoadRef.current) {
+        isInitialLoadRef.current = false;
+        shouldAutoScrollRef.current = true;
+        scrollToBottom("auto");
+      }
     });
 
     return () => unsub();
-  }, [user?.uid, activeConversationId]);
+  }, [user?.uid, activeConversationId, scrollToBottom]);
 
   const startNewChat = useCallback(() => {
     setActiveConversationId(null);
@@ -242,6 +280,9 @@ export default function ChatPage() {
     setMessagesLoaded(true);
     pendingMessages.current.clear();
     setSidebarOpen(false);
+    shouldAutoScrollRef.current = true;
+    userScrolledUpRef.current = false;
+    isInitialLoadRef.current = false;
     textareaRef.current?.focus();
   }, []);
 
@@ -266,6 +307,9 @@ export default function ChatPage() {
     setMessagesLoaded(false);
     pendingMessages.current.clear();
     setSidebarOpen(false);
+    isInitialLoadRef.current = true;
+    shouldAutoScrollRef.current = true;
+    userScrolledUpRef.current = false;
   }, []);
 
   const renameConversation = async (conversationId: string, newTitle: string) => {
@@ -300,9 +344,9 @@ export default function ChatPage() {
         setMessages([]);
         pendingMessages.current.clear();
       }
-    } catch (err) {
-      console.error("Failed to delete conversation:", err);
-      alert("Failed to delete conversation. Please try again.");
+    } catch {
+      setChatError("Failed to delete conversation. Please try again.");
+      setTimeout(() => setChatError(null), 4000);
     }
   };
 
@@ -316,8 +360,12 @@ export default function ChatPage() {
         content: "Please complete your profile by selecting your class and board in settings.",
         createdAt: Date.now(),
       }]);
+      shouldAutoScrollRef.current = true;
       return;
     }
+
+    shouldAutoScrollRef.current = true;
+    userScrolledUpRef.current = false;
 
     let conversationId = activeConversationId;
     const db = getFirestoreDb();
@@ -344,6 +392,8 @@ export default function ChatPage() {
       playSend();
     }
 
+    let aiMessage: ChatMessage | null = null;
+
     try {
       const token = await getFirebaseIdToken();
       const res = await fetch("/api/chat", {
@@ -365,23 +415,54 @@ export default function ChatPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to get response");
 
-      const aiMessage: ChatMessage = {
+      aiMessage = {
         id: `temp-${generateId()}`,
         role: "assistant",
         content: data.answer,
         createdAt: Date.now(),
       };
       pendingMessages.current.set(aiMessage.id, aiMessage);
-      setMessages((prev) => [...prev, aiMessage]);
+      if (aiMessage) {
+        const msg = aiMessage;
+        setMessages((prev) => [...prev, msg]);
+      }
 
       if (preferences.soundEnabled) {
         playReceive();
       }
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      if (preferences.soundEnabled) {
+        playError();
+      }
+      pendingMessages.current.clear();
+      if (process.env.NODE_ENV === "development") {
+        console.error("[CHAT CLIENT] AI request failed:", error);
+      }
+      const errorMsg: ChatMessage = {
+        id: generateId(),
+        role: "assistant",
+        content:
+          process.env.NODE_ENV === "development"
+            ? `Error: ${error.message}`
+            : "Sorry, I couldn't connect to the AI service. Please check your connection and try again.",
+        createdAt: Date.now(),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+      setIsTyping(false);
+      return;
+    }
 
-      const messagesCol = collection(db, "users", user.uid, "conversations", conversationId!, "messages");
+    if (!aiMessage || !conversationId) {
+      setIsTyping(false);
+      return;
+    }
+
+    try {
+      const messagesCol = collection(db, "users", user.uid, "conversations", conversationId, "messages");
       const userMsgRef = doc(messagesCol);
       const aiMsgRef = doc(messagesCol);
-      const convRef = doc(db, "users", user.uid, "conversations", conversationId!);
+      const convRef = doc(db, "users", user.uid, "conversations", conversationId);
 
       const batch = writeBatch(db);
 
@@ -402,31 +483,23 @@ export default function ChatPage() {
       });
 
       await batch.commit();
-      setActiveConversationId(conversationId!);
+      setActiveConversationId(conversationId);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       if (preferences.soundEnabled) {
         playError();
       }
-      pendingMessages.current.clear();
+      pendingMessages.current.delete(aiMessage.id);
       if (process.env.NODE_ENV === "development") {
-        console.error("[CHAT CLIENT] sendMessage failed:", error);
+        console.error("[CHAT CLIENT] Firestore save failed:", error);
       }
-      const isFirestoreError = error.message.includes("Invalid document reference") || error.message.includes("permission") || error.message.includes("firestore");
-      const errorMsg: ChatMessage = {
+      const warningMsg: ChatMessage = {
         id: generateId(),
         role: "assistant",
-        content:
-          process.env.NODE_ENV === "development"
-            ? isFirestoreError
-              ? `Save error: ${error.message}`
-              : `Error: ${error.message}`
-            : isFirestoreError
-              ? "Failed to save your chat. Please try again."
-              : "Sorry, I couldn't connect to the AI service. Please check your connection and try again.",
+        content: "Answer generated, but conversation could not be saved. Please try again.",
         createdAt: Date.now(),
       };
-      setMessages((prev) => [...prev, errorMsg]);
+      setMessages((prev) => [...prev, warningMsg]);
     } finally {
       setIsTyping(false);
     }
@@ -611,6 +684,15 @@ export default function ChatPage() {
 
       {/* Main chat area */}
       <div className="flex-1 flex flex-col h-full min-w-0 px-4 sm:px-6">
+        {chatError && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-3 p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm"
+          >
+            {chatError}
+          </motion.div>
+        )}
         <motion.div
           variants={chatItemVariants}
           className="flex items-center gap-3 mb-3"
@@ -640,7 +722,7 @@ export default function ChatPage() {
         </motion.div>
 
         {/* Messages area */}
-        <div className="flex-1 overflow-y-auto space-y-3 pb-6">
+        <div ref={chatContainerRef} className="flex-1 overflow-y-auto space-y-3 pb-6">
           {!messagesLoaded && messages.length === 0 && (
             <div className="text-center py-8 text-foreground/50">
               {activeConversationId ? (
@@ -667,7 +749,7 @@ export default function ChatPage() {
                   initial={animationsEnabled ? { opacity: 0, y: 8 } : false}
                   animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2, delay: animationsEnabled ? idx * 0.03 : 0 }}
+                  transition={{ duration: 0.2, delay: animationsEnabled ? Math.min(idx * 0.03, 0.3) : 0 }}
                   className={`flex gap-2.5 ${
                     isUser ? "justify-end" : "justify-start"
                   }`}

@@ -50,6 +50,7 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [clearHistoryConfirmOpen, setClearHistoryConfirmOpen] = useState(false);
+  const [notification, setNotification] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [tempName, setTempName] = useState("");
   const [tempPhotoUrl, setTempPhotoUrl] = useState("");
   const [tempClass, setTempClass] = useState("10");
@@ -123,10 +124,17 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
     if (tempPhotoUrl.trim()) {
       updates.photoURL = tempPhotoUrl.trim();
     }
-    await updateDoc(doc(db, "users", user.uid), updates);
-    setEditProfileOpen(false);
-    reloadProfile();
-    playProfileUpdate();
+    try {
+      await updateDoc(doc(db, "users", user.uid), updates);
+      setEditProfileOpen(false);
+      reloadProfile();
+      playProfileUpdate();
+      setNotification({ type: "success", text: "Profile updated successfully" });
+      setTimeout(() => setNotification(null), 3000);
+    } catch {
+      setNotification({ type: "error", text: "Failed to update profile" });
+      setTimeout(() => setNotification(null), 3000);
+    }
   };
 
   const handleRevokeSession = async (sessionId: string) => {
@@ -134,9 +142,12 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
       await revokeSession(sessionId);
       setSessions((prev) => prev.filter((s) => s.id !== sessionId));
       playSessionLogout();
+      setNotification({ type: "success", text: "Session revoked" });
+      setTimeout(() => setNotification(null), 3000);
     } catch (err) {
-      console.error("Failed to revoke session:", err);
-      alert(err instanceof Error ? err.message : "Failed to revoke session");
+      const msg = err instanceof Error ? err.message : "Failed to revoke session";
+      setNotification({ type: "error", text: msg });
+      setTimeout(() => setNotification(null), 3000);
     }
   };
 
@@ -145,20 +156,29 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
       await revokeAllOtherSessions();
        setSessions((prev) => prev.filter((s) => s.id === currentSessionId));
       playSessionLogout();
+      setNotification({ type: "success", text: "All other sessions logged out" });
+      setTimeout(() => setNotification(null), 3000);
     } catch (err) {
-      console.error("Failed to revoke sessions:", err);
-      alert(err instanceof Error ? err.message : "Failed to revoke sessions");
+      const msg = err instanceof Error ? err.message : "Failed to revoke sessions";
+      setNotification({ type: "error", text: msg });
+      setTimeout(() => setNotification(null), 3000);
     }
   };
 
   const handleChangePassword = async () => {
-    if (!currentPassword || !newPassword) return;
+    if (!currentPassword || !newPassword) {
+      setNotification({ type: "error", text: "Please fill in all password fields" });
+      setTimeout(() => setNotification(null), 3000);
+      return;
+    }
     if (newPassword !== confirmNewPassword) {
-      alert("New passwords do not match");
+      setNotification({ type: "error", text: "New passwords do not match" });
+      setTimeout(() => setNotification(null), 3000);
       return;
     }
     if (newPassword.length < 6) {
-      alert("New password must be at least 6 characters");
+      setNotification({ type: "error", text: "New password must be at least 6 characters" });
+      setTimeout(() => setNotification(null), 3000);
       return;
     }
     try {
@@ -169,23 +189,33 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
       setConfirmNewPassword("");
       reloadProfile();
       playPasswordChange();
+      setNotification({ type: "success", text: "Password changed successfully" });
+      setTimeout(() => setNotification(null), 3000);
     } catch (err) {
-      console.error("Change password error:", err);
-      alert(err instanceof Error ? err.message : "Failed to change password");
+      const msg = err instanceof Error ? err.message : "Failed to change password";
+      setNotification({ type: "error", text: msg });
+      setTimeout(() => setNotification(null), 3000);
     }
   };
 
   const handleDeleteAccount = async () => {
-    if (!deleteAccountPassword) return;
+    if (!deleteAccountPassword) {
+      setNotification({ type: "error", text: "Please enter your password" });
+      setTimeout(() => setNotification(null), 3000);
+      return;
+    }
     try {
       await deleteAccount(deleteAccountPassword);
       setDeleteAccountOpen(false);
       setDeleteAccountPassword("");
       reloadProfile();
       playSuccess();
+      setNotification({ type: "success", text: "Account deleted" });
+      setTimeout(() => setNotification(null), 3000);
     } catch (err) {
-      console.error("Delete account error:", err);
-      alert(err instanceof Error ? err.message : "Failed to delete account");
+      const msg = err instanceof Error ? err.message : "Failed to delete account";
+      setNotification({ type: "error", text: msg });
+      setTimeout(() => setNotification(null), 3000);
     }
   };
 
@@ -215,9 +245,11 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
     try {
       await Promise.all(deletePromises);
       setConversations([]);
-    } catch (err) {
-      console.error("Failed to clear all history:", err);
-      alert("Failed to clear all history. Please try again.");
+      setNotification({ type: "success", text: "All chat history cleared" });
+      setTimeout(() => setNotification(null), 3000);
+    } catch {
+      setNotification({ type: "error", text: "Failed to clear all history. Please try again." });
+      setTimeout(() => setNotification(null), 3000);
     }
     setClearHistoryConfirmOpen(false);
     playSuccess();
@@ -266,6 +298,19 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-4">
+              {notification && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`p-3 rounded-xl text-sm font-medium ${
+                    notification.type === "success"
+                      ? "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400"
+                      : "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400"
+                  }`}
+                >
+                  {notification.text}
+                </motion.div>
+              )}
               {/* APPEARANCE */}
               <div className="subtle-card rounded-xl p-4">
                 <h4 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40 mb-3">

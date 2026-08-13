@@ -76,6 +76,11 @@ export default function PhotoDoubtPage() {
   const handleSubmit = async () => {
     if (!file || !user || loading) return;
 
+    if (!user.class || !user.board) {
+      setError("Please complete your profile by selecting your class and board in settings.");
+      return;
+    }
+
     setError(null);
 
     try {

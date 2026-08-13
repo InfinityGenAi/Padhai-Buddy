@@ -21,20 +21,20 @@
   }
 
   .dark:root {
-    --background: #101218;
+    --background: #0f0f14;
     --foreground: #e2e8f0;
     --primary: #8b5cf6;
     --primary-dark: #7c3aed;
-    --card-bg: #1a102e;
-    --card-border: #2d2050;
-    --border-color: #2d2050;
-    --sidebar-bg: #150d28;
-    --glass-bg: rgba(26, 16, 46, 0.6);
+    --card-bg: #1a1a24;
+    --card-border: #2e2e3a;
+    --border-color: #2e2e3a;
+    --sidebar-bg: #13131a;
+    --glass-bg: rgba(26, 26, 36, 0.7);
     --glass-border: rgba(139, 92, 246, 0.15);
-    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
-    --glass-strong-bg: rgba(26, 16, 46, 0.8);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+    --glass-strong-bg: rgba(26, 26, 36, 0.85);
     --glass-strong-border: rgba(139, 92, 246, 0.25);
-    --glass-strong-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+    --glass-strong-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
   }
 
   body {
@@ -86,9 +86,9 @@
   }
 
   .dark .glass {
-    background: rgba(26, 16, 46, 0.6);
-    border: 1px solid rgba(139, 92, 246, 0.15);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
   }
@@ -102,6 +102,20 @@
 
   .dark .card-subtle {
     box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.3);
+    border-color: var(--card-border);
+  }
+
+  /* Premium subtle card */
+  .subtle-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+    border-radius: 1rem;
+  }
+
+  .dark .subtle-card {
+    box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.25);
+    border-color: var(--card-border);
   }
 
   /* Premium pill badge */
@@ -163,7 +177,11 @@
   }
 
   .input-field::placeholder {
-    color: rgba(128, 128, 128, 0.6);
+    color: rgba(128, 128, 128, 0.65);
+  }
+
+  .dark .input-field::placeholder {
+    color: rgba(255, 255, 255, 0.3);
   }
 
   .input-field:focus {
@@ -273,19 +291,19 @@
   }
 
   .bg-foreground-subtle {
-    background: rgba(23, 23, 23, 0.025);
+    background: rgba(23, 23, 23, 0.03);
   }
 
   .dark .bg-foreground-subtle {
-    background: rgba(255, 255, 255, 0.025);
+    background: rgba(255, 255, 255, 0.04);
   }
 
   .bg-foreground-subtle-hover:hover {
-    background: rgba(23, 23, 23, 0.04);
+    background: rgba(23, 23, 23, 0.05);
   }
 
   .dark .bg-foreground-subtle-hover:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(255, 255, 255, 0.06);
   }
 
   /* Card hover micro-interaction */
@@ -321,23 +339,27 @@
     font-weight: 500;
     letter-spacing: 0.02em;
     text-transform: uppercase;
-    background: rgba(23, 23, 23, 0.04);
-    color: rgba(23, 23, 23, 0.45);
-    border: 1px solid rgba(23, 23, 23, 0.08);
+    background: rgba(23, 23, 23, 0.05);
+    color: rgba(23, 23, 23, 0.5);
+    border: 1px solid rgba(23, 23, 23, 0.1);
   }
 
   .dark .coming-soon-badge {
-    background: rgba(255, 255, 255, 0.04);
-    color: rgba(255, 255, 255, 0.35);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.1);
   }
 
   /* Progress bar */
   .progress-track {
-    background: rgba(23, 23, 23, 0.06);
+    background: rgba(23, 23, 23, 0.07);
     border-radius: 9999px;
     overflow: hidden;
     height: 6px;
+  }
+
+  .dark .progress-track {
+    background: rgba(255, 255, 255, 0.08);
   }
 
   .progress-fill {
@@ -381,13 +403,13 @@
   }
 
   .chart-grid-line {
-    stroke: rgba(23, 23, 23, 0.06);
+    stroke: rgba(23, 23, 23, 0.07);
     stroke-width: 1;
     stroke-dasharray: 3 3;
   }
 
   .dark .chart-grid-line {
-    stroke: rgba(255, 255, 255, 0.06);
+    stroke: rgba(255, 255, 255, 0.08);
   }
 
   @keyframes chartLineIn {
@@ -417,7 +439,7 @@
 
   /* Subjects progress donut bg */
   .donut-bg {
-    stroke: rgba(23, 23, 23, 0.06);
+    stroke: rgba(23, 23, 23, 0.07);
   }
   .dark .donut-bg {
     stroke: rgba(255, 255, 255, 0.08);
@@ -431,7 +453,7 @@
     background-color: rgba(23, 23, 23, 0.03);
   }
   .dark .subject-row:hover {
-    background-color: rgba(255, 255, 255, 0.03);
+    background-color: rgba(255, 255, 255, 0.05);
   }
 
   .subject-bar {
@@ -498,7 +520,11 @@
   }
 
   .search-input::placeholder {
-    color: rgba(23, 23, 23, 0.4);
+    color: rgba(23, 23, 23, 0.45);
+  }
+
+  .dark .search-input::placeholder {
+    color: rgba(255, 255, 255, 0.35);
   }
 
   .search-input:focus {

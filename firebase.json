@@ -2,7 +2,7 @@
   "hosting": {
     "public": "public",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "site": "padhai-buddy-170c4"
+    "site": "infinity-gen-ai"
   },
   "firestore": {
     "rules": "firestore.rules",

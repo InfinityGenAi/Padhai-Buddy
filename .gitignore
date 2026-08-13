@@ -37,6 +37,10 @@ yarn-error.log*
 .env.local
 .env.*.local
 
+# Playwright
+storageState.json
+playwright/.cache/
+
 # vercel
 .vercel
 

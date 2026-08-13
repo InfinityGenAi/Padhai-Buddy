@@ -47,22 +47,23 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { signIn, signInWithGoogle, firebaseUser, user, loading, preferences } = useAuth();
+  const { signIn, signInWithGoogle, firebaseUser, user, loading, needsOnboarding, preferences } = useAuth();
   const router = useRouter();
 
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
 
   useEffect(() => {
-    if (!firebaseUser) {
-      return;
-    }
-    if (user && user.class && user.board) {
+    if (loading) return;
+    if (!firebaseUser) return;
+    if (needsOnboarding) {
+      router.replace("/onboarding");
+    } else if (user?.class && user?.board) {
       router.replace("/dashboard");
     } else {
       router.replace("/onboarding");
     }
-  }, [firebaseUser, user, router]);
+  }, [firebaseUser, user, loading, needsOnboarding, router]);
 
   if (loading) {
     return (

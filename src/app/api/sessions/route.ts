@@ -81,7 +81,13 @@ export async function POST(req: NextRequest) {
     }
 
     const uid = decoded.uid;
-    const body = await req.json();
+
+    let body: { sessionId?: string; device?: string; browser?: string; os?: string; userAgent?: string };
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
     const sessionId = String(body.sessionId || "");
     if (!sessionId) {

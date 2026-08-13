@@ -33,6 +33,7 @@ export default function HistoryPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteAllOpen, setDeleteAllOpen] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -64,10 +65,16 @@ export default function HistoryPage() {
   }, [user?.uid]);
 
   useEffect(() => {
-    const handleClickOutside = () => setMenuDoubtId(null);
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (menuDoubtId && target instanceof Element && target.closest('[data-menu-doubt]')) {
+        return;
+      }
+      setMenuDoubtId(null);
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [menuDoubtId]);
 
   const formatDate = (ts: number) => {
     const date = new Date(ts);
@@ -107,9 +114,9 @@ export default function HistoryPage() {
       if (expandedId === doubtId) {
         setExpandedId(null);
       }
-    } catch (err) {
-      console.error("Failed to delete doubt:", err);
-      alert(err instanceof Error ? err.message : "Failed to delete history entry. Please try again.");
+    } catch {
+      setHistoryError("Failed to delete history entry. Please try again.");
+      setTimeout(() => setHistoryError(null), 4000);
     } finally {
       setDeletingId(null);
     }
@@ -130,9 +137,10 @@ export default function HistoryPage() {
       await Promise.all(deletePromises);
       setDoubts([]);
       setDeleteAllOpen(false);
-    } catch (err) {
-      console.error("Failed to delete all history:", err);
-      alert(err instanceof Error ? err.message : "Failed to clear history. Please try again.");
+      setHistoryError(null);
+    } catch {
+      setHistoryError("Failed to clear history. Please try again.");
+      setTimeout(() => setHistoryError(null), 4000);
     } finally {
       setDeletingAll(false);
     }
@@ -180,6 +188,16 @@ export default function HistoryPage() {
           </button>
         )}
       </motion.div>
+
+      {historyError && (
+        <motion.div
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm"
+        >
+          {historyError}
+        </motion.div>
+      )}
 
       {doubts.length === 0 ? (
         <motion.div
@@ -265,7 +283,7 @@ export default function HistoryPage() {
                 </div>
 
                 {menuDoubtId === doubt.id && (
-                  <div className="absolute right-2 top-12 bg-card border border-border rounded-xl shadow-lg py-1 z-10 min-w-[120px]">
+                  <div className="absolute right-2 top-12 bg-card border border-border rounded-xl shadow-lg py-1 z-10 min-w-[120px]" data-menu-doubt>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
