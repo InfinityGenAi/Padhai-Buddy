@@ -6,6 +6,7 @@ import AnimatedBackground from "@/components/AnimatedBackground";
 import RequireAuth from "@/components/AuthWrapper";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import SettingsModal from "@/components/SettingsModal";
+import ProfileModal from "@/components/ProfileModal";
 import { SettingsModalProvider, useSettingsModal } from "@/contexts/SettingsModalContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { registerSession, heartbeatSession } from "@/lib/sessions";
@@ -30,6 +31,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [notifications] = useState<{ id: string; text: string; time: string }[]>([]);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -77,8 +79,13 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
   const handleProfileSettings = useCallback(() => {
     setProfileOpen(false);
     playSettings();
-    close();
-  }, [close]);
+    open();
+  }, [open]);
+
+  const handleProfileView = useCallback(() => {
+    setProfileOpen(false);
+    setProfileModalOpen(true);
+  }, []);
 
   const handleLogout = useCallback(async () => {
     setProfileOpen(false);
@@ -169,10 +176,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
                         className="absolute right-0 top-full mt-2 w-48 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden"
                       >
                         <button
-                          onClick={() => {
-                            setProfileOpen(false);
-                            open();
-                          }}
+                          onClick={handleProfileView}
                           className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-foreground/70 hover:bg-foreground/5 transition-colors"
                         >
                           <UserIcon className="w-4 h-4" />
@@ -215,6 +219,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
         <BottomNav />
       </div>
       <SettingsModal isOpen={isOpen} onClose={close} />
+      <ProfileModal isOpen={profileModalOpen} onClose={() => setProfileModalOpen(false)} />
     </>
   );
 }

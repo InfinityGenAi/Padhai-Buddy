@@ -55,6 +55,12 @@ export async function POST(req: NextRequest) {
       await deleteCollection(adminDb, `users/${uid}/sessions`);
       await deleteNestedCollection(adminDb, `users/${uid}/conversations`, "messages");
       await deleteCollection(adminDb, `users/${uid}/conversations`);
+      await deleteCollection(adminDb, `users/${uid}/quizAttempts`);
+      await deleteNestedCollection(adminDb, `users/${uid}/flashcardDecks`, "cards");
+      await deleteCollection(adminDb, `users/${uid}/flashcardDecks`);
+      await deleteCollection(adminDb, `users/${uid}/notes`);
+      await deleteCollection(adminDb, `users/${uid}/studySessions`);
+      await deleteCollection(adminDb, `users/${uid}/resources`);
       await adminDb.collection("users").doc(uid).delete();
     } catch (err) {
       console.error("Firestore cleanup error:", err);

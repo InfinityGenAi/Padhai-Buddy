@@ -112,7 +112,7 @@ export default async function globalSetup() {
 
     await page.waitForURL("http://localhost:3000/dashboard", { timeout: 30000 });
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(3000);
+    await page.waitForSelector("text=Hi,", { timeout: 30000 });
 
     await context.storageState({ path: storageStatePath });
   } finally {

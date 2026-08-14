@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { mockSessionsRoute, filterCriticalErrors } from "./utils/test-helpers";
 
 test.describe("Quick Smoke Tests", () => {
   test("homepage loads without critical console errors", async ({ page }) => {
@@ -8,14 +9,12 @@ test.describe("Quick Smoke Tests", () => {
     });
     page.on("pageerror", (err) => errors.push(err.message));
 
+    await mockSessionsRoute(page);
     await page.goto("http://localhost:3000/");
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2000);
+    await expect(page.locator("body")).toBeVisible();
 
-    const critical = errors.filter(
-      (e) => !e.includes("favicon") && !e.includes("404") && !e.includes("Static Server")
-    );
-    expect(critical).toEqual([]);
+    expect(filterCriticalErrors(errors)).toEqual([]);
   });
 
   test("login page loads without critical console errors", async ({ page }) => {
@@ -25,14 +24,12 @@ test.describe("Quick Smoke Tests", () => {
     });
     page.on("pageerror", (err) => errors.push(err.message));
 
+    await mockSessionsRoute(page);
     await page.goto("http://localhost:3000/login");
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForTimeout(2000);
+    await expect(page.locator("text=Welcome Back")).toBeAttached();
 
-    const critical = errors.filter(
-      (e) => !e.includes("favicon") && !e.includes("404") && !e.includes("Static Server")
-    );
-    expect(critical).toEqual([]);
+    expect(filterCriticalErrors(errors)).toEqual([]);
   });
 
   test.describe("unauthenticated redirect tests", () => {

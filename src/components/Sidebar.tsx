@@ -27,16 +27,16 @@ const mainNavItems = [
   { name: "Dashboard", href: "/dashboard", icon: HomeIcon, available: true },
   { name: "Chat Doubt", href: "/dashboard/chat", icon: ChatBubbleLeftEllipsisIcon, available: true },
   { name: "Photo Doubt", href: "/dashboard/photo-doubt", icon: PhotoIcon, available: true },
-  { name: "Quick Quiz", href: "#", icon: BookOpenIcon, available: false },
-  { name: "Flashcards", href: "#", icon: SparklesIcon, available: false },
-  { name: "Notes", href: "#", icon: DocumentTextIcon, available: false },
-  { name: "Study Planner", href: "#", icon: CalendarIcon, available: false },
-  { name: "Study Timer", href: "#", icon: ClockIcon, available: false },
-  { name: "Progress", href: "#", icon: ChartBarIcon, available: false },
+  { name: "Quick Quiz", href: "/dashboard/quiz", icon: BookOpenIcon, available: true },
+  { name: "Flashcards", href: "/dashboard/flashcards", icon: SparklesIcon, available: true },
+  { name: "Notes", href: "/dashboard/notes", icon: DocumentTextIcon, available: true },
+  { name: "Study Planner", href: "/dashboard/planner", icon: CalendarIcon, available: true },
+  { name: "Study Timer", href: "/dashboard/timer", icon: ClockIcon, available: true },
+  { name: "Progress", href: "/dashboard/progress", icon: ChartBarIcon, available: true },
   { name: "History", href: "/dashboard/history", icon: ClockIcon, available: true },
-  { name: "Resources", href: "#", icon: SpeakerWaveIcon, available: false },
-  { name: "Leaderboard", href: "#", icon: TrophyIcon, available: false },
-  { name: "More", href: "#", icon: Squares2X2Icon, available: false },
+  { name: "Resources", href: "/dashboard/resources", icon: SpeakerWaveIcon, available: true },
+  { name: "Leaderboard", href: "/dashboard/leaderboard", icon: TrophyIcon, available: true },
+  { name: "More", href: "/dashboard/more", icon: Squares2X2Icon, available: true },
 ];
 
 export default function Sidebar() {
@@ -62,38 +62,25 @@ export default function Sidebar() {
             const isActive = pathname === item.href;
 
             return (
-              <div key={item.name} className="relative">
-                {item.available ? (
-                  <Link href={item.href}>
+              <Link key={item.name} href={item.href}>
+                <motion.div
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all relative focus-ring ${
+                    isActive
+                      ? "bg-primary/10 text-primary"
+                      : "text-foreground/65 hover:bg-foreground-subtle-hover hover:text-foreground"
+                  }`}
+                  whileHover={animationsEnabled ? { x: isActive ? 0 : 2 } : undefined}
+                >
+                  <item.icon className="w-[18px] h-[18px] flex-shrink-0" />
+                  <span className="truncate">{item.name}</span>
+                  {isActive && (
                     <motion.div
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all relative focus-ring ${
-                        isActive
-                          ? "bg-primary/10 text-primary"
-                          : "text-foreground/65 hover:bg-foreground-subtle-hover hover:text-foreground"
-                      }`}
-                      whileHover={animationsEnabled ? { x: isActive ? 0 : 2 } : undefined}
-                    >
-                      <item.icon className="w-[18px] h-[18px] flex-shrink-0" />
-                      <span className="truncate">{item.name}</span>
-                      {isActive && (
-                        <motion.div
-                          layoutId="sidebar-indicator"
-                          className="ml-auto w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_6px_rgba(124,58,237,0.45)]"
-                        />
-                      )}
-                    </motion.div>
-                  </Link>
-                ) : (
-                  <div
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-foreground/40 cursor-default"
-                    title="Coming soon"
-                  >
-                    <item.icon className="w-[18px] h-[18px] flex-shrink-0 opacity-60" />
-                    <span className="truncate flex-1">{item.name}</span>
-                    <span className="coming-soon-badge flex-shrink-0">Soon</span>
-                  </div>
-                )}
-              </div>
+                      layoutId="sidebar-indicator"
+                      className="ml-auto w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_6px_rgba(124,58,237,0.45)]"
+                    />
+                  )}
+                </motion.div>
+              </Link>
             );
           })}
         </nav>

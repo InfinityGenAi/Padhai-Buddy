@@ -15,6 +15,7 @@ const navItems = [
   { name: "Home", href: "/dashboard", icon: HomeIcon },
   { name: "Chat", href: "/dashboard/chat", icon: ChatBubbleLeftEllipsisIcon },
   { name: "Photo", href: "/dashboard/photo-doubt", icon: PhotoIcon },
+  { name: "Quiz", href: "/dashboard/quiz", icon: ClockIcon },
   { name: "History", href: "/dashboard/history", icon: ClockIcon },
 ];
 

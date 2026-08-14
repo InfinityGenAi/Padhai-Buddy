@@ -1,6 +1,10 @@
 export type UserBoard = "CBSE" | "ICSE" | "State Board";
 export type UserClass = 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 export type DoubtType = "text" | "photo";
+export type QuizDifficulty = "easy" | "medium" | "hard";
+export type TimerMode = "pomodoro" | "stopwatch" | "custom";
+export type PlanPriority = "low" | "medium" | "high";
+export type ResourceType = "video" | "article" | "pdf" | "link" | "notes";
 
 export interface StudyPlan {
   id: string;
@@ -9,6 +13,8 @@ export interface StudyPlan {
   durationMinutes: number;
   plannedDate: string;
   completed: boolean;
+  priority?: PlanPriority;
+  startTime?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -81,4 +87,96 @@ export interface ChangePasswordPayload {
 
 export interface DeleteAccountPayload {
   password: string;
+}
+
+export interface QuizAttempt {
+  id: string;
+  subject: string;
+  class: UserClass;
+  board: UserBoard;
+  difficulty: QuizDifficulty;
+  totalQuestions: number;
+  correctAnswers: number;
+  score: number;
+  questions: QuizQuestion[];
+  createdAt: number;
+}
+
+export interface QuizQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+  selectedIndex?: number;
+}
+
+export interface FlashcardDeck {
+  id: string;
+  title: string;
+  subject: string;
+  description?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface Flashcard {
+  id: string;
+  deckId: string;
+  front: string;
+  back: string;
+  status: "new" | "learning" | "known" | "difficult";
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface Note {
+  id: string;
+  title: string;
+  subject: string;
+  body: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface StudySession {
+  id: string;
+  mode: TimerMode;
+  durationMinutes: number;
+  completed: boolean;
+  createdAt: number;
+}
+
+export interface Resource {
+  id: string;
+  title: string;
+  subject: string;
+  type: ResourceType;
+  description: string;
+  url?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface LeaderboardEntry {
+  id: string;
+  displayName: string;
+  score: number;
+  weeklyActivity: number;
+  avatarUrl?: string;
+}
+
+export interface ProgressStats {
+  totalDoubts: number;
+  weeklyDoubts: number;
+  totalQuizzes: number;
+  avgQuizScore: number;
+  totalFlashcards: number;
+  flashcardsReviewed: number;
+  totalNotes: number;
+  totalStudySessions: number;
+  totalStudyMinutes: number;
+  plansCompleted: number;
+  plansTotal: number;
+  dailyActivity: { day: string; value: number }[];
 }
