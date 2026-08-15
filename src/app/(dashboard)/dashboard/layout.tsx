@@ -6,11 +6,10 @@ import AnimatedBackground from "@/components/AnimatedBackground";
 import RequireAuth from "@/components/AuthWrapper";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import SettingsModal from "@/components/SettingsModal";
-import ProfileModal from "@/components/ProfileModal";
 import { SettingsModalProvider, useSettingsModal } from "@/contexts/SettingsModalContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { registerSession, heartbeatSession } from "@/lib/sessions";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
   BellIcon,
@@ -31,14 +30,15 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [notifications] = useState<{ id: string; text: string; time: string }[]>([]);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+  const sessionRegisteredRef = useRef(false);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid || sessionRegisteredRef.current) return;
 
+    sessionRegisteredRef.current = true;
     registerSession();
 
     let cancelled = false;
@@ -76,6 +76,8 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  const router = useRouter();
+
   const handleProfileSettings = useCallback(() => {
     setProfileOpen(false);
     playSettings();
@@ -84,8 +86,8 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
 
   const handleProfileView = useCallback(() => {
     setProfileOpen(false);
-    setProfileModalOpen(true);
-  }, []);
+    router.push("/dashboard/profile");
+  }, [router]);
 
   const handleLogout = useCallback(async () => {
     setProfileOpen(false);
@@ -219,7 +221,6 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
         <BottomNav />
       </div>
       <SettingsModal isOpen={isOpen} onClose={close} />
-      <ProfileModal isOpen={profileModalOpen} onClose={() => setProfileModalOpen(false)} />
     </>
   );
 }

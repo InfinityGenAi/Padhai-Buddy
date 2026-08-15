@@ -3,6 +3,29 @@ import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { getGroqClient, GROQ_TEXT_MODEL } from "@/lib/groq";
 import type { QuizAttempt, QuizQuestion } from "@/types";
 
+function validateQuestions(questions: unknown[]): QuizQuestion[] | null {
+  if (!Array.isArray(questions) || questions.length < 1 || questions.length > 20) {
+    return null;
+  }
+  const parsed: QuizQuestion[] = [];
+  for (let i = 0; i < questions.length; i++) {
+    const q = questions[i] as Record<string, unknown>;
+    if (typeof q.question !== "string" || !q.question.trim()) return null;
+    if (!Array.isArray(q.options) || q.options.length !== 4) return null;
+    if (typeof q.correctIndex !== "number" || q.correctIndex < 0 || q.correctIndex > 3) return null;
+    if (typeof q.explanation !== "string" || !q.explanation.trim()) return null;
+    parsed.push({
+      id: `q-${i}`,
+      question: q.question.trim(),
+      options: q.options.map(String),
+      correctIndex: q.correctIndex,
+      explanation: q.explanation.trim(),
+      selectedIndex: undefined,
+    });
+  }
+  return parsed;
+}
+
 export async function POST(req: NextRequest) {
   try {
     if (!adminAuth || initializationError) {
@@ -21,16 +44,71 @@ export async function POST(req: NextRequest) {
     }
 
     let body: {
+      action?: string;
+      attemptId?: string;
       subject?: unknown;
       class?: unknown;
       board?: unknown;
       difficulty?: unknown;
       numberOfQuestions?: unknown;
+      questions?: unknown;
     };
     try {
       body = await req.json();
     } catch {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    if (body.action === "submit") {
+      const { attemptId, questions } = body;
+      if (!attemptId || !Array.isArray(questions)) {
+        return NextResponse.json({ error: "attemptId and questions are required" }, { status: 400 });
+      }
+
+      if (!adminDb) {
+        return NextResponse.json({ error: "Server not initialized" }, { status: 500 });
+      }
+
+      const attemptRef = adminDb.collection("users").doc(decoded.uid).collection("quizAttempts").doc(attemptId);
+      const snap = await attemptRef.get();
+      if (!snap.exists) {
+        return NextResponse.json({ error: "Quiz attempt not found" }, { status: 404 });
+      }
+
+      const validQs = validateQuestions(questions);
+      if (!validQs) {
+        return NextResponse.json({ error: "Quiz generation failed. Please try again." }, { status: 400 });
+      }
+
+      const totalQuestions = validQs.length;
+      let correctAnswers = 0;
+      for (let i = 0; i < totalQuestions; i++) {
+        const serverQ = (snap.data() as Record<string, unknown>).questions as QuizQuestion[];
+        const clientQ = validQs[i];
+        if (i < serverQ.length && clientQ.selectedIndex !== undefined && clientQ.selectedIndex === serverQ[i].correctIndex) {
+          correctAnswers++;
+        }
+      }
+
+      const score = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+
+      await attemptRef.update({
+        questions: validQs,
+        correctAnswers,
+        score,
+        completedAt: Date.now(),
+      });
+
+      return NextResponse.json({
+        attempt: {
+          id: attemptId,
+          ...(snap.data() as Record<string, unknown>),
+          questions: validQs,
+          correctAnswers,
+          score,
+          completedAt: Date.now(),
+        },
+      });
     }
 
     const { subject, class: studentClass, board, difficulty, numberOfQuestions } = body;
@@ -73,19 +151,13 @@ export async function POST(req: NextRequest) {
       let questions: QuizQuestion[];
       try {
         const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) throw new Error("Invalid format");
-        questions = parsed.map((q: Record<string, unknown>, idx: number) => ({
-          id: `q-${idx}`,
-          question: String(q.question || `Question ${idx + 1}`),
-          options: Array.isArray(q.options) ? q.options.map(String) : ["A", "B", "C", "D"],
-          correctIndex: typeof q.correctIndex === "number" ? q.correctIndex : 0,
-          explanation: String(q.explanation || "No explanation available."),
-          selectedIndex: undefined as number | undefined,
-        }));
+        const validQs = validateQuestions(parsed);
+        if (!validQs || validQs.length < numQuestions) {
+          return NextResponse.json({ error: "Quiz generation failed. Please try again." }, { status: 400 });
+        }
+        questions = validQs;
       } catch {
-        questions = [
-          { id: "q-0", question: `What is a key concept in ${subject}?`, options: ["Option A", "Option B", "Option C", "Option D"], correctIndex: 0, explanation: "This is a fallback question. Please try again.", selectedIndex: undefined },
-        ];
+        return NextResponse.json({ error: "Quiz generation failed. Please try again." }, { status: 400 });
       }
 
       const attempt: QuizAttempt = {

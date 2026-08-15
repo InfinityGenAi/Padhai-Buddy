@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { sendEmailVerification, reload } from "firebase/auth";
 import { motion, useReducedMotion } from "framer-motion";
-import { playSignup } from "@/lib/sounds";
+import { playSignup, playEmailSent } from "@/lib/sounds";
 import {
   EyeIcon,
   EyeSlashIcon,
@@ -48,26 +49,38 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { signUp, signInWithGoogle, firebaseUser, loading, preferences } = useAuth();
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [verified, setVerified] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+  const { signUp, signInWithGoogle, firebaseUser, loading, preferences, reloadProfile } = useAuth();
   const router = useRouter();
 
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
 
   useEffect(() => {
-    if (firebaseUser) {
+    if (!firebaseUser) return;
+    if (verified) {
+      router.replace("/onboarding");
+    } else if (firebaseUser.emailVerified) {
       router.replace("/onboarding");
     }
-  }, [firebaseUser, router]);
+  }, [firebaseUser, verified, router]);
 
-  if (loading) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center gap-3 bg-background">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        <span className="text-sm text-foreground/60">Loading…</span>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!verificationSent || resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [verificationSent, resendCooldown]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,7 +95,7 @@ export default function SignupPage() {
     try {
       await signUp(name, email, password);
       playSignup();
-      router.replace("/onboarding");
+      setVerificationSent(true);
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
@@ -108,6 +121,126 @@ export default function SignupPage() {
       setIsSubmitting(false);
     }
   };
+
+  const handleResend = async () => {
+    if (resendCooldown > 0 || !firebaseUser) return;
+    try {
+      await sendEmailVerification(firebaseUser);
+      playEmailSent();
+      setResendCooldown(60);
+      setVerificationError(null);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        if (err.message.toLowerCase().includes("too-many-requests")) {
+          setError("Too many requests. Please wait before resending.");
+        } else {
+          setError(err.message);
+        }
+      }
+    }
+  };
+
+  const handleVerified = async () => {
+    if (!firebaseUser) return;
+    setVerificationError(null);
+    try {
+      await reload(firebaseUser);
+      if (firebaseUser.emailVerified) {
+        setVerified(true);
+        await reloadProfile();
+      } else {
+        setVerificationError("Verification link is invalid or expired. Please check your email or resend.");
+      }
+    } catch {
+      setVerificationError("Could not verify email. Please try again.");
+    }
+  };
+
+  if (verificationSent && firebaseUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+        <AnimatedBackground animate={animationsEnabled} />
+        <motion.div
+          variants={animationsEnabled ? staggerContainer : undefined}
+          initial={animationsEnabled ? "hidden" : false}
+          animate={animationsEnabled ? "visible" : false}
+          className="relative z-10 w-full max-w-md mx-auto p-6"
+        >
+          <motion.div
+            variants={animationsEnabled ? staggerItem : undefined}
+            className="glass-strong card-subtle rounded-2xl p-8 shadow-xl text-center"
+          >
+            <motion.div
+              variants={animationsEnabled ? staggerItem : undefined}
+              className="flex justify-center mb-4"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                <EnvelopeIcon className="w-8 h-8 text-white" />
+              </div>
+            </motion.div>
+
+            <motion.h1
+              variants={animationsEnabled ? staggerItem : undefined}
+              className="text-3xl font-bold text-primary mb-1"
+            >
+              Check Your Email
+            </motion.h1>
+            <motion.p
+              variants={animationsEnabled ? staggerItem : undefined}
+              className="text-sm text-foreground/60 mb-6"
+            >
+              We sent a verification link to:<br />
+              <span className="font-medium text-foreground">{email}</span>
+            </motion.p>
+
+            {verificationError && (
+              <motion.div
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-xl p-3 mb-4 text-sm"
+              >
+                {verificationError}
+              </motion.div>
+            )}
+
+            <motion.div variants={animationsEnabled ? staggerItem : undefined} className="space-y-3">
+              <button
+                onClick={handleVerified}
+                className="w-full btn-primary py-2.5 rounded-xl font-medium"
+              >
+                I&apos;ve Verified — Continue
+              </button>
+              <button
+                onClick={handleResend}
+                disabled={resendCooldown > 0}
+                className="w-full py-2.5 rounded-xl font-medium text-sm text-foreground/70 hover:text-foreground hover:bg-foreground/5 transition-colors disabled:opacity-50"
+              >
+                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Email"}
+              </button>
+              <button
+                onClick={() => window.open("https://mail.google.com/", "_blank")}
+                className="w-full py-2.5 rounded-xl font-medium text-sm text-foreground/70 hover:text-foreground hover:bg-foreground/5 transition-colors"
+              >
+                Open Gmail
+              </button>
+              <p className="text-xs text-foreground/40">
+                Check your spam or promotions folder if you don&apos;t see it.
+              </p>
+            </motion.div>
+          </motion.div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center gap-3 bg-background">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <span className="text-sm text-foreground/60">Loading…</span>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
@@ -205,6 +338,7 @@ export default function SignupPage() {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40 hover:text-foreground transition-colors"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? (
                       <EyeSlashIcon className="w-5 h-5" />

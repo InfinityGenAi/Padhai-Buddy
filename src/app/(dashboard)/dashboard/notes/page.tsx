@@ -10,6 +10,7 @@ import {
   PencilSquareIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
+import { playSaveSuccess, playDeleteSuccess } from "@/lib/sounds";
 
 type NoteView = "list" | "editor";
 
@@ -66,6 +67,7 @@ export default function NotesPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
+      if (preferences.soundEnabled) playSaveSuccess();
       await fetchNotes();
       setView("list");
       setEditingNote(null);
@@ -86,6 +88,7 @@ export default function NotesPage() {
         body: JSON.stringify({ action: "delete", noteId }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
+      if (preferences.soundEnabled) playDeleteSuccess();
       setNotes(notes.filter((n) => n.id !== noteId));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to delete note");

@@ -59,27 +59,79 @@ service cloud.firestore {
       }
 
       match /quizAttempts/{attemptId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.subject is string
+          && request.resource.data.class is int
+          && request.resource.data.board in ["CBSE", "ICSE", "State Board"]
+          && request.resource.data.difficulty in ["easy", "medium", "hard"]
+          && request.resource.data.totalQuestions is int
+          && request.resource.data.totalQuestions >= 1
+          && request.resource.data.totalQuestions <= 20
+          && request.resource.data.questions is list
+          && request.resource.data.questions.size() == request.resource.data.totalQuestions;
+        allow update: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null && request.auth.uid == userId;
       }
 
       match /flashcardDecks/{deckId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.title is string
+          && request.resource.data.subject is string
+          && request.resource.data.createdAt is number
+          && request.resource.data.updatedAt is number;
+        allow update: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null && request.auth.uid == userId;
 
         match /cards/{cardId} {
-          allow read, write: if request.auth != null && request.auth.uid == userId;
+          allow read: if request.auth != null && request.auth.uid == userId;
+          allow create: if request.auth != null && request.auth.uid == userId
+            && request.resource.data.front is string
+            && request.resource.data.back is string
+            && request.resource.data.status in ["new", "learning", "known", "difficult"]
+            && request.resource.data.createdAt is number
+            && request.resource.data.updatedAt is number;
+          allow update: if request.auth != null && request.auth.uid == userId;
+          allow delete: if request.auth != null && request.auth.uid == userId;
         }
       }
 
       match /notes/{noteId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.title is string
+          && request.resource.data.subject is string
+          && request.resource.data.body is string
+          && request.resource.data.createdAt is number
+          && request.resource.data.updatedAt is number;
+        allow update: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null && request.auth.uid == userId;
       }
 
       match /studySessions/{sessionId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.mode in ["pomodoro", "stopwatch", "custom"]
+          && request.resource.data.durationMinutes is int
+          && request.resource.data.durationMinutes > 0
+          && request.resource.data.completed is bool
+          && request.resource.data.createdAt is number;
+        allow update: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null && request.auth.uid == userId;
       }
 
       match /resources/{resourceId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.title is string
+          && request.resource.data.subject is string
+          && request.resource.data.type in ["video", "article", "pdf", "link", "notes"]
+          && request.resource.data.description is string
+          && request.resource.data.createdAt is number
+          && request.resource.data.updatedAt is number;
+        allow update: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null && request.auth.uid == userId;
       }
     }
 

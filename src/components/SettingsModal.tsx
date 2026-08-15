@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -19,6 +20,13 @@ import {
   ComputerDesktopIcon,
   BookOpenIcon,
   DocumentTextIcon,
+  ArrowRightIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  BellIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  AcademicCapIcon,
 } from "@heroicons/react/24/outline";
 import {
   revokeSession,
@@ -32,33 +40,33 @@ import { getFirestoreDb } from "@/lib/firebase";
 import {
   collection,
   deleteDoc,
+  doc,
   getDocs,
   query,
   orderBy,
-  updateDoc,
-  doc,
 } from "firebase/firestore";
 import type { UserPreferences, UserSession, Conversation } from "@/types";
-import { playProfileUpdate, playPasswordChange, playSessionLogout, playSuccess } from "@/lib/sounds";
+import { playPasswordChange, playSessionLogout, playSuccess } from "@/lib/sounds";
 
 export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const router = useRouter();
   const { user, preferences, updatePreferences, reloadProfile } = useAuth();
   const [sessions, setSessions] = useState<UserSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionsUnavailable, setSessionsUnavailable] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [clearHistoryConfirmOpen, setClearHistoryConfirmOpen] = useState(false);
   const [notification, setNotification] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [tempName, setTempName] = useState("");
-  const [tempPhotoUrl, setTempPhotoUrl] = useState("");
-  const [tempClass, setTempClass] = useState("10");
-  const [tempBoard, setTempBoard] = useState("CBSE");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [deleteAccountPassword, setDeleteAccountPassword] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
+  const [showDeleteAccountPassword, setShowDeleteAccountPassword] = useState(false);
   const [currentSessionId] = useState(() => getOrCreateSessionId());
 
   useEffect(() => {
@@ -66,11 +74,15 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
 
     const loadSessions = async () => {
       setSessionsLoading(true);
+      setSessionsUnavailable(false);
       try {
         const list = await fetchSessions();
         setSessions(list);
-      } catch {
-        // ignore
+      } catch (err) {
+        if (err instanceof Error && err.message === "SESSION_TRACKING_UNAVAILABLE") {
+          setSessionsUnavailable(true);
+          setSessions([]);
+        }
       } finally {
         setSessionsLoading(false);
       }
@@ -112,30 +124,6 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
     },
     [updatePreferences],
   );
-
-  const updateUserProfile = async () => {
-    const db = getFirestoreDb();
-    if (!db || !user?.uid) return;
-    const updates: Record<string, unknown> = {
-      name: tempName.trim() || user.name,
-      class: Number(tempClass) as 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12,
-      board: tempBoard as "CBSE" | "ICSE" | "State Board",
-    };
-    if (tempPhotoUrl.trim()) {
-      updates.photoURL = tempPhotoUrl.trim();
-    }
-    try {
-      await updateDoc(doc(db, "users", user.uid), updates);
-      setEditProfileOpen(false);
-      reloadProfile();
-      playProfileUpdate();
-      setNotification({ type: "success", text: "Profile updated successfully" });
-      setTimeout(() => setNotification(null), 3000);
-    } catch {
-      setNotification({ type: "error", text: "Failed to update profile" });
-      setTimeout(() => setNotification(null), 3000);
-    }
-  };
 
   const handleRevokeSession = async (sessionId: string) => {
     try {
@@ -221,9 +209,15 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
 
   const refreshSessions = async () => {
     setSessionsLoading(true);
+    setSessionsUnavailable(false);
     try {
       const list = await fetchSessions();
       setSessions(list);
+    } catch (err) {
+      if (err instanceof Error && err.message === "SESSION_TRACKING_UNAVAILABLE") {
+        setSessionsUnavailable(true);
+        setSessions([]);
+      }
     } finally {
       setSessionsLoading(false);
     }
@@ -256,11 +250,8 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
   };
 
   const openEditProfile = () => {
-    setTempName(user?.name || "");
-    setTempClass(String(user?.class || "10"));
-    setTempBoard(user?.board || "CBSE");
-    setTempPhotoUrl(user?.photoURL || "");
-    setEditProfileOpen(true);
+    router.push("/dashboard/profile");
+    onClose();
   };
 
   return (
@@ -403,6 +394,97 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                       />
                     </motion.button>
                   </div>
+
+                  {preferences.soundEnabled && (
+                    <div className="space-y-4 pt-3 border-t border-foreground/10">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-foreground/60">Volume</p>
+                          <span className="text-[11px] text-foreground/40 capitalize">
+                            {preferences.soundVolume || "medium"}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={2}
+                          step={1}
+                          value={
+                            preferences.soundVolume === "low"
+                              ? 0
+                              : preferences.soundVolume === "medium"
+                                ? 1
+                                : 2
+                          }
+                          onChange={(e) =>
+                            handleUpdate({
+                              soundVolume: ["low", "medium", "high"][Number(e.target.value)] as "low" | "medium" | "high",
+                            })
+                          }
+                          className="w-full h-1.5 bg-foreground/10 rounded-full appearance-none cursor-pointer
+                            [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
+                            [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary
+                            [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer
+                            [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4
+                            [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary
+                            [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
+                        />
+                        <div className="flex justify-between text-[10px] text-foreground/30 px-0.5">
+                          <span>Low</span>
+                          <span>Medium</span>
+                          <span>High</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-foreground/60">Categories</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { key: "ui" as const, label: "UI", icon: ComputerDesktopIcon, desc: "Buttons, toggles" },
+                            { key: "success" as const, label: "Success", icon: CheckCircleIcon, desc: "Completions" },
+                            { key: "error" as const, label: "Error", icon: XCircleIcon, desc: "Alerts, failures" },
+                            { key: "notifications" as const, label: "Notifications", icon: BellIcon, desc: "Messages, alerts" },
+                            { key: "study" as const, label: "Study", icon: AcademicCapIcon, desc: "Quiz, timer" },
+                          ].map(({ key, label, icon: Icon, desc }) => {
+                            const active = preferences.soundCategories?.[key] ?? true;
+                            return (
+                              <button
+                                key={key}
+                                onClick={() =>
+                                  handleUpdate({
+                                    soundCategories: {
+                                      ...(preferences.soundCategories || { ui: true, success: true, error: true, notifications: true, study: true }),
+                                      [key]: !active,
+                                    },
+                                  })
+                                }
+                                className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border text-xs transition-colors ${
+                                  active
+                                    ? "border-primary/30 bg-primary/5 text-foreground"
+                                    : "border-foreground/10 bg-foreground/5 text-foreground/40"
+                                }`}
+                              >
+                                <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                                <div className="text-left min-w-0">
+                                  <p className="font-medium truncate">{label}</p>
+                                  <p className="text-[10px] opacity-60 truncate">{desc}</p>
+                                </div>
+                                <div
+                                  className={`ml-auto w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center ${
+                                    active
+                                      ? "border-primary bg-primary"
+                                      : "border-foreground/20"
+                                  }`}
+                                >
+                                  {active && <CheckIcon className="w-2.5 h-2.5 text-white" />}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -556,6 +638,7 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                     className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-foreground/70 hover:bg-foreground/5 transition-colors"
                   >
                     Edit Profile
+                    <ArrowRightIcon className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setChangePasswordOpen(true)}
@@ -573,7 +656,7 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
 
                 {/* Sessions list */}
                 <div className="space-y-2">
-                  {sessionsLoading && sessions.length === 0 ? (
+                  {sessionsLoading && sessions.length === 0 && !sessionsUnavailable ? (
                     <div className="space-y-2">
                       {[1, 2].map((i) => (
                         <div
@@ -582,6 +665,10 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                         />
                       ))}
                     </div>
+                  ) : sessionsUnavailable ? (
+                    <p className="text-xs text-foreground/50 py-2">
+                      Session tracking is temporarily unavailable. Please try again later.
+                    </p>
                   ) : sessions.length === 0 ? (
                     <p className="text-xs text-foreground/50 py-2">
                       No active sessions found
@@ -680,111 +767,6 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
             </div>
           </motion.div>
 
-          {/* Edit Profile Modal */}
-          <AnimatePresence>
-            {editProfileOpen && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-                onClick={(e) => {
-                  if (e.target === e.currentTarget) {
-                    setEditProfileOpen(false);
-                  }
-                }}
-              >
-                <motion.div
-                  initial={{ scale: 0.95, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.95, opacity: 0 }}
-                  className="glass-strong rounded-2xl p-6 max-w-sm w-full shadow-2xl"
-                >
-                  <h3 className="text-lg font-semibold mb-4">Edit Profile</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-xl font-semibold flex-shrink-0">
-                        {tempName?.charAt(0)?.toUpperCase() || "U"}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <label className="text-xs text-foreground/60 mb-1 block">Display Name</label>
-                        <input
-                          type="text"
-                          value={tempName}
-                          onChange={(e) => setTempName(e.target.value)}
-                          className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                          maxLength={50}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs text-foreground/60 mb-1 block">Email</label>
-                      <input
-                        type="email"
-                        value={user?.email || ""}
-                        disabled
-                        className="w-full bg-foreground/5 border border-border rounded-xl px-3 py-2 text-sm text-foreground/50 cursor-not-allowed"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-foreground/60 mb-1 block">Profile Photo URL</label>
-                      <input
-                        type="url"
-                        value={tempPhotoUrl}
-                        onChange={(e) => setTempPhotoUrl(e.target.value)}
-                        placeholder="https://example.com/photo.jpg"
-                        className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-foreground/60 mb-1 block">Class</label>
-                      <select
-                        value={tempClass}
-                        onChange={(e) => setTempClass(e.target.value)}
-                        className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                      >
-                        {[5, 6, 7, 8, 9, 10, 11, 12].map((c) => (
-                          <option key={c} value={c}>
-                            Class {c}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs text-foreground/60 mb-1 block">Board</label>
-                      <select
-                        value={tempBoard}
-                        onChange={(e) => setTempBoard(e.target.value)}
-                        className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                      >
-                        <option value="CBSE">CBSE</option>
-                        <option value="ICSE">ICSE</option>
-                        <option value="State Board">State Board</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 justify-end mt-4">
-                    <button
-                      onClick={() => setEditProfileOpen(false)}
-                      className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-foreground/5 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={updateUserProfile}
-                      className="px-4 py-2 btn-primary rounded-xl text-sm font-medium flex items-center gap-1"
-                    >
-                      <CheckIcon className="w-4 h-4" />
-                      Save
-                    </motion.button>
-                  </div>
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           {/* Change Password Modal */}
           <AnimatePresence>
             {changePasswordOpen && (
@@ -799,6 +781,9 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                     setCurrentPassword("");
                     setNewPassword("");
                     setConfirmNewPassword("");
+                    setShowCurrentPassword(false);
+                    setShowNewPassword(false);
+                    setShowConfirmNewPassword(false);
                   }
                 }}
               >
@@ -812,34 +797,76 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                   <div className="space-y-3">
                     <div>
                       <label className="text-xs text-foreground/60 mb-1 block">Current Password</label>
-                      <input
-                        type="password"
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                        autoFocus
-                      />
+                      <div className="relative">
+                        <input
+                          type={showCurrentPassword ? "text" : "password"}
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          className="w-full bg-background border border-border rounded-xl px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground"
+                          aria-label={showCurrentPassword ? "Hide password" : "Show password"}
+                        >
+                          {showCurrentPassword ? (
+                            <EyeSlashIcon className="w-4 h-4" />
+                          ) : (
+                            <EyeIcon className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="text-xs text-foreground/60 mb-1 block">New Password</label>
-                      <input
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showNewPassword ? "text" : "password"}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="w-full bg-background border border-border rounded-xl px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground"
+                          aria-label={showNewPassword ? "Hide password" : "Show password"}
+                        >
+                          {showNewPassword ? (
+                            <EyeSlashIcon className="w-4 h-4" />
+                          ) : (
+                            <EyeIcon className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="text-xs text-foreground/60 mb-1 block">Confirm New Password</label>
-                      <input
-                        type="password"
-                        value={confirmNewPassword}
-                        onChange={(e) => setConfirmNewPassword(e.target.value)}
-                        className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleChangePassword();
-                        }}
-                      />
+                      <div className="relative">
+                        <input
+                          type={showConfirmNewPassword ? "text" : "password"}
+                          value={confirmNewPassword}
+                          onChange={(e) => setConfirmNewPassword(e.target.value)}
+                          className="w-full bg-background border border-border rounded-xl px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleChangePassword();
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmNewPassword(!showConfirmNewPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground"
+                          aria-label={showConfirmNewPassword ? "Hide password" : "Show password"}
+                        >
+                          {showConfirmNewPassword ? (
+                            <EyeSlashIcon className="w-4 h-4" />
+                          ) : (
+                            <EyeIcon className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <div className="flex gap-2 justify-end mt-4">
@@ -880,6 +907,7 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                   if (e.target === e.currentTarget) {
                     setDeleteAccountOpen(false);
                     setDeleteAccountPassword("");
+                    setShowDeleteAccountPassword(false);
                   }
                 }}
               >
@@ -898,16 +926,30 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                       <label className="text-xs text-foreground/60 mb-1 block">
                         Enter your password to confirm
                       </label>
-                      <input
-                        type="password"
-                        value={deleteAccountPassword}
-                        onChange={(e) => setDeleteAccountPassword(e.target.value)}
-                        className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/30"
-                        placeholder="Your password"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleDeleteAccount();
-                        }}
-                      />
+                      <div className="relative">
+                        <input
+                          type={showDeleteAccountPassword ? "text" : "password"}
+                          value={deleteAccountPassword}
+                          onChange={(e) => setDeleteAccountPassword(e.target.value)}
+                          className="w-full bg-background border border-border rounded-xl px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/30"
+                          placeholder="Your password"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleDeleteAccount();
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowDeleteAccountPassword(!showDeleteAccountPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground"
+                          aria-label={showDeleteAccountPassword ? "Hide password" : "Show password"}
+                        >
+                          {showDeleteAccountPassword ? (
+                            <EyeSlashIcon className="w-4 h-4" />
+                          ) : (
+                            <EyeIcon className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <div className="flex gap-2 justify-end mt-4">

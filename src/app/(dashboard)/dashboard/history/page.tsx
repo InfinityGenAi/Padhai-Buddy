@@ -21,10 +21,11 @@ import {
   TrashIcon,
   EllipsisVerticalIcon,
 } from "@heroicons/react/24/outline";
+import { playDeleteSuccess } from "@/lib/sounds";
 import type { Doubt } from "@/types";
 
 export default function HistoryPage() {
-  const { user } = useAuth();
+  const { user, preferences } = useAuth();
   const [doubts, setDoubts] = useState<Doubt[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -114,6 +115,7 @@ export default function HistoryPage() {
       if (expandedId === doubtId) {
         setExpandedId(null);
       }
+      if (preferences.soundEnabled) playDeleteSuccess();
     } catch {
       setHistoryError("Failed to delete history entry. Please try again.");
       setTimeout(() => setHistoryError(null), 4000);
@@ -138,6 +140,7 @@ export default function HistoryPage() {
       setDoubts([]);
       setDeleteAllOpen(false);
       setHistoryError(null);
+      if (preferences.soundEnabled) playDeleteSuccess();
     } catch {
       setHistoryError("Failed to clear history. Please try again.");
       setTimeout(() => setHistoryError(null), 4000);

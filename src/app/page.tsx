@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
+import * as THREE from "three";
 import {
   ChatBubbleLeftEllipsisIcon,
   PhotoIcon,
@@ -16,17 +17,74 @@ import {
 } from "@heroicons/react/24/outline";
 import AnimatedBackground from "@/components/AnimatedBackground";
 
+if (typeof window !== "undefined") {
+  (window as unknown as { THREE?: typeof THREE }).THREE = THREE;
+}
+
+import "vanta/dist/vanta.fog.min.js";
+
 export default function Home() {
   const { firebaseUser, loading, preferences } = useAuth();
   const router = useRouter();
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
+  const vantaRef = useRef<HTMLDivElement>(null);
+  const vantaInstanceRef = useRef<{ destroy: () => void } | null>(null);
+
+  const webglAvailable = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      const canvas = document.createElement("canvas");
+      return !!(
+        window.WebGLRenderingContext &&
+        (canvas.getContext("webgl") || canvas.getContext("experimental-webgl"))
+      );
+    } catch {
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
     if (!loading && firebaseUser) {
       router.replace("/dashboard");
     }
   }, [firebaseUser, loading, router]);
+
+  useEffect(() => {
+    if (!vantaRef.current || !webglAvailable || !animationsEnabled) return;
+    if (typeof window === "undefined") return;
+
+    const VANTA = (window as Window & { VANTA?: { FOG?: (opts: { el: HTMLElement; THREE: typeof THREE; [key: string]: unknown }) => { destroy: () => void } } }).VANTA;
+    if (!VANTA?.FOG) return;
+
+    try {
+      vantaInstanceRef.current = VANTA.FOG({
+        el: vantaRef.current,
+        THREE: THREE,
+        highlightColor: document.documentElement.classList.contains("dark") ? 0x1e1b4b : 0xf5f3ff,
+        midtoneColor: document.documentElement.classList.contains("dark") ? 0x312e81 : 0xddd6fe,
+        lowlightColor: document.documentElement.classList.contains("dark") ? 0x1e3a8a : 0xbfdbfe,
+        baseColor: document.documentElement.classList.contains("dark") ? 0x0f172a : 0xfffbeb,
+        blurFactor: document.documentElement.classList.contains("dark") ? 0.6 : 0.5,
+        speed: 0.4,
+        mouseControls: true,
+        mouseEase: true,
+        touchControls: false,
+        gyroControls: false,
+        scale: 1,
+        scaleMobile: 2,
+      });
+    } catch (e) {
+      console.warn("[VANTA] Failed to initialize", e);
+    }
+
+    return () => {
+      if (vantaInstanceRef.current && typeof vantaInstanceRef.current.destroy === "function") {
+        vantaInstanceRef.current.destroy();
+        vantaInstanceRef.current = null;
+      }
+    };
+  }, [webglAvailable, animationsEnabled]);
 
   if (loading) {
     return (
@@ -88,9 +146,18 @@ export default function Home() {
     },
   ];
 
+  const showVanta = animationsEnabled && webglAvailable;
+
   return (
     <div className="min-h-screen relative overflow-hidden">
-      <AnimatedBackground animate={animationsEnabled} />
+      {showVanta ? (
+        <>
+          <div ref={vantaRef} className="fixed inset-0 z-0" data-pb="background" />
+          <div className="fixed inset-0 z-[1] bg-white/[0.03] dark:bg-black/[0.05] pointer-events-none" />
+        </>
+      ) : (
+        <AnimatedBackground animate={animationsEnabled} />
+      )}
 
       <header className="relative z-10 flex items-center justify-between px-4 sm:px-6 py-4 max-w-7xl mx-auto">
         <motion.div

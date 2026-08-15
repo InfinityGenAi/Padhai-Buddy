@@ -39,6 +39,11 @@ export function detectDevice(): DeviceInfo {
   return { device, browser, os, userAgent: ua };
 }
 
+const REGISTER_COOLDOWN_MS = 5 * 60 * 1000;
+const HEARTBEAT_COOLDOWN_MS = 5 * 60 * 1000;
+const registerCooldowns = new Map<string, number>();
+const heartbeatCooldowns = new Map<string, number>();
+
 export function getOrCreateSessionId(): string {
   if (typeof window === "undefined") return crypto.randomUUID();
   const key = "padhai-buddy-session-id";
@@ -56,6 +61,12 @@ export async function registerSession(): Promise<void> {
   if (!user) return;
 
   const sessionId = getOrCreateSessionId();
+  const now = Date.now();
+  const lastRegister = registerCooldowns.get(sessionId) || 0;
+  if (now - lastRegister < REGISTER_COOLDOWN_MS) {
+    return;
+  }
+
   const device = detectDevice();
 
   try {
@@ -75,12 +86,25 @@ export async function registerSession(): Promise<void> {
       }),
     });
 
+    if (res.status === 503) {
+      const data = await res.json().catch(() => ({}));
+      if (data.degraded) {
+        registerCooldowns.set(sessionId, now + 10 * 60 * 1000);
+        if (process.env.NODE_ENV === "development") {
+          console.debug("[Session] Registration degraded:", data.code);
+        }
+        return;
+      }
+    }
+
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.error || "Failed to register session");
     }
+
+    registerCooldowns.delete(sessionId);
   } catch {
-    // ignore registration errors
+    registerCooldowns.set(sessionId, now + REGISTER_COOLDOWN_MS);
   }
 }
 
@@ -90,11 +114,17 @@ export async function heartbeatSession(): Promise<void> {
   if (!user) return;
 
   const sessionId = getOrCreateSessionId();
+  const now = Date.now();
+  const lastHeartbeat = heartbeatCooldowns.get(sessionId) || 0;
+  if (now - lastHeartbeat < HEARTBEAT_COOLDOWN_MS) {
+    return;
+  }
+
   const device = detectDevice();
 
   try {
     const token = await user.getIdToken();
-    await fetch("/api/sessions", {
+    const res = await fetch("/api/sessions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -106,8 +136,26 @@ export async function heartbeatSession(): Promise<void> {
         userAgent: device.userAgent,
       }),
     });
+
+    if (res.status === 503) {
+      const data = await res.json().catch(() => ({}));
+      if (data.degraded) {
+        heartbeatCooldowns.set(sessionId, now + 10 * 60 * 1000);
+        if (process.env.NODE_ENV === "development") {
+          console.debug("[Session] Heartbeat degraded:", data.code);
+        }
+        return;
+      }
+    }
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Failed to send heartbeat");
+    }
+
+    heartbeatCooldowns.delete(sessionId);
   } catch {
-    // ignore heartbeat errors
+    heartbeatCooldowns.set(sessionId, now + HEARTBEAT_COOLDOWN_MS);
   }
 }
 
@@ -121,10 +169,21 @@ export async function fetchSessions(): Promise<UserSession[]> {
     const res = await fetch("/api/sessions", {
       headers: { Authorization: `Bearer ${token}` },
     });
+
+    if (res.status === 503) {
+      const data = await res.json().catch(() => ({}));
+      if (data.degraded) {
+        throw new Error("SESSION_TRACKING_UNAVAILABLE");
+      }
+    }
+
     if (!res.ok) return [];
     const data = await res.json();
     return Array.isArray(data.sessions) ? data.sessions : [];
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.message === "SESSION_TRACKING_UNAVAILABLE") {
+      throw err;
+    }
     return [];
   }
 }
@@ -143,6 +202,13 @@ export async function revokeSession(sessionId: string): Promise<void> {
     },
     body: JSON.stringify({ sessionId: getOrCreateSessionId() }),
   });
+
+  if (res.status === 503) {
+    const data = await res.json().catch(() => ({}));
+    if (data.degraded) {
+      throw new Error("Session tracking is temporarily unavailable. Please try again later.");
+    }
+  }
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -164,6 +230,13 @@ export async function revokeAllOtherSessions(): Promise<void> {
     },
     body: JSON.stringify({ sessionId: getOrCreateSessionId() }),
   });
+
+  if (res.status === 503) {
+    const data = await res.json().catch(() => ({}));
+    if (data.degraded) {
+      throw new Error("Session tracking is temporarily unavailable. Please try again later.");
+    }
+  }
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));

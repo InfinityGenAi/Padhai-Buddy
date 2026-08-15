@@ -10,6 +10,8 @@ import {
   GoogleAuthProvider,
   signOut,
   updateProfile,
+  sendPasswordResetEmail,
+  confirmPasswordReset,
 } from "firebase/auth";
 import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
 import { getFirebaseAuth, getFirestoreDb, waitForFirebaseInit } from "@/lib/firebase";
@@ -18,6 +20,14 @@ import type { UserProfile, UserBoard, UserClass, UserPreferences } from "@/types
 
 const DEFAULT_PREFERENCES: UserPreferences = {
   soundEnabled: true,
+  soundVolume: "medium",
+  soundCategories: {
+    ui: true,
+    success: true,
+    error: true,
+    notifications: true,
+    study: true,
+  },
   animationsEnabled: true,
   theme: "system",
   notificationsEnabled: true,
@@ -62,6 +72,8 @@ interface AuthContextType {
   completeOnboarding: (cls: UserClass, board: UserBoard) => Promise<void>;
   preferences: UserPreferences;
   updatePreferences: (prefs: Partial<UserPreferences>) => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
+  resetPassword: (oobCode: string, newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -134,7 +146,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setNeedsOnboarding(false);
           const remotePrefs = data.preferences;
           const localPrefs = loadLocalPreferences();
-          const merged = { ...DEFAULT_PREFERENCES, ...localPrefs, ...(remotePrefs || { }) };
+          const merged: UserPreferences = {
+            ...DEFAULT_PREFERENCES,
+            ...localPrefs,
+            ...(remotePrefs || {}),
+            soundCategories: {
+              ...DEFAULT_PREFERENCES.soundCategories,
+              ...(localPrefs.soundCategories || {}),
+              ...((remotePrefs as UserPreferences | undefined)?.soundCategories || {}),
+            },
+          };
           setPreferences(merged);
           saveLocalPreferences(merged);
         } else {
@@ -272,6 +293,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setNeedsOnboarding(false);
   }
 
+  async function sendPasswordReset(email: string) {
+    await waitForFirebaseInit();
+    const auth = getFirebaseAuth();
+    if (!auth) throw new Error("Firebase not initialized");
+    const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+    await sendPasswordResetEmail(auth, email, {
+      url: `${origin}/reset-password`,
+      handleCodeInApp: true,
+    });
+  }
+
+  async function resetPassword(oobCode: string, newPassword: string) {
+    await waitForFirebaseInit();
+    const auth = getFirebaseAuth();
+    if (!auth) throw new Error("Firebase not initialized");
+    await confirmPasswordReset(auth, oobCode, newPassword);
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -288,6 +327,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         completeOnboarding,
         preferences,
         updatePreferences,
+        sendPasswordReset,
+        resetPassword,
       }}
     >
       {children}

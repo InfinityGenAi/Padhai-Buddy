@@ -25,12 +25,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Name, class, and board are required" }, { status: 400 });
     }
 
+    const nameStr = String(name).trim();
+    if (nameStr.length < 2 || nameStr.length > 50) {
+      return NextResponse.json({ error: "Name must be between 2 and 50 characters" }, { status: 400 });
+    }
+
+    const classNum = Number(studentClass);
+    if (!Number.isInteger(classNum) || classNum < 5 || classNum > 12) {
+      return NextResponse.json({ error: "Class must be between 5 and 12" }, { status: 400 });
+    }
+
+    const boardStr = String(board);
+    const validBoards = ["CBSE", "ICSE", "State Board"];
+    if (!validBoards.includes(boardStr)) {
+      return NextResponse.json({ error: "Invalid board value" }, { status: 400 });
+    }
+
     const updates: Record<string, unknown> = {
-      name: String(name),
-      class: Number(studentClass),
-      board: String(board),
+      name: nameStr,
+      class: classNum,
+      board: boardStr,
     };
-    if (photoURL) updates.photoURL = String(photoURL);
+
+    if (photoURL !== undefined && photoURL !== null && String(photoURL).trim() !== "") {
+      const url = String(photoURL).trim();
+      if (url.length > 2048) {
+        return NextResponse.json({ error: "Photo URL is too long" }, { status: 400 });
+      }
+      try {
+        new URL(url);
+      } catch {
+        return NextResponse.json({ error: "Photo URL must be a valid URL" }, { status: 400 });
+      }
+      updates.photoURL = url;
+    }
 
     await adminDb.collection("users").doc(decoded.uid).update(updates);
 

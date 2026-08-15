@@ -6,6 +6,8 @@ const ROUTES = [
   "/login",
   "/signup",
   "/onboarding",
+  "/forgot-password",
+  "/reset-password",
   "/dashboard",
   "/dashboard/chat",
   "/dashboard/history",

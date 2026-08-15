@@ -177,10 +177,18 @@ export default function LoginPage() {
               </div>
             </motion.div>
 
-            <motion.div variants={animationsEnabled ? staggerItem : undefined}>
-              <label className="block text-sm font-medium mb-1.5">
+            <motion.div variants={animationsEnabled ? staggerItem : undefined} className="flex items-center justify-between">
+              <label className="block text-sm font-medium">
                 Password
               </label>
+              <Link
+                href="/forgot-password"
+                className="text-xs text-primary font-medium hover:underline"
+              >
+                Forgot Password?
+              </Link>
+            </motion.div>
+            <motion.div variants={animationsEnabled ? staggerItem : undefined}>
               <div className="relative">
                 <LockClosedIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
                 <input
@@ -196,6 +204,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40 hover:text-foreground transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
                     <EyeSlashIcon className="w-5 h-5" />

@@ -11,6 +11,7 @@ import {
   MagnifyingGlassIcon,
   GlobeAltIcon,
 } from "@heroicons/react/24/outline";
+import { playSaveSuccess, playDeleteSuccess } from "@/lib/sounds";
 import type { Resource, ResourceType } from "@/types";
 
 const RESOURCE_TYPES: ResourceType[] = ["video", "article", "pdf", "link", "notes"];
@@ -68,6 +69,7 @@ export default function ResourcesPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
+      if (preferences.soundEnabled) playSaveSuccess();
       await fetchResources();
       setShowAdd(false);
       setEditing(null);
@@ -89,6 +91,7 @@ export default function ResourcesPage() {
         body: JSON.stringify({ action: "delete", resourceId }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
+      if (preferences.soundEnabled) playDeleteSuccess();
       setResources(resources.filter((r) => r.id !== resourceId));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to delete resource");

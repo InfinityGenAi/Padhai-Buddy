@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ sessions });
   } catch (error: unknown) {
-    console.error("Sessions list error:", error);
+    console.error("[Sessions] List error:", error);
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -99,11 +99,6 @@ export async function POST(req: NextRequest) {
       .doc(uid)
       .collection("sessions")
       .doc(sessionId);
-    const sessionSnap = await sessionRef.get();
-
-    const createdAt = sessionSnap.exists
-      ? sessionSnap.data()?.createdAt || Date.now()
-      : Date.now();
 
     const sessionData = {
       device: String(body.device || "Unknown Device"),
@@ -112,24 +107,37 @@ export async function POST(req: NextRequest) {
       userAgent: String(body.userAgent || ""),
       lastActive: Date.now(),
       current: true,
-      createdAt,
     };
 
     await sessionRef.set(sessionData, { merge: true });
 
-    const sessionsRef = adminDb
+    const currentQuery = adminDb
       .collection("users")
       .doc(uid)
-      .collection("sessions");
-    const allSnap = await sessionsRef.get();
-    const otherUpdates = allSnap.docs
-      .filter((d) => d.id !== sessionId && d.data().current === true)
-      .map((d) => d.ref.update({ current: false }));
-    await Promise.all(otherUpdates);
+      .collection("sessions")
+      .where("current", "==", true);
+
+    const currentSnap = await currentQuery.get();
+    const batch = adminDb.batch();
+    const otherUpdates = currentSnap.docs
+      .filter((d) => d.id !== sessionId)
+      .map((d) => batch.update(d.ref, { current: false }));
+
+    if (otherUpdates.length > 0) {
+      await batch.commit();
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    console.error("Session register error:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("RESOURCE_EXHAUSTED") || message.includes("8 RESOURCE_EXHAUSTED")) {
+      console.error("[Session] Firestore quota exhausted during registration");
+      return NextResponse.json(
+        { success: false, degraded: true, code: "RESOURCE_EXHAUSTED" },
+        { status: 503 },
+      );
+    }
+    console.error("[Session] Register error:", error);
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }

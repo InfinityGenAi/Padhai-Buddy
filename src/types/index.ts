@@ -32,6 +32,14 @@ export interface UserProfile {
 
 export interface UserPreferences {
   soundEnabled: boolean;
+  soundVolume: "low" | "medium" | "high";
+  soundCategories: {
+    ui: boolean;
+    success: boolean;
+    error: boolean;
+    notifications: boolean;
+    study: boolean;
+  };
   animationsEnabled: boolean;
   theme: "light" | "dark" | "system";
   notificationsEnabled: boolean;
@@ -100,6 +108,7 @@ export interface QuizAttempt {
   score: number;
   questions: QuizQuestion[];
   createdAt: number;
+  completedAt?: number;
 }
 
 export interface QuizQuestion {

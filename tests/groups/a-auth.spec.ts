@@ -48,7 +48,7 @@ test.describe("A. Public/Auth Tests", () => {
 
   test("dashboard greeting shows user name", async ({ page }) => {
     await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/dashboard");
+    await page.goto("http://localhost:3000/dashboard", { timeout: 30000 });
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
   });
@@ -105,5 +105,101 @@ test.describe("A. Public/Auth Tests", () => {
       await page.goto("http://localhost:3000/dashboard");
       await expect(page).toHaveURL("http://localhost:3000/login", { timeout: 15000 });
     });
+  });
+
+  test("forgot password page loads from login link", async ({ page }) => {
+    await mockSessionsRoute(page);
+    await page.goto("http://localhost:3000/login");
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(3000);
+    await page.goto("http://localhost:3000/forgot-password", { timeout: 30000 });
+    await page.waitForLoadState("domcontentloaded");
+    await expect(page.locator("h1:has-text('Forgot Password?')")).toBeAttached();
+  });
+
+  test("forgot password page has email form", async ({ page }) => {
+    await mockSessionsRoute(page);
+    await page.goto("http://localhost:3000/forgot-password", { timeout: 30000 });
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(1500);
+    await expect(page.locator("text=Send Reset Link")).toBeAttached();
+    await expect(page.locator('input[type="email"]')).toBeAttached();
+  });
+
+  test("forgot password submits with empty email shows error", async ({ page }) => {
+    await mockSessionsRoute(page);
+    await page.goto("http://localhost:3000/forgot-password", { timeout: 30000 });
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(1500);
+    await page.click("button:has-text('Send Reset Link')");
+    await expect(page.locator("text=Please enter your email address")).toBeAttached();
+  });
+
+  test("forgot password submits with invalid email shows error", async ({ page }) => {
+    await mockSessionsRoute(page);
+    await page.goto("http://localhost:3000/forgot-password", { timeout: 30000 });
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(1500);
+    await page.fill('input[type="email"]', "not-an-email");
+    await page.click("button:has-text('Send Reset Link')");
+    await expect(page.locator("text=Please enter a valid email address")).toBeAttached();
+  });
+
+  test.describe("login show password (unauthenticated)", () => {
+    test.use({ storageState: undefined });
+
+    test.beforeEach(async ({ page }) => {
+      await page.addInitScript(() => {
+        localStorage.clear();
+        sessionStorage.clear();
+      });
+    });
+
+    test("toggle works", async ({ page }) => {
+      await mockSessionsRoute(page);
+      await page.goto("http://localhost:3000/login");
+      await page.waitForLoadState("domcontentloaded");
+      await page.waitForTimeout(1500);
+      const passwordInput = page.locator('input[type="password"]').first();
+      await expect(passwordInput).toBeAttached();
+      const showBtn = page.locator('button[aria-label="Show password"]').first();
+      await expect(showBtn).toBeAttached();
+      await showBtn.click();
+      const textInput = page.locator('input[type="text"]').first();
+      await expect(textInput).toBeAttached();
+    });
+  });
+
+  test.describe("signup show password (unauthenticated)", () => {
+    test.use({ storageState: undefined });
+
+    test.beforeEach(async ({ page }) => {
+      await page.addInitScript(() => {
+        localStorage.clear();
+        sessionStorage.clear();
+      });
+    });
+
+    test("toggle works", async ({ page }) => {
+      await mockSessionsRoute(page);
+      await page.goto("http://localhost:3000/signup");
+      await page.waitForLoadState("domcontentloaded");
+      await page.waitForTimeout(1500);
+      const passwordInput = page.locator('input[type="password"]').first();
+      await expect(passwordInput).toBeAttached();
+      const showBtn = page.locator('button[aria-label="Show password"]').first();
+      await expect(showBtn).toBeAttached();
+      await showBtn.click();
+      const textInput = page.locator('input[type="text"]').first();
+      await expect(textInput).toBeAttached();
+    });
+  });
+
+  test("reset password with invalid link shows error", async ({ page }) => {
+    await mockSessionsRoute(page);
+    await page.goto("http://localhost:3000/reset-password", { timeout: 30000 });
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForTimeout(1500);
+    await expect(page.locator("text=Invalid or expired reset link")).toBeAttached();
   });
 });

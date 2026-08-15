@@ -49,10 +49,18 @@ export async function GET(req: NextRequest) {
 
     let totalFlashcards = 0;
     let flashcardsReviewed = 0;
-    for (const deckSnap of flashcardsSnap.docs) {
+    const cardPromises = flashcardsSnap.docs.map(async (deckSnap) => {
       const cardsSnap = await userRef.collection("flashcardDecks").doc(deckSnap.id).collection("cards").get();
-      totalFlashcards += cardsSnap.size;
-      flashcardsReviewed += cardsSnap.docs.filter((d) => d.data().status !== "new").length;
+      let reviewed = 0;
+      cardsSnap.forEach((d) => {
+        if (d.data().status !== "new") reviewed++;
+      });
+      return { total: cardsSnap.size, reviewed };
+    });
+    const cardResults = await Promise.all(cardPromises);
+    for (const result of cardResults) {
+      totalFlashcards += result.total;
+      flashcardsReviewed += result.reviewed;
     }
 
     const sessions = sessionsSnap.docs.map((d) => d.data());

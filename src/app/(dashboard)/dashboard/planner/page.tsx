@@ -9,6 +9,7 @@ import {
   CheckCircleIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
+import { playTaskComplete } from "@/lib/sounds";
 import type { StudyPlan, PlanPriority } from "@/types";
 
 type PlanFilter = "all" | "today" | "upcoming" | "completed";
@@ -88,6 +89,7 @@ export default function PlannerPage() {
       });
       if (!res.ok) throw new Error((await res.json()).error);
       setPlans(plans.map((p) => (p.id === plan.id ? { ...p, completed: !p.completed } : p)));
+      if (!plan.completed && preferences.soundEnabled) playTaskComplete();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to update plan");
     }

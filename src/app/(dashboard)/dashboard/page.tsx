@@ -14,6 +14,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { getFirestoreDb } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, doc, onSnapshot, query, orderBy, deleteDoc } from "firebase/firestore";
+import { playTaskComplete } from "@/lib/sounds";
 import type { Doubt, StudyPlan } from "@/types";
 
 function buildSafeChartPath(dailyCounts: number[]): { pathD: string; areaD: string; points: { x: number; y: number; val: number }[] } {
@@ -100,6 +101,7 @@ async function handleAddPlan(
   setShowAddPlan: (v: boolean) => void,
   setAddingPlan: (v: boolean) => void,
   setPlanError: (msg: string | null) => void,
+  soundEnabled?: boolean,
 ) {
   if (!newPlanTitle.trim() || !uid) return;
   const db = getFirestoreDb();
@@ -121,6 +123,7 @@ async function handleAddPlan(
     setNewPlanSubject("");
     setNewPlanDuration(30);
     setShowAddPlan(false);
+    if (soundEnabled) playTaskComplete();
   } catch {
     setPlanError("Failed to add task. Please try again.");
     setTimeout(() => setPlanError(null), 4000);
@@ -731,7 +734,7 @@ export default function DashboardPage() {
               className="subtle-card rounded-2xl p-6 max-w-sm w-full shadow-2xl"
             >
               <h3 className="text-lg font-semibold mb-4">Add Study Task</h3>
-              <form onSubmit={() => handleAddPlan(user?.uid, newPlanTitle, newPlanSubject, newPlanDuration, today, setNewPlanTitle, setNewPlanSubject, setNewPlanDuration, setShowAddPlan, setAddingPlan, setPlanError)} className="space-y-3">
+              <form onSubmit={() => handleAddPlan(user?.uid, newPlanTitle, newPlanSubject, newPlanDuration, today, setNewPlanTitle, setNewPlanSubject, setNewPlanDuration, setShowAddPlan, setAddingPlan, setPlanError, preferences.soundEnabled)} className="space-y-3">
                 <div>
                   <label className="text-xs text-foreground/60 mb-1 block">Subject</label>
                   <input

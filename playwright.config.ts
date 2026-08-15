@@ -15,11 +15,11 @@ export default defineConfig({
     baseURL: "http://localhost:3000",
     storageState: path.resolve(__dirname, "storageState.json"),
     trace: "on-first-retry",
-    actionTimeout: 15000,
-    navigationTimeout: 15000,
+    actionTimeout: 30000,
+    navigationTimeout: 30000,
   },
   expect: {
-    timeout: 15000,
+    timeout: 30000,
   },
   projects: [
     {

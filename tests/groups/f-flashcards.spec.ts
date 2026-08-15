@@ -69,6 +69,52 @@ test.describe("F. Flashcards Tests", () => {
           return;
         }
 
+        if (body.action === "addCard") {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              card: {
+                id: "card-" + Date.now(),
+                deckId: body.deckId,
+                front: body.front,
+                back: body.back,
+                status: body.status || "new",
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+              },
+            }),
+          });
+          return;
+        }
+
+        if (body.action === "updateCard") {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ success: true }),
+          });
+          return;
+        }
+
+        if (body.action === "deleteCard") {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ success: true }),
+          });
+          return;
+        }
+
+        if (body.action === "deleteDeck") {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ success: true }),
+          });
+          return;
+        }
+
         await route.fulfill({
           status: 400,
           contentType: "application/json",

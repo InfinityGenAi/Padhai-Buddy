@@ -9,6 +9,60 @@ test.describe("E. Quiz Tests", () => {
       if (route.request().method() === "POST") {
         const postData = await route.request().postData();
         const body = JSON.parse(postData || "{}");
+
+        if (body.action === "submit") {
+          const updatedQuestions = body.questions || [];
+          let correctAnswers = 0;
+          const serverQuestions = [
+            {
+              id: "q-0",
+              question: "What is 2 + 2?",
+              options: ["3", "4", "5", "6"],
+              correctIndex: 1,
+              explanation: "2 + 2 equals 4.",
+            },
+            {
+              id: "q-1",
+              question: "What is the capital of France?",
+              options: ["London", "Berlin", "Paris", "Madrid"],
+              correctIndex: 2,
+              explanation: "Paris is the capital of France.",
+            },
+          ];
+
+          for (let i = 0; i < serverQuestions.length && i < updatedQuestions.length; i++) {
+            const q = updatedQuestions[i];
+            if (q.selectedIndex === serverQuestions[i].correctIndex) {
+              correctAnswers++;
+            }
+          }
+
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              attempt: {
+                id: body.attemptId || "quiz-" + Date.now(),
+                subject: body.subject || "Maths",
+                class: body.class || 10,
+                board: body.board || "CBSE",
+                difficulty: body.difficulty || "medium",
+                totalQuestions: serverQuestions.length,
+                correctAnswers,
+                score: Math.round((correctAnswers / serverQuestions.length) * 100),
+                questions: serverQuestions.map((sq, idx) => ({
+                  ...sq,
+                  id: sq.id,
+                  selectedIndex: updatedQuestions[idx]?.selectedIndex,
+                })),
+                createdAt: Date.now(),
+                completedAt: Date.now(),
+              },
+            }),
+          });
+          return;
+        }
+
         await route.fulfill({
           status: 200,
           contentType: "application/json",

@@ -10,6 +10,7 @@ import {
   ArrowPathIcon,
   PlayIcon,
 } from "@heroicons/react/24/outline";
+import { playQuizCorrect, playQuizWrong, playQuizComplete } from "@/lib/sounds";
 import type { QuizAttempt } from "@/types";
 
 type QuizState = "setup" | "active" | "result";
@@ -90,6 +91,9 @@ export default function QuizPage() {
       if (index === updated.questions[currentIndex].correctIndex) {
         updated.correctAnswers = (updated.correctAnswers || 0) + 1;
         updated.score = Math.round((updated.correctAnswers / updated.totalQuestions) * 100);
+        if (preferences.soundEnabled) playQuizCorrect();
+      } else {
+        if (preferences.soundEnabled) playQuizWrong();
       }
       setAttempt(updated);
     }
@@ -111,8 +115,41 @@ export default function QuizPage() {
     }
   };
 
-  const handleSubmit = () => {
-    setState("result");
+  const handleSubmit = async () => {
+    if (!attempt) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const token = await (await import("@/lib/auth-utils")).getFirebaseIdToken();
+      const res = await fetch("/api/quiz", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: "submit",
+          attemptId: attempt.id,
+          questions: attempt.questions.map((q) => ({
+            id: q.id,
+            question: q.question,
+            options: q.options,
+            correctIndex: q.correctIndex,
+            explanation: q.explanation,
+            selectedIndex: q.selectedIndex,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to submit quiz");
+      if (preferences.soundEnabled) playQuizComplete();
+      setAttempt(data.attempt);
+      setState("result");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to submit quiz");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRetry = () => {
