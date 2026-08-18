@@ -47,6 +47,9 @@ async function ensureTestUser(): Promise<string> {
   try {
     const userRecord = await auth.getUserByEmail(TEST_EMAIL);
     uid = userRecord.uid;
+    if (!userRecord.emailVerified) {
+      await auth.updateUser(uid, { emailVerified: true });
+    }
   } catch (e: unknown) {
     const err = e as { code?: string };
     if (err.code === "auth/user-not-found") {
@@ -54,6 +57,7 @@ async function ensureTestUser(): Promise<string> {
         email: TEST_EMAIL,
         password: TEST_PASSWORD,
         displayName: "Test User",
+        emailVerified: true,
       });
       uid = userRecord.uid;
     } else {
@@ -104,17 +108,34 @@ export default async function globalSetup() {
   const page = await context.newPage();
 
   try {
-    await page.goto("http://localhost:3000/login");
-    await page.waitForLoadState("networkidle");
-    await page.fill('input[type="email"]', TEST_EMAIL);
-    await page.fill('input[type="password"]', TEST_PASSWORD);
-    await page.click('button[type="submit"]');
+    await page.goto("http://localhost:3000/login", { waitUntil: "domcontentloaded" });
 
-    await page.waitForURL("http://localhost:3000/dashboard", { timeout: 30000 });
-    await page.waitForLoadState("networkidle");
-    await page.waitForSelector("text=Hi,", { timeout: 30000 });
+    const currentUrl = page.url();
+    console.log("Global setup - current URL after navigation:", currentUrl);
+    console.log("Global setup - page title:", await page.title());
+
+    const bodyContent = await page.locator("body").innerText();
+    console.log("Global setup - body content (first 200 chars):", bodyContent.substring(0, 200));
+
+    const emailInput = page.locator('input[type="email"]');
+    const count = await emailInput.count();
+    console.log("Global setup - email input count:", count);
+
+    await emailInput.waitFor({ timeout: 120000, state: "attached" });
+
+    await emailInput.fill(TEST_EMAIL, { force: true });
+    await page.fill('input[type="password"]', TEST_PASSWORD, { force: true });
+    await page.click('button[type="submit"]', { force: true });
+
+    await page.waitForURL("http://localhost:3000/dashboard", { timeout: 120000 });
+    await page.waitForLoadState("domcontentloaded");
+    await page.waitForSelector("text=Hi,", { timeout: 120000 });
 
     await context.storageState({ path: storageStatePath });
+  } catch (error) {
+    console.error("Global setup failed:", error);
+    await page.screenshot({ path: "test-results/global-setup-failure.png" });
+    throw error;
   } finally {
     await browser.close();
   }

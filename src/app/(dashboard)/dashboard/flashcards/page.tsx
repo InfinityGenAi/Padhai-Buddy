@@ -302,13 +302,22 @@ export default function FlashcardsPage() {
           </motion.div>
         )}
 
-        <motion.div
-          onClick={() => { if (preferences.soundEnabled) playFlashcardFlip(); setIsFlipped(!isFlipped); }}
-          className="subtle-card rounded-2xl p-8 min-h-[200px] flex items-center justify-center cursor-pointer"
-          whileHover={{ scale: 1.01 }}
-        >
-          <p className="text-center text-lg font-medium">{isFlipped ? currentCard.back : currentCard.front}</p>
-        </motion.div>
+        <div className="[perspective:1200px]">
+          <motion.div
+            onClick={() => { if (preferences.soundEnabled) playFlashcardFlip(); setIsFlipped(!isFlipped); }}
+            animate={{ rotateY: isFlipped ? 180 : 0 }}
+            transition={{ duration: animationsEnabled ? 0.45 : 0, ease: "easeInOut" }}
+            className="subtle-card rounded-2xl p-8 min-h-[200px] relative cursor-pointer [transform-style:preserve-3d]"
+            whileHover={animationsEnabled ? { scale: 1.01 } : undefined}
+          >
+            <div className="absolute inset-0 flex items-center justify-center p-8 [backface-visibility:hidden]">
+              <p className="text-center text-lg font-medium">{currentCard.front}</p>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center p-8 [transform:rotateY(180deg)] [backface-visibility:hidden]">
+              <p className="text-center text-lg font-medium">{currentCard.back}</p>
+            </div>
+          </motion.div>
+        </div>
 
         <div className="flex gap-2 justify-center">
           <button onClick={() => { if (preferences.soundEnabled) playTaskComplete(); markCard("difficult"); }} className="px-4 py-2 rounded-xl text-sm font-medium bg-red-50 dark:bg-red-950/30 text-red-600 hover:bg-red-100">

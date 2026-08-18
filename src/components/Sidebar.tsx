@@ -22,6 +22,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSettingsModal } from "@/contexts/SettingsModalContext";
 import { motion, useReducedMotion } from "framer-motion";
 import { playLogout, playSettings } from "@/lib/sounds";
+import BrandLogo from "./BrandLogo";
 
 const mainNavItems = [
   { name: "Dashboard", href: "/dashboard", icon: HomeIcon, available: true },
@@ -51,9 +52,7 @@ export default function Sidebar() {
       <div className="flex flex-col h-full">
         {/* Logo */}
         <div className="flex items-center gap-3 px-6 pt-6 pb-5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-md flex-shrink-0">
-            <LogoIcon className="w-5 h-5 text-white" />
-          </div>
+          <BrandLogo size={36} />
           <h2 className="text-lg font-bold text-primary tracking-tight">Padhai Buddy</h2>
         </div>
 
@@ -113,22 +112,5 @@ export default function Sidebar() {
         </div>
       </div>
     </aside>
-  );
-}
-
-function LogoIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M12 3l1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5L12 3z" />
-      <path d="M5 16l.5 2L8 19l-2 .5L5 22l-.5-2L2 19l2-.5L5 16z" />
-    </svg>
   );
 }

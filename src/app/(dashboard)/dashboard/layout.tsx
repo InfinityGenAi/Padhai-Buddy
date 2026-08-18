@@ -6,6 +6,7 @@ import AnimatedBackground from "@/components/AnimatedBackground";
 import RequireAuth from "@/components/AuthWrapper";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import SettingsModal from "@/components/SettingsModal";
+import BrandLogo from "@/components/BrandLogo";
 import { SettingsModalProvider, useSettingsModal } from "@/contexts/SettingsModalContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { registerSession, heartbeatSession } from "@/lib/sessions";
@@ -203,6 +204,23 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
                     )}
                   </AnimatePresence>
                 </div>
+              )}
+            </div>
+          </header>
+          <header className="sm:hidden flex items-center justify-between px-4 py-3 border-b border-border/40">
+            <BrandLogo size={28} />
+            <div className="flex items-center gap-2">
+              {user && (
+                <motion.button
+                  whileHover={animationsEnabled ? { scale: 1.05 } : undefined}
+                  whileTap={animationsEnabled ? { scale: 0.95 } : undefined}
+                  onClick={() => setProfileOpen((prev) => !prev)}
+                  className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 cursor-pointer"
+                  aria-label="Account"
+                  aria-expanded={profileOpen}
+                >
+                  {user.name?.charAt(0).toUpperCase() || "U"}
+                </motion.button>
               )}
             </div>
           </header>

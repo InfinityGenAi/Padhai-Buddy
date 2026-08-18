@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, useReducedMotion } from "framer-motion";
-import { UserIcon, AcademicCapIcon } from "@heroicons/react/24/outline";
+import { UserIcon } from "@heroicons/react/24/outline";
 import type { UserBoard, UserClass } from "@/types";
 import AnimatedBackground from "@/components/AnimatedBackground";
+import BrandLogo from "@/components/BrandLogo";
 
 const CLASSES: UserClass[] = [5, 6, 7, 8, 9, 10, 11, 12];
 const BOARDS: UserBoard[] = ["CBSE", "ICSE", "State Board"];
@@ -17,8 +18,8 @@ export default function OnboardingPage() {
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
   const [name, setName] = useState("");
-  const [selectedClass, setSelectedClass] = useState<UserClass>(9);
-  const [selectedBoard, setSelectedBoard] = useState<UserBoard>("CBSE");
+  const [selectedClass, setSelectedClass] = useState<UserClass | undefined>(undefined);
+  const [selectedBoard, setSelectedBoard] = useState<UserBoard | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,12 +38,16 @@ export default function OnboardingPage() {
         router.replace("/dashboard");
       }
     }
-  }, [firebaseUser, user, authLoading, router, completeOnboarding, derivedName, name]);
+  }, [firebaseUser, user, authLoading, router, derivedName, name]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setError("Please enter your name");
+      return;
+    }
+    if (!selectedClass || !selectedBoard) {
+      setError("Please select your class and board");
       return;
     }
 
@@ -75,11 +80,11 @@ export default function OnboardingPage() {
         <motion.div
           initial={animationsEnabled ? { opacity: 0, y: 20 } : false}
           animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
-          transition={animationsEnabled ? { duration: 0.6, ease: "easeOut", delay: 0.1 } : undefined}
-          className="glass-strong card-subtle rounded-2xl p-8 shadow-xl"
+          transition={animationsEnabled ? { duration: 0.6, ease: "easeOut" } : undefined}
+          className="auth-card p-8"
         >
           <div className="text-center mb-6">
-            <AcademicCapIcon className="w-10 h-10 text-primary mx-auto mb-2" />
+            <BrandLogo size={48} className="mx-auto mb-2" />
             <h1 className="text-3xl font-bold text-primary mb-1">
               Welcome to Padhai Buddy!
             </h1>
@@ -103,14 +108,14 @@ export default function OnboardingPage() {
               <label className="block text-sm font-medium mb-1.5">
                 Full Name
               </label>
-              <div className="relative">
-                <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
+              <div className="auth-input-wrapper">
+                <UserIcon className="auth-input-icon" />
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Enter your full name"
-                  className="w-full pl-10 pr-4 py-2.5 input-field"
+                  className="auth-input"
                   required
                 />
               </div>
@@ -121,11 +126,12 @@ export default function OnboardingPage() {
                 Class
               </label>
               <select
-                value={selectedClass}
-                onChange={(e) => setSelectedClass(Number(e.target.value) as UserClass)}
-                className="w-full py-2.5 px-4 input-field"
+                value={selectedClass ?? ""}
+                onChange={(e) => setSelectedClass(e.target.value ? Number(e.target.value) as UserClass : undefined)}
+                className="auth-select"
                 required
               >
+                <option value="">Select class</option>
                 {CLASSES.map((c) => (
                   <option key={c} value={c}>
                     Class {c}
@@ -139,11 +145,12 @@ export default function OnboardingPage() {
                 Board
               </label>
               <select
-                value={selectedBoard}
-                onChange={(e) => setSelectedBoard(e.target.value as UserBoard)}
-                className="w-full py-2.5 px-4 input-field"
+                value={selectedBoard ?? ""}
+                onChange={(e) => setSelectedBoard(e.target.value ? e.target.value as UserBoard : undefined)}
+                className="auth-select"
                 required
               >
+                <option value="">Select board</option>
                 {BOARDS.map((b) => (
                   <option key={b} value={b}>
                     {b}

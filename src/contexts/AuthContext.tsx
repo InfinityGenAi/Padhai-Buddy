@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, useCallback, ReactNode } from "react";
 import {
   onAuthStateChanged,
   User as FirebaseUser,
@@ -12,6 +12,7 @@ import {
   updateProfile,
   sendPasswordResetEmail,
   confirmPasswordReset,
+  sendEmailVerification,
 } from "firebase/auth";
 import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
 import { getFirebaseAuth, getFirestoreDb, waitForFirebaseInit } from "@/lib/firebase";
@@ -66,7 +67,7 @@ interface AuthContextType {
   needsOnboarding: boolean;
   reloadProfile: () => void;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (name: string, email: string, password: string) => Promise<void>;
+  signUp: (name: string, email: string, password: string, cls?: UserClass, board?: UserBoard) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   completeOnboarding: (cls: UserClass, board: UserBoard) => Promise<void>;
@@ -93,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [preferences, setPreferences] = useState<UserPreferences>(() =>
     loadLocalPreferences(),
   );
+  const signingUpRef = useRef(false);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -160,7 +162,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           saveLocalPreferences(merged);
         } else {
           setUser(null);
-          setNeedsOnboarding(true);
+          if (!signingUpRef.current) {
+            setNeedsOnboarding(true);
+          }
         }
         setAuthError(null);
       })
@@ -168,16 +172,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthError(err instanceof Error ? err.message : String(err));
         setNeedsOnboarding(false);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!signingUpRef.current) {
+          setLoading(false);
+        }
+      });
   };
 
-  const reloadProfile = () => {
+  const reloadProfile = useCallback(() => {
     if (firebaseUser) {
       setLoading(true);
       setAuthError(null);
       loadUserProfile(firebaseUser);
     }
-  };
+  }, [firebaseUser]);
 
   useEffect(() => {
     let unsub: (() => void) | undefined;
@@ -205,30 +213,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  async function signIn(email: string, password: string) {
+  const signIn = useCallback(async (email: string, password: string) => {
     await waitForFirebaseInit();
     const auth = getFirebaseAuth();
     if (!auth) throw new Error("Firebase not initialized");
     await signInWithEmailAndPassword(auth, email, password);
-  }
+  }, []);
 
-  async function signUp(name: string, email: string, password: string) {
+  const signUp = useCallback(async (name: string, email: string, password: string, cls?: UserClass, board?: UserBoard) => {
     await waitForFirebaseInit();
     const auth = getFirebaseAuth();
     if (!auth) throw new Error("Firebase not initialized");
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(cred.user, { displayName: name });
-  }
+    signingUpRef.current = true;
+    setLoading(true);
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(cred.user, { displayName: name });
+      try {
+        await sendEmailVerification(cred.user);
+      } catch (verifyErr) {
+        console.warn("[AuthContext] Failed to send verification email:", verifyErr);
+      }
 
-  async function signInWithGoogle() {
+      if (cls && board) {
+        const db = getFirestoreDb();
+        if (db) {
+          const updated: UserProfile = {
+            uid: cred.user.uid,
+            name,
+            email: cred.user.email || email,
+            class: cls,
+            board,
+            createdAt: Date.now(),
+            preferences: { ...DEFAULT_PREFERENCES },
+          };
+          await setDoc(doc(db, "users", cred.user.uid), updated, { merge: true });
+          setUser(updated);
+          setNeedsOnboarding(false);
+        }
+      }
+    } catch (err) {
+      if (auth.currentUser) {
+        try {
+          await auth.currentUser.delete();
+        } catch (cleanupErr) {
+          console.error("[AuthContext] Failed to cleanup Firebase user after signup failure:", cleanupErr);
+        }
+      }
+      setUser(null);
+      setNeedsOnboarding(false);
+      throw err;
+    } finally {
+      signingUpRef.current = false;
+      if (!cls || !board) {
+        setNeedsOnboarding(true);
+      }
+      setLoading(false);
+    }
+  }, []);
+
+  const signInWithGoogle = useCallback(async () => {
     await waitForFirebaseInit();
     const auth = getFirebaseAuth();
     if (!auth) throw new Error("Firebase not initialized");
     const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
     await signInWithPopup(auth, provider);
-  }
+  }, []);
 
-  async function completeOnboarding(cls: UserClass, board: UserBoard) {
+  const completeOnboarding = useCallback(async (cls: UserClass, board: UserBoard) => {
     await waitForFirebaseInit();
     const auth = getFirebaseAuth();
     if (!auth || !auth.currentUser) throw new Error("Not authenticated");
@@ -242,14 +295,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       class: cls,
       board,
       createdAt: user?.createdAt || Date.now(),
+      preferences: { ...DEFAULT_PREFERENCES },
     };
 
     await setDoc(doc(db, "users", auth.currentUser.uid), updated, { merge: true });
     setUser(updated);
     setNeedsOnboarding(false);
-  }
+  }, [user, firebaseUser]);
 
-  async function updatePreferences(prefs: Partial<UserPreferences>) {
+  const updatePreferences = useCallback(async (prefs: Partial<UserPreferences>) => {
     await waitForFirebaseInit();
     const auth = getFirebaseAuth();
     if (!auth || !auth.currentUser) return;
@@ -267,9 +321,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore sync errors
     }
-  }
+  }, [preferences]);
 
-  async function logout() {
+  const logout = useCallback(async () => {
     await waitForFirebaseInit();
     const auth = getFirebaseAuth();
     if (!auth) return;
@@ -291,9 +345,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setFirebaseUser(null);
     setNeedsOnboarding(false);
-  }
+  }, []);
 
-  async function sendPasswordReset(email: string) {
+  const sendPasswordReset = useCallback(async (email: string) => {
     await waitForFirebaseInit();
     const auth = getFirebaseAuth();
     if (!auth) throw new Error("Firebase not initialized");
@@ -302,14 +356,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       url: `${origin}/reset-password`,
       handleCodeInApp: true,
     });
-  }
+  }, []);
 
-  async function resetPassword(oobCode: string, newPassword: string) {
+  const resetPassword = useCallback(async (oobCode: string, newPassword: string) => {
     await waitForFirebaseInit();
     const auth = getFirebaseAuth();
     if (!auth) throw new Error("Firebase not initialized");
     await confirmPasswordReset(auth, oobCode, newPassword);
-  }
+  }, []);
 
   return (
     <AuthContext.Provider

@@ -11,6 +11,7 @@ import {
   CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import AnimatedBackground from "@/components/AnimatedBackground";
+import BrandLogo from "@/components/BrandLogo";
 
 const staggerContainer = {
   hidden: { opacity: 0 },
@@ -117,14 +118,14 @@ export default function ResetPasswordPage() {
         >
           <motion.div
             variants={animationsEnabled ? staggerItem : undefined}
-            className="glass-strong card-subtle rounded-2xl p-8 shadow-xl text-center"
+            className="auth-card p-8 text-center"
           >
             <motion.div
               variants={animationsEnabled ? staggerItem : undefined}
               className="flex justify-center mb-4"
             >
-              <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                <CheckCircleIcon className="w-10 h-10 text-green-600 dark:text-green-400" />
+              <div className="success-check">
+                <CheckCircleIcon className="w-8 h-8 text-white" />
               </div>
             </motion.div>
             <motion.h1
@@ -162,19 +163,17 @@ export default function ResetPasswordPage() {
         animate={animationsEnabled ? "visible" : false}
         className="relative z-10 w-full max-w-md mx-auto p-6"
       >
-        <motion.div
-          variants={animationsEnabled ? staggerItem : undefined}
-          className="glass-strong card-subtle rounded-2xl p-8 shadow-xl"
-        >
-          <div className="text-center mb-6">
-            <motion.div
-              variants={animationsEnabled ? staggerItem : undefined}
-              className="flex justify-center mb-4"
-            >
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg">
-                <LockClosedIcon className="w-8 h-8 text-white" />
-              </div>
-            </motion.div>
+         <motion.div
+           variants={animationsEnabled ? staggerItem : undefined}
+           className="auth-card p-8"
+         >
+           <div className="text-center mb-6">
+             <motion.div
+               variants={animationsEnabled ? staggerItem : undefined}
+               className="flex justify-center mb-4"
+             >
+               <BrandLogo size={56} />
+             </motion.div>
             <motion.h1
               variants={animationsEnabled ? staggerItem : undefined}
               className="text-3xl font-bold text-primary mb-1"
@@ -204,14 +203,14 @@ export default function ResetPasswordPage() {
               <label className="block text-sm font-medium mb-1.5">
                 New Password
               </label>
-              <div className="relative">
-                <LockClosedIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
+              <div className="auth-input-wrapper">
+                <LockClosedIcon className="auth-input-icon" />
                 <input
                   type={showNewPassword ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="At least 6 characters"
-                  className="w-full pl-10 pr-12 py-2.5 input-field"
+                  className="auth-input"
                   required
                   minLength={6}
                   autoFocus
@@ -219,7 +218,7 @@ export default function ResetPasswordPage() {
                 <button
                   type="button"
                   onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40 hover:text-foreground transition-colors"
+                  className="password-toggle"
                   aria-label={showNewPassword ? "Hide password" : "Show password"}
                 >
                   {showNewPassword ? (
@@ -229,27 +228,45 @@ export default function ResetPasswordPage() {
                   )}
                 </button>
               </div>
+              {newPassword && (
+                <div className="mt-1.5 flex items-center gap-2">
+                  <div className="flex-1 h-1 bg-foreground/10 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${
+                        newPassword.length < 6
+                          ? "w-1/4 bg-red-500"
+                          : newPassword.length < 10
+                            ? "w-2/4 bg-amber-500"
+                            : "w-full bg-green-500"
+                      }`}
+                    />
+                  </div>
+                  <span className="text-[10px] text-foreground/50">
+                    {newPassword.length < 6 ? "Weak" : newPassword.length < 10 ? "Medium" : "Strong"}
+                  </span>
+                </div>
+              )}
             </motion.div>
 
             <motion.div variants={animationsEnabled ? staggerItem : undefined}>
               <label className="block text-sm font-medium mb-1.5">
                 Confirm New Password
               </label>
-              <div className="relative">
-                <LockClosedIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
+              <div className="auth-input-wrapper">
+                <LockClosedIcon className="auth-input-icon" />
                 <input
                   type={showConfirmPassword ? "text" : "password"}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Repeat your password"
-                  className="w-full pl-10 pr-12 py-2.5 input-field"
+                  className="auth-input"
                   required
                   minLength={6}
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40 hover:text-foreground transition-colors"
+                  className="password-toggle"
                   aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                 >
                   {showConfirmPassword ? (

@@ -19,6 +19,7 @@ export default function PhotoDoubtPage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [answer, setAnswer] = useState<string | null>(null);
+  const [answerNotSaved, setAnswerNotSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,6 +42,7 @@ export default function PhotoDoubtPage() {
     setFile(f);
     setError(null);
     setAnswer(null);
+    setAnswerNotSaved(false);
     if (preview) URL.revokeObjectURL(preview);
     const url = URL.createObjectURL(f);
     setPreview(url);
@@ -104,6 +106,7 @@ export default function PhotoDoubtPage() {
       if (!res.ok) throw new Error(data.error || "Failed to get response");
 
       setAnswer(data.answer);
+      setAnswerNotSaved(data.saved === false);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -116,6 +119,7 @@ export default function PhotoDoubtPage() {
     setFile(null);
     setPreview(null);
     setAnswer(null);
+    setAnswerNotSaved(false);
     setError(null);
   };
 
@@ -263,6 +267,11 @@ export default function PhotoDoubtPage() {
             <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
               {answer}
             </div>
+            {answerNotSaved && (
+              <p className="mt-3 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+                Your answer couldn&apos;t be saved to history. It won&apos;t appear in Doubt History.
+              </p>
+            )}
             <motion.button
               onClick={resetUpload}
               className="mt-6 w-full btn-primary py-2 rounded-xl font-medium"

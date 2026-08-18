@@ -72,7 +72,7 @@ export default function LeaderboardPage() {
     <motion.div initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined} animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined} className="space-y-5 w-full">
       <div className="flex items-center gap-2">
         <TrophyIcon className="w-6 h-6 text-primary" />
-        <h1 className="text-xl font-semibold">Leaderboard</h1>
+        <h1 className="text-xl font-semibold">My Study Rank</h1>
       </div>
 
       <div className="subtle-card rounded-xl p-6 text-center">
@@ -80,7 +80,7 @@ export default function LeaderboardPage() {
           {rank === "Gold" ? "🥇" : rank === "Silver" ? "🥈" : rank === "Bronze" ? "🥉" : "🌟"}
         </div>
         <h2 className="text-lg font-bold">{rank} Rank</h2>
-        <p className="text-sm text-foreground/60">Total Score: <span className="font-semibold text-primary">{totalScore}</span></p>
+        <p className="text-sm text-foreground/60">Your personal study score: <span className="font-semibold text-primary">{totalScore}</span></p>
       </div>
 
       <div className="subtle-card rounded-xl p-5">

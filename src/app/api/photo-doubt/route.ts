@@ -162,15 +162,17 @@ export async function POST(req: NextRequest) {
     }
 
     if (saveError) {
-      return NextResponse.json(
-        { error: "Answer generated, but doubt could not be saved. Please try again.", _dev: process.env.NODE_ENV === "development" ? saveError : undefined },
-        { status: 500 },
-      );
+      return NextResponse.json({
+        answer,
+        userId: decoded.uid,
+        saved: false,
+      });
     }
 
     return NextResponse.json({
       answer,
       userId: decoded.uid,
+      saved: true,
     });
   } catch (error: unknown) {
     console.error("Photo doubt API error:", error);

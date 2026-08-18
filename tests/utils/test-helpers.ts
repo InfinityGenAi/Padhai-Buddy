@@ -1,5 +1,48 @@
 import { type Page } from "@playwright/test";
 
+export async function pixelDiffRatio(
+  page: Page,
+  a: Buffer,
+  b: Buffer,
+  threshold = 24,
+): Promise<number> {
+  return page.evaluate(
+    async ({ a, b, threshold }) => {
+      const load = (dataUrl: string) =>
+        new Promise<HTMLImageElement>((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error("image decode failed"));
+          img.src = dataUrl;
+        });
+      const [ia, ib] = await Promise.all([load(a), load(b)]);
+      const canvas = document.createElement("canvas");
+      canvas.width = ia.width;
+      canvas.height = ia.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return 0;
+      ctx.drawImage(ia, 0, 0);
+      const da = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(ib, 0, 0);
+      const db = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let changed = 0;
+      for (let i = 0; i < da.length; i += 4) {
+        if (
+          Math.abs(da[i] - db[i]) +
+            Math.abs(da[i + 1] - db[i + 1]) +
+            Math.abs(da[i + 2] - db[i + 2]) >
+          threshold
+        ) {
+          changed++;
+        }
+      }
+      return changed / (canvas.width * canvas.height);
+    },
+    { a: `data:image/png;base64,${a.toString("base64")}`, b: `data:image/png;base64,${b.toString("base64")}`, threshold },
+  );
+}
+
 
 export function filterCriticalErrors(errors: string[]): string[] {
   return errors.filter((e) => {

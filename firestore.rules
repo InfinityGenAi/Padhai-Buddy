@@ -2,7 +2,24 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.uid is string
+        && request.resource.data.uid == userId
+        && request.resource.data.name is string
+        && request.resource.data.email is string
+        && request.resource.data.class is int
+        && request.resource.data.board in ["CBSE", "ICSE", "State Board"]
+        && request.resource.data.createdAt is int
+        && request.resource.data.preferences is map;
+      allow update: if request.auth != null && request.auth.uid == userId
+        && (!("name" in request.resource.data) || request.resource.data.name is string)
+        && (!("email" in request.resource.data) || request.resource.data.email is string)
+        && (!("class" in request.resource.data) || request.resource.data.class is int)
+        && (!("board" in request.resource.data) || request.resource.data.board in ["CBSE", "ICSE", "State Board"])
+        && (!("createdAt" in request.resource.data) || request.resource.data.createdAt is int)
+        && (!("preferences" in request.resource.data) || request.resource.data.preferences is map);
+      allow delete: if false;
 
       match /doubts/{doubtId} {
         allow read: if request.auth != null && request.auth.uid == userId;
@@ -18,7 +35,12 @@ service cloud.firestore {
         allow create: if request.auth != null && request.auth.uid == userId
           && request.resource.data.keys().hasAll([
             'device', 'userAgent', 'lastActive', 'current', 'createdAt'
-          ]);
+          ])
+          && request.resource.data.device is string
+          && request.resource.data.userAgent is string
+          && request.resource.data.lastActive is number
+          && request.resource.data.current is bool
+          && request.resource.data.createdAt is number;
         allow update, delete: if request.auth != null && request.auth.uid == userId;
       }
 

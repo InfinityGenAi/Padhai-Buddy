@@ -128,6 +128,8 @@ export default function TimerPage() {
   }, [isRunning, mode, soundEnabled, getDuration, saveSession]);
 
   const handleComplete = async () => {
+    if (saveAttemptedRef.current) return;
+    saveAttemptedRef.current = true;
     const duration = mode === "stopwatch" ? Math.floor(elapsed / 60) : Math.floor(getDuration() / 60);
     if (duration > 0) {
       await saveSession(duration);

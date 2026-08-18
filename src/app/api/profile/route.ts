@@ -18,7 +18,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
 
-    const body = await req.json();
+    let body: { name?: string; class?: unknown; board?: unknown; photoURL?: unknown };
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
     const { name, class: studentClass, board, photoURL } = body;
 
     if (!name || !studentClass || !board) {

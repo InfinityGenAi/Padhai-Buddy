@@ -21,7 +21,7 @@ function buildSafeChartPath(dailyCounts: number[]): { pathD: string; areaD: stri
   const maxVal = Math.max(...dailyCounts, 1);
   const points = dailyCounts.map((val, idx) => ({
     x: (idx / 6) * 100,
-    y: val > 0 ? 100 - (val / maxVal) * 75 - 10 : 50,
+    y: val > 0 ? 50 - (val / maxVal) * 40 : 50,
     val,
   }));
 
@@ -35,7 +35,7 @@ function buildSafeChartPath(dailyCounts: number[]): { pathD: string; areaD: stri
     d += ` C ${points[0].x + 10} ${points[0].y}, ${points[0].x + 15} ${points[0].y}, ${points[0].x + 20} ${points[0].y}`;
     return {
       pathD: d,
-      areaD: `${d} L ${points[0].x + 20} 100 L ${points[0].x} 100 Z`,
+      areaD: `${d} L ${points[0].x + 20} 50 L ${points[0].x} 50 Z`,
       points,
     };
   }
@@ -56,7 +56,7 @@ function buildSafeChartPath(dailyCounts: number[]): { pathD: string; areaD: stri
 
   return {
     pathD: d,
-    areaD: `${d} L 100 100 L 0 100 Z`,
+    areaD: `${d} L 100 50 L 0 50 Z`,
     points,
   };
 }
@@ -136,6 +136,7 @@ export default function DashboardPage() {
   const { user, preferences } = useAuth();
   const [weeklyDoubts, setWeeklyDoubts] = useState(0);
   const [totalDoubts, setTotalDoubts] = useState(0);
+  const [weeklyStudyMinutes, setWeeklyStudyMinutes] = useState(0);
   const [recentDoubts, setRecentDoubts] = useState<Doubt[]>([]);
   const [loading, setLoading] = useState(true);
   const [weeklyChartData, setWeeklyChartData] = useState<number[]>(new Array(7).fill(0));
@@ -175,6 +176,16 @@ export default function DashboardPage() {
         const allDoubts: Doubt[] = [];
         const dailyCounts = new Array(7).fill(0);
 
+        let studyMinutes = 0;
+        const studySnap = await getDocs(collection(db, "users", user.uid, "studySessions"));
+        studySnap.forEach((doc) => {
+          const data = doc.data();
+          const createdAt = data.createdAt?.toDate?.()?.getTime?.() || data.createdAt || 0;
+          if (createdAt >= weekAgo) {
+            studyMinutes += Number(data.durationMinutes) || 0;
+          }
+        });
+
         allSnap.forEach((doc) => {
           const data = doc.data();
           total++;
@@ -198,6 +209,7 @@ export default function DashboardPage() {
         allDoubts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
         setWeeklyDoubts(weekly);
         setTotalDoubts(total);
+        setWeeklyStudyMinutes(studyMinutes);
         setRecentDoubts(allDoubts.slice(0, 4));
         setWeeklyChartData(dailyCounts);
       } catch {
@@ -303,6 +315,14 @@ export default function DashboardPage() {
     return date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
   };
 
+  const formatStudyTime = (minutes: number) => {
+    if (minutes <= 0) return "—";
+    if (minutes < 60) return `${minutes}m`;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  };
+
   const renderInsight = () => {
     if (loading) {
       return (
@@ -368,7 +388,7 @@ export default function DashboardPage() {
     >
       {/* Welcome Header */}
       <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
-        <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight sm:hidden">
           Hi, {firstName}! 👋
         </h1>
         <p className="text-sm sm:text-base text-foreground/55 mt-1">
@@ -519,7 +539,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
               <div>
                 <p className="text-[11px] text-foreground/45 font-medium uppercase tracking-wider mb-1">Study Time</p>
-                <p className="text-sm font-semibold text-foreground">—</p>
+                <p className="text-sm font-semibold text-foreground">{loading ? "…" : formatStudyTime(weeklyStudyMinutes)}</p>
               </div>
               <div>
                 <p className="text-[11px] text-foreground/45 font-medium uppercase tracking-wider mb-1">Doubts Solved</p>
@@ -538,7 +558,7 @@ export default function DashboardPage() {
                   className="absolute pointer-events-none z-10 px-2.5 py-1.5 rounded-lg bg-foreground/90 text-white text-xs font-medium shadow-lg"
                   style={{
                     left: `${chartPoints[hoveredPoint].x}%`,
-                    top: `${chartPoints[hoveredPoint].y}%`,
+                    top: `${(chartPoints[hoveredPoint].y / 60) * 100}%`,
                     transform: "translate(-50%, -130%)",
                   }}
                 >
@@ -666,7 +686,7 @@ export default function DashboardPage() {
               {recentDoubts.map((doubt) => (
                 <div
                   key={doubt.id}
-                  className="flex items-start gap-3 p-3 rounded-xl bg-foreground-subtle bg-foreground-subtle-hover transition-colors"
+                  className="flex items-start gap-3 p-3 rounded-xl bg-foreground/5 hover:bg-foreground/10 transition-colors"
                 >
                   <div
                     className={`p-2 rounded-lg flex-shrink-0 ${
@@ -734,7 +754,7 @@ export default function DashboardPage() {
               className="subtle-card rounded-2xl p-6 max-w-sm w-full shadow-2xl"
             >
               <h3 className="text-lg font-semibold mb-4">Add Study Task</h3>
-              <form onSubmit={() => handleAddPlan(user?.uid, newPlanTitle, newPlanSubject, newPlanDuration, today, setNewPlanTitle, setNewPlanSubject, setNewPlanDuration, setShowAddPlan, setAddingPlan, setPlanError, preferences.soundEnabled)} className="space-y-3">
+              <form onSubmit={(e) => { e.preventDefault(); handleAddPlan(user?.uid, newPlanTitle, newPlanSubject, newPlanDuration, today, setNewPlanTitle, setNewPlanSubject, setNewPlanDuration, setShowAddPlan, setAddingPlan, setPlanError, preferences.soundEnabled); }} className="space-y-3">
                 <div>
                   <label className="text-xs text-foreground/60 mb-1 block">Subject</label>
                   <input

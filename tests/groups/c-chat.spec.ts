@@ -22,12 +22,28 @@ test.describe("C. Chat Tests", () => {
   });
 
   test("send question and receive response", async ({ page }) => {
+    const answerText = "2 + 2 equals 4. This is a mocked AI response for testing.";
+    await page.route("**/api/chat", async (route) => {
+      if (route.request().method() === "POST") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ answer: answerText, userId: "mock-user" }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ conversations: [] }),
+      });
+    });
+
     const input = page.locator("textarea, input[type='text']").first();
-    if (await input.count() > 0) {
-      await expect(input).toBeAttached();
-      await input.fill("What is 2+2?");
-      await page.keyboard.press("Enter");
-      await expect(page.locator("text=What is 2+2?")).toBeVisible();
-    }
+    await expect(input).toBeAttached();
+    await input.fill("What is 2+2?");
+    await page.keyboard.press("Enter");
+    await expect(page.locator("div.whitespace-pre-wrap", { hasText: "What is 2+2?" })).toBeVisible();
+    await expect(page.locator(`text=${answerText}`).first()).toBeVisible({ timeout: 15000 });
   });
 });

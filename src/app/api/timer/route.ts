@@ -18,24 +18,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
 
-    const body = await req.json();
+    let body: { action?: string; sessionId?: string; mode?: string; durationMinutes?: number; completed?: boolean };
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
     const { action, sessionId, mode, durationMinutes, completed } = body;
 
+    const VALID_MODES = ["pomodoro", "stopwatch", "custom"];
+
     if (action === "create" || action === "update") {
-      if (!mode || !durationMinutes) return NextResponse.json({ error: "Mode and duration are required" }, { status: 400 });
-
-      if (action === "create") {
-        const sessionRef = adminDb.collection("users").doc(decoded.uid).collection("studySessions").doc();
-        const session = { mode, durationMinutes, completed: completed || false, createdAt: Date.now() };
-        await sessionRef.set(session);
-        return NextResponse.json({ session: { id: sessionRef.id, ...session } });
+      if (!mode || !VALID_MODES.includes(String(mode))) {
+        return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
       }
+      if (action === "create" || action === "update") {
+        if (action === "create") {
+          if (typeof durationMinutes !== "number" || !Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 600) {
+            return NextResponse.json({ error: "durationMinutes must be an integer between 1 and 600" }, { status: 400 });
+          }
 
-      if (action === "update" && sessionId) {
-        const updates: Record<string, unknown> = {};
-        if (completed !== undefined) updates.completed = completed;
-        await adminDb.collection("users").doc(decoded.uid).collection("studySessions").doc(sessionId).update(updates);
-        return NextResponse.json({ success: true });
+          const sessionRef = adminDb.collection("users").doc(decoded.uid).collection("studySessions").doc();
+          const session = { mode: String(mode), durationMinutes, completed: completed || false, createdAt: Date.now() };
+          await sessionRef.set(session);
+          return NextResponse.json({ session: { id: sessionRef.id, ...session } });
+        }
+
+        if (action === "update" && sessionId) {
+          const updates: Record<string, unknown> = {};
+          if (completed !== undefined) updates.completed = completed;
+          await adminDb.collection("users").doc(decoded.uid).collection("studySessions").doc(sessionId).update(updates);
+          return NextResponse.json({ success: true });
+        }
       }
     }
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { sendEmailVerification } from "firebase/auth";
 import { motion, useReducedMotion } from "framer-motion";
 import { playLogin } from "@/lib/sounds";
 import {
@@ -11,9 +12,9 @@ import {
   EyeSlashIcon,
   LockClosedIcon,
   EnvelopeIcon,
-  SparklesIcon,
 } from "@heroicons/react/24/outline";
 import AnimatedBackground from "@/components/AnimatedBackground";
+import BrandLogo from "@/components/BrandLogo";
 
 const GoogleIcon = () => (
   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -47,6 +48,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const { signIn, signInWithGoogle, firebaseUser, user, loading, needsOnboarding, preferences } = useAuth();
   const router = useRouter();
 
@@ -64,6 +66,20 @@ export default function LoginPage() {
       router.replace("/onboarding");
     }
   }, [firebaseUser, user, loading, needsOnboarding, router]);
+
+  useEffect(() => {
+    if (!firebaseUser || !firebaseUser.emailVerified || resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [firebaseUser, resendCooldown]);
 
   if (loading) {
     return (
@@ -111,6 +127,21 @@ export default function LoginPage() {
     }
   };
 
+  const handleResendVerification = async () => {
+    if (resendCooldown > 0 || !firebaseUser) return;
+    try {
+      await sendEmailVerification(firebaseUser);
+      setResendCooldown(60);
+      setError(null);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      }
+    }
+  };
+
+  const showVerificationBanner = !!firebaseUser && !firebaseUser.emailVerified;
+
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
       <AnimatedBackground animate={animationsEnabled} />
@@ -120,19 +151,17 @@ export default function LoginPage() {
         animate={animationsEnabled ? "visible" : false}
         className="relative z-10 w-full max-w-md mx-auto p-6"
       >
-        <motion.div
-          variants={animationsEnabled ? staggerItem : undefined}
-          className="glass-strong card-subtle rounded-2xl p-8 shadow-xl"
-        >
-          {/* Logo */}
-          <motion.div
-            variants={animationsEnabled ? staggerItem : undefined}
-            className="flex justify-center mb-6"
-          >
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg">
-              <SparklesIcon className="w-8 h-8 text-white" />
-            </div>
-          </motion.div>
+         <motion.div
+           variants={animationsEnabled ? staggerItem : undefined}
+           className="auth-card p-8"
+         >
+           {/* Logo */}
+           <motion.div
+             variants={animationsEnabled ? staggerItem : undefined}
+             className="flex justify-center mb-6"
+           >
+             <BrandLogo size={56} />
+           </motion.div>
 
           <div className="text-center mb-6">
             <motion.h1
@@ -149,6 +178,24 @@ export default function LoginPage() {
             </motion.p>
           </div>
 
+          {showVerificationBanner && (
+            <motion.div
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 rounded-xl p-3 mb-4 text-sm"
+            >
+              Your email is not verified. Some features may be limited.{" "}
+              <button
+                type="button"
+                onClick={handleResendVerification}
+                disabled={resendCooldown > 0}
+                className="font-medium underline disabled:opacity-50"
+              >
+                Resend verification email
+              </button>
+            </motion.div>
+          )}
+
           {error && (
             <motion.div
               initial={animationsEnabled ? { opacity: 0, y: -5 } : false}
@@ -159,19 +206,35 @@ export default function LoginPage() {
             </motion.div>
           )}
 
+          <motion.button
+            onClick={handleGoogle}
+            disabled={isSubmitting}
+            className="w-full glass card-subtle border border-border rounded-xl py-2.5 font-medium flex items-center justify-center gap-2 hover:bg-foreground/5 transition-colors disabled:opacity-50"
+            whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
+            whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
+            variants={animationsEnabled ? staggerItem : undefined}
+          >
+            <GoogleIcon />
+            Continue with Google
+          </motion.button>
+
+          <div className="auth-divider">
+            <span>or</span>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <motion.div variants={animationsEnabled ? staggerItem : undefined}>
               <label className="block text-sm font-medium mb-1.5">
                 Email
               </label>
-              <div className="relative">
-                <EnvelopeIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
+              <div className="auth-input-wrapper">
+                <EnvelopeIcon className="auth-input-icon" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="w-full pl-10 pr-4 py-2.5 input-field"
+                  className="auth-input"
                   required
                 />
               </div>
@@ -183,27 +246,27 @@ export default function LoginPage() {
               </label>
               <Link
                 href="/forgot-password"
-                className="text-xs text-primary font-medium hover:underline"
+                className="auth-link text-xs"
               >
                 Forgot Password?
               </Link>
             </motion.div>
             <motion.div variants={animationsEnabled ? staggerItem : undefined}>
-              <div className="relative">
-                <LockClosedIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
+              <div className="auth-input-wrapper">
+                <LockClosedIcon className="auth-input-icon" />
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-12 py-2.5 input-field"
+                  className="auth-input"
                   required
                   minLength={6}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40 hover:text-foreground transition-colors"
+                  className="password-toggle"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
@@ -226,24 +289,6 @@ export default function LoginPage() {
               {isSubmitting ? "Logging in..." : "Login"}
             </motion.button>
           </form>
-
-          <div className="my-6 flex items-center">
-            <div className="flex-1 border-t border-border"></div>
-            <span className="px-3 text-xs text-foreground/50">or</span>
-            <div className="flex-1 border-t border-border"></div>
-          </div>
-
-          <motion.button
-            onClick={handleGoogle}
-            disabled={isSubmitting}
-            className="w-full glass card-subtle border border-border rounded-xl py-2.5 font-medium flex items-center justify-center gap-2 hover:bg-foreground/5 transition-colors disabled:opacity-50"
-            whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
-            whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
-            variants={animationsEnabled ? staggerItem : undefined}
-          >
-            <GoogleIcon />
-            Login with Google
-          </motion.button>
 
           <motion.p
             variants={animationsEnabled ? staggerItem : undefined}

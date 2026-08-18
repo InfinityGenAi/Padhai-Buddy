@@ -63,16 +63,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
 
-    const body = await req.json();
+    let body: { action?: string; planId?: string; title?: string; subject?: string; durationMinutes?: number; plannedDate?: string; completed?: boolean; priority?: string };
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
     const { action, planId, title, subject, durationMinutes, plannedDate, completed, priority } = body;
+
+    const VALID_PRIORITIES = ["low", "medium", "high"];
 
     if (action === "create") {
       if (!title || !subject || !plannedDate) return NextResponse.json({ error: "Title, subject, and date are required" }, { status: 400 });
+      if (typeof title !== "string" || title.trim().length > 200) return NextResponse.json({ error: "Title must be a string of at most 200 characters" }, { status: 400 });
+      if (typeof subject !== "string" || subject.trim().length > 100) return NextResponse.json({ error: "Subject must be a string of at most 100 characters" }, { status: 400 });
+      if (typeof durationMinutes !== "number" || !Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 600) {
+        return NextResponse.json({ error: "durationMinutes must be an integer between 1 and 600" }, { status: 400 });
+      }
+      if (priority !== undefined && !VALID_PRIORITIES.includes(String(priority))) {
+        return NextResponse.json({ error: "Invalid priority" }, { status: 400 });
+      }
       const planRef = adminDb.collection("users").doc(decoded.uid).collection("studyPlans").doc();
       const plan = {
-        title,
-        subject,
-        durationMinutes: durationMinutes || 30,
+        title: title.trim(),
+        subject: subject.trim(),
+        durationMinutes,
         plannedDate,
         completed: completed || false,
         priority: priority || "medium",
@@ -85,12 +100,26 @@ export async function POST(req: NextRequest) {
 
     if (action === "update" && planId) {
       const updates: Record<string, unknown> = { updatedAt: Date.now() };
-      if (title !== undefined) updates.title = title;
-      if (subject !== undefined) updates.subject = subject;
-      if (durationMinutes !== undefined) updates.durationMinutes = durationMinutes;
+      if (title !== undefined) {
+        if (typeof title !== "string" || title.trim().length > 200) return NextResponse.json({ error: "Title must be a string of at most 200 characters" }, { status: 400 });
+        updates.title = title.trim();
+      }
+      if (subject !== undefined) {
+        if (typeof subject !== "string" || subject.trim().length > 100) return NextResponse.json({ error: "Subject must be a string of at most 100 characters" }, { status: 400 });
+        updates.subject = subject.trim();
+      }
+      if (durationMinutes !== undefined) {
+        if (typeof durationMinutes !== "number" || !Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 600) {
+          return NextResponse.json({ error: "durationMinutes must be an integer between 1 and 600" }, { status: 400 });
+        }
+        updates.durationMinutes = durationMinutes;
+      }
       if (plannedDate !== undefined) updates.plannedDate = plannedDate;
       if (completed !== undefined) updates.completed = completed;
-      if (priority !== undefined) updates.priority = priority;
+      if (priority !== undefined) {
+        if (!VALID_PRIORITIES.includes(String(priority))) return NextResponse.json({ error: "Invalid priority" }, { status: 400 });
+        updates.priority = String(priority);
+      }
       await adminDb.collection("users").doc(decoded.uid).collection("studyPlans").doc(planId).update(updates);
       return NextResponse.json({ success: true });
     }

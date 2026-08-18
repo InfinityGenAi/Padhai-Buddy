@@ -7,22 +7,31 @@ function validateQuestions(questions: unknown[]): QuizQuestion[] | null {
   if (!Array.isArray(questions) || questions.length < 1 || questions.length > 20) {
     return null;
   }
-  const parsed: QuizQuestion[] = [];
-  for (let i = 0; i < questions.length; i++) {
-    const q = questions[i] as Record<string, unknown>;
-    if (typeof q.question !== "string" || !q.question.trim()) return null;
-    if (!Array.isArray(q.options) || q.options.length !== 4) return null;
-    if (typeof q.correctIndex !== "number" || q.correctIndex < 0 || q.correctIndex > 3) return null;
-    if (typeof q.explanation !== "string" || !q.explanation.trim()) return null;
-    parsed.push({
-      id: `q-${i}`,
-      question: q.question.trim(),
-      options: q.options.map(String),
-      correctIndex: q.correctIndex,
-      explanation: q.explanation.trim(),
-      selectedIndex: undefined,
-    });
-  }
+const parsed: QuizQuestion[] = [];
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i] as Record<string, unknown>;
+      if (typeof q.question !== "string" || !q.question.trim()) return null;
+      if (!Array.isArray(q.options) || q.options.length !== 4) return null;
+      if (typeof q.correctIndex !== "number" || q.correctIndex < 0 || q.correctIndex > 3) return null;
+      if (typeof q.explanation !== "string" || !q.explanation.trim()) return null;
+      let selectedIndex: number | undefined;
+      if (
+        typeof q.selectedIndex === "number" &&
+        Number.isInteger(q.selectedIndex) &&
+        q.selectedIndex >= 0 &&
+        q.selectedIndex <= 3
+      ) {
+        selectedIndex = q.selectedIndex;
+      }
+      parsed.push({
+        id: `q-${i}`,
+        question: q.question.trim(),
+        options: q.options.map(String),
+        correctIndex: q.correctIndex,
+        explanation: q.explanation.trim(),
+        ...(selectedIndex !== undefined ? { selectedIndex } : {}),
+      });
+    }
   return parsed;
 }
 

@@ -11,6 +11,14 @@ import {
   InformationCircleIcon,
   ArrowTopRightOnSquareIcon,
   XMarkIcon,
+  DocumentTextIcon,
+  BookOpenIcon,
+  ClockIcon,
+  TrophyIcon,
+  FolderIcon,
+  CalendarIcon,
+  Cog6ToothIcon,
+  ChatBubbleLeftRightIcon,
 } from "@heroicons/react/24/outline";
 
 export default function MorePage() {
@@ -27,6 +35,54 @@ export default function MorePage() {
       title: "Study Insights",
       desc: "View detailed analytics about your study patterns and performance.",
       href: "/dashboard/progress",
+    },
+    {
+      icon: DocumentTextIcon,
+      title: "Notes",
+      desc: "Write and organize your study notes.",
+      href: "/dashboard/notes",
+    },
+    {
+      icon: BookOpenIcon,
+      title: "Flashcards",
+      desc: "Create flashcards to memorize key concepts.",
+      href: "/dashboard/flashcards",
+    },
+    {
+      icon: CalendarIcon,
+      title: "Study Planner",
+      desc: "Plan your daily study tasks and track progress.",
+      href: "/dashboard/planner",
+    },
+    {
+      icon: ClockIcon,
+      title: "Study Timer",
+      desc: "Use Pomodoro or custom timers to focus.",
+      href: "/dashboard/timer",
+    },
+    {
+      icon: TrophyIcon,
+      title: "Leaderboard",
+      desc: "Track your study rank and stay motivated.",
+      href: "/dashboard/leaderboard",
+    },
+    {
+      icon: FolderIcon,
+      title: "Resources",
+      desc: "Browse curated learning resources.",
+      href: "/dashboard/resources",
+    },
+    {
+      icon: ChatBubbleLeftRightIcon,
+      title: "Doubt History",
+      desc: "Review your past questions and answers.",
+      href: "/dashboard/history",
+    },
+    {
+      icon: Cog6ToothIcon,
+      title: "Profile & Settings",
+      desc: "Update your profile, preferences, and account.",
+      href: "/dashboard/profile",
     },
     {
       icon: QuestionMarkCircleIcon,

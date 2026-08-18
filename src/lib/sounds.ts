@@ -1,4 +1,4 @@
-const SOUND_PREFS_KEY = "padhai-buddy-sound-preferences";
+const SOUND_PREFS_KEY = "padhai-buddy-preferences";
 
 interface SoundPreferences {
   soundEnabled: boolean;
@@ -213,8 +213,13 @@ export function playMessageReceived() {
   ], NOTIFICATIONS);
 }
 
-export const playSend = playMessageSent;
-export const playReceive = playMessageReceived;
+export function playSend() {
+  playMessageSent();
+}
+
+export function playReceive() {
+  playMessageReceived();
+}
 
 export function playQuizCorrect() {
   playNotes("quizCorrect", [

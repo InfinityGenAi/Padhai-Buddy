@@ -46,14 +46,20 @@ test.describe("P. Animation Tests", () => {
     await page.locator("text=Settings").first().click();
     await expect(page.locator("text=Theme").first()).toBeAttached();
 
-    const animToggle = page.locator("text=Animations").first();
-    if (await animToggle.count() > 0) {
-      await page.evaluate(() => {
-        localStorage.setItem("padhai-buddy-preferences", JSON.stringify({ animationsEnabled: false }));
-        window.location.reload();
-      });
-      await page.waitForLoadState("domcontentloaded");
-      await expect(page.locator("text=Hi,").first()).toBeAttached();
+    const animToggle = page.locator('button[role="switch"][aria-label="Animations"]');
+    await expect(animToggle).toBeAttached();
+
+    if ((await animToggle.getAttribute("aria-checked")) === "true") {
+      await animToggle.click();
     }
+    await expect(animToggle).toHaveAttribute("aria-checked", "false");
+
+    const ambientLight = page.locator('[data-pb="ambient-light"]').first();
+    await expect(ambientLight).toBeAttached();
+    await expect
+      .poll(() =>
+        ambientLight.evaluate((el) => getComputedStyle(el).animationName)
+      )
+      .toBe("none");
   });
 });

@@ -8,6 +8,7 @@ import {
   PlusIcon,
   CheckCircleIcon,
   TrashIcon,
+  PencilIcon,
 } from "@heroicons/react/24/outline";
 import { playTaskComplete } from "@/lib/sounds";
 import type { StudyPlan, PlanPriority } from "@/types";
@@ -31,6 +32,7 @@ export default function PlannerPage() {
   const [newDate, setNewDate] = useState(new Date().toISOString().split("T")[0]);
   const [newPriority, setNewPriority] = useState<PlanPriority>("medium");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingPlan, setEditingPlan] = useState<StudyPlan | null>(null);
 
   const fetchPlans = async () => {
     if (!user?.uid) return;
@@ -92,6 +94,41 @@ export default function PlannerPage() {
       if (!plan.completed && preferences.soundEnabled) playTaskComplete();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to update plan");
+    }
+  };
+
+  const startEdit = (plan: StudyPlan) => {
+    setEditingPlan(plan);
+    setNewTitle(plan.title);
+    setNewSubject(plan.subject);
+    setNewDuration(plan.durationMinutes);
+    setNewDate(plan.plannedDate || new Date().toISOString().split("T")[0]);
+    setNewPriority(plan.priority || "medium");
+    setShowAdd(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!editingPlan || !newTitle.trim()) return;
+    setAdding(true);
+    try {
+      const token = await (await import("@/lib/auth-utils")).getFirebaseIdToken();
+      const res = await fetch("/api/planner", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: "update", planId: editingPlan.id, title: newTitle, subject: newSubject, durationMinutes: newDuration, plannedDate: newDate, priority: newPriority }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      setPlans(plans.map((p) => (p.id === editingPlan.id ? { ...p, title: newTitle, subject: newSubject, durationMinutes: newDuration, plannedDate: newDate, priority: newPriority } : p)));
+      setShowAdd(false);
+      setEditingPlan(null);
+      setNewTitle("");
+      setNewSubject("");
+      setNewDuration(30);
+      setNewPriority("medium");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update plan");
+    } finally {
+      setAdding(false);
     }
   };
 
@@ -159,6 +196,7 @@ export default function PlannerPage() {
                 <p className="text-xs text-foreground/50">{plan.subject} — {plan.durationMinutes} min — {plan.plannedDate}</p>
               </div>
               {plan.priority && <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${priorityColors[plan.priority]}`}>{plan.priority}</span>}
+              <button onClick={() => startEdit(plan)} className="p-1 rounded-md text-foreground/30 hover:text-blue-500"><PencilIcon className="w-3.5 h-3.5" /></button>
               <button onClick={() => handleDelete(plan.id)} disabled={deletingId === plan.id} className="p-1 rounded-md text-foreground/30 hover:text-red-500 disabled:opacity-50"><TrashIcon className="w-3.5 h-3.5" /></button>
             </motion.div>
           ))}
@@ -169,7 +207,7 @@ export default function PlannerPage() {
         {showAdd && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setShowAdd(false); }}>
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="glass-strong rounded-2xl p-6 max-w-sm w-full">
-              <h3 className="text-lg font-semibold mb-4">Add Study Task</h3>
+              <h3 className="text-lg font-semibold mb-4">{editingPlan ? "Edit Study Task" : "Add Study Task"}</h3>
               <div className="space-y-3">
                 <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Task title" className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm" />
                 <input value={newSubject} onChange={(e) => setNewSubject(e.target.value)} placeholder="Subject" className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm" />
@@ -186,8 +224,8 @@ export default function PlannerPage() {
                 </select>
               </div>
               <div className="flex gap-2 justify-end mt-4">
-                <button onClick={() => setShowAdd(false)} className="px-4 py-2 rounded-xl text-sm hover:bg-foreground/5">Cancel</button>
-                <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={handleAdd} disabled={adding || !newTitle.trim()} className="px-4 py-2 btn-primary rounded-xl text-sm disabled:opacity-50">Add Task</motion.button>
+                <button onClick={() => { setShowAdd(false); setEditingPlan(null); }} className="px-4 py-2 rounded-xl text-sm hover:bg-foreground/5">Cancel</button>
+                <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={editingPlan ? handleUpdate : handleAdd} disabled={adding || !newTitle.trim()} className="px-4 py-2 btn-primary rounded-xl text-sm disabled:opacity-50">{editingPlan ? "Save Changes" : "Add Task"}</motion.button>
               </div>
             </motion.div>
           </motion.div>

@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
-import * as THREE from "three";
 import {
   ChatBubbleLeftEllipsisIcon,
   PhotoIcon,
@@ -14,14 +13,36 @@ import {
   CheckIcon,
   BookOpenIcon,
   LightBulbIcon,
+  UserPlusIcon,
+  QuestionMarkCircleIcon,
+  BeakerIcon,
+  TrophyIcon,
 } from "@heroicons/react/24/outline";
-import AnimatedBackground from "@/components/AnimatedBackground";
+import BrandLogo from "@/components/BrandLogo";
 
-if (typeof window !== "undefined") {
-  (window as unknown as { THREE?: typeof THREE }).THREE = THREE;
+const VANTA_FOG_MOUSE_LINE = "vec2 st = gl_FragCoord.xy / iResolution.xy*3.;";
+const VANTA_FOG_MOUSE_PATCH = `${VANTA_FOG_MOUSE_LINE}\n  st += (iMouse - 0.5 * iResolution.xy) / iResolution.y * 0.8;`;
+
+function installVantaFogMouseShaderPatch(): void {
+  if (typeof WebGLRenderingContext === "undefined") return;
+  const proto = WebGLRenderingContext.prototype as WebGLRenderingContext & {
+    shaderSource?: ((shader: WebGLShader, source: string) => void) & { __padhaiPatched?: boolean };
+  };
+  const original = proto.shaderSource;
+  if (!original || original.__padhaiPatched) return;
+  proto.shaderSource = function (this: WebGLRenderingContext, shader: WebGLShader, source: string) {
+    if (
+      typeof source === "string" &&
+      source.includes("uniform vec2 iMouse") &&
+      source.includes(VANTA_FOG_MOUSE_LINE) &&
+      !source.includes("iMouse - 0.5 * iResolution.xy")
+    ) {
+      source = source.replace(VANTA_FOG_MOUSE_LINE, VANTA_FOG_MOUSE_PATCH);
+    }
+    return original.call(this, shader, source);
+  };
+  proto.shaderSource.__padhaiPatched = true;
 }
-
-import "vanta/dist/vanta.fog.min.js";
 
 export default function Home() {
   const { firebaseUser, loading, preferences } = useAuth();
@@ -30,6 +51,7 @@ export default function Home() {
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
   const vantaRef = useRef<HTMLDivElement>(null);
   const vantaInstanceRef = useRef<{ destroy: () => void } | null>(null);
+  const isMountedRef = useRef(false);
 
   const webglAvailable = useMemo(() => {
     if (typeof window === "undefined") return false;
@@ -45,46 +67,82 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!loading && firebaseUser) {
-      router.replace("/dashboard");
-    }
-  }, [firebaseUser, loading, router]);
-
-  useEffect(() => {
-    if (!vantaRef.current || !webglAvailable || !animationsEnabled) return;
-    if (typeof window === "undefined") return;
-
-    const VANTA = (window as Window & { VANTA?: { FOG?: (opts: { el: HTMLElement; THREE: typeof THREE; [key: string]: unknown }) => { destroy: () => void } } }).VANTA;
-    if (!VANTA?.FOG) return;
-
-    try {
-      vantaInstanceRef.current = VANTA.FOG({
-        el: vantaRef.current,
-        THREE: THREE,
-        highlightColor: document.documentElement.classList.contains("dark") ? 0x1e1b4b : 0xf5f3ff,
-        midtoneColor: document.documentElement.classList.contains("dark") ? 0x312e81 : 0xddd6fe,
-        lowlightColor: document.documentElement.classList.contains("dark") ? 0x1e3a8a : 0xbfdbfe,
-        baseColor: document.documentElement.classList.contains("dark") ? 0x0f172a : 0xfffbeb,
-        blurFactor: document.documentElement.classList.contains("dark") ? 0.6 : 0.5,
-        speed: 0.4,
-        mouseControls: true,
-        mouseEase: true,
-        touchControls: false,
-        gyroControls: false,
-        scale: 1,
-        scaleMobile: 2,
-      });
-    } catch (e) {
-      console.warn("[VANTA] Failed to initialize", e);
-    }
+    if (isMountedRef.current) return;
+    isMountedRef.current = true;
 
     return () => {
+      isMountedRef.current = false;
       if (vantaInstanceRef.current && typeof vantaInstanceRef.current.destroy === "function") {
         vantaInstanceRef.current.destroy();
         vantaInstanceRef.current = null;
       }
     };
-  }, [webglAvailable, animationsEnabled]);
+  }, []);
+
+  useEffect(() => {
+    if (!vantaRef.current || !webglAvailable || !animationsEnabled) {
+      if (vantaInstanceRef.current && typeof vantaInstanceRef.current.destroy === "function") {
+        vantaInstanceRef.current.destroy();
+        vantaInstanceRef.current = null;
+      }
+      return;
+    }
+    if (typeof window === "undefined") return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const THREE = await import("three");
+        await import("vanta/dist/vanta.fog.min.js");
+        if (cancelled) return;
+        const VANTA = (window as Window & { VANTA?: { FOG?: (opts: Record<string, unknown>) => { destroy: () => void } } }).VANTA;
+        if (!VANTA?.FOG) return;
+
+        installVantaFogMouseShaderPatch();
+
+        if (vantaInstanceRef.current && typeof vantaInstanceRef.current.destroy === "function") {
+          vantaInstanceRef.current.destroy();
+          vantaInstanceRef.current = null;
+        }
+
+        const isDark = document.documentElement.classList.contains("dark");
+        vantaInstanceRef.current = VANTA.FOG({
+          el: vantaRef.current,
+          THREE,
+          highlightColor: isDark ? 0xc4b5fd : 0x8b5cf6,
+          midtoneColor: isDark ? 0x818cf8 : 0xa5b4fc,
+          lowlightColor: isDark ? 0x2dd4bf : 0x6ee7d0,
+          baseColor: isDark ? 0x1e1b3a : 0xfffbeb,
+          blurFactor: 0.42,
+          speed: 0.4,
+          mouseControls: true,
+          mouseEase: false,
+          touchControls: false,
+          gyroControls: false,
+          scale: 1,
+          scaleMobile: 1,
+          zoom: 0.6,
+        });
+      } catch (e) {
+        console.warn("[VANTA] Failed to initialize", e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (vantaInstanceRef.current && typeof vantaInstanceRef.current.destroy === "function") {
+        vantaInstanceRef.current.destroy();
+        vantaInstanceRef.current = null;
+      }
+    };
+  }, [webglAvailable, animationsEnabled, preferences.theme, loading]);
+
+  useEffect(() => {
+    if (!loading && firebaseUser) {
+      router.replace("/dashboard");
+    }
+  }, [firebaseUser, loading, router]);
 
   if (loading) {
     return (
@@ -146,17 +204,42 @@ export default function Home() {
     },
   ];
 
+  const steps = [
+    {
+      number: 1,
+      icon: UserPlusIcon,
+      title: "Sign up for free",
+      desc: "Create your account and set your class and board — CBSE, ICSE, or State Board — in under a minute.",
+    },
+    {
+      number: 2,
+      icon: QuestionMarkCircleIcon,
+      title: "Ask your doubt",
+      desc: "Type your question in Chat Doubt or snap a photo in Photo Doubt. Any subject, any chapter.",
+    },
+    {
+      number: 3,
+      icon: BeakerIcon,
+      title: "Get step-by-step help",
+      desc: "Receive clear, curriculum-aware explanations tailored to your class and board.",
+    },
+    {
+      number: 4,
+      icon: TrophyIcon,
+      title: "Practice & track",
+      desc: "Lock it in with quizzes, flashcards, study timers, and progress insights.",
+    },
+  ];
+
   const showVanta = animationsEnabled && webglAvailable;
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      {showVanta ? (
+      {showVanta && (
         <>
-          <div ref={vantaRef} className="fixed inset-0 z-0" data-pb="background" />
+          <div ref={vantaRef} className="fixed inset-0 z-0 pointer-events-none" data-pb="background" />
           <div className="fixed inset-0 z-[1] bg-white/[0.03] dark:bg-black/[0.05] pointer-events-none" />
         </>
-      ) : (
-        <AnimatedBackground animate={animationsEnabled} />
       )}
 
       <header className="relative z-10 flex items-center justify-between px-4 sm:px-6 py-4 max-w-7xl mx-auto">
@@ -164,7 +247,9 @@ export default function Home() {
           initial={animationsEnabled ? { opacity: 0, x: -20 } : false}
           animate={animationsEnabled ? { opacity: 1, x: 0 } : false}
           transition={{ duration: 0.6, ease: "easeOut" }}
+          className="flex items-center gap-3"
         >
+          <BrandLogo size={32} />
           <h1 className="text-2xl font-bold text-primary">Padhai Buddy</h1>
         </motion.div>
 
@@ -378,6 +463,56 @@ export default function Home() {
                 Instant answers
               </span>
             </div>
+          </motion.div>
+        </motion.div>
+
+        {/* How It Works */}
+        <motion.div
+          variants={animationsEnabled ? staggerContainer : undefined}
+          initial={animationsEnabled ? "hidden" : false}
+          animate={animationsEnabled ? "visible" : false}
+          className="mt-20 sm:mt-28"
+        >
+          <motion.div
+            variants={animationsEnabled ? staggerItem : undefined}
+            className="text-center mb-10"
+          >
+            <h3 className="text-2xl font-bold text-foreground mb-2">
+              How It Works
+            </h3>
+            <p className="text-foreground/60 text-sm max-w-md mx-auto">
+              From your first doubt to exam day — Padhai Buddy has your back.
+            </p>
+          </motion.div>
+
+          <motion.div
+            variants={animationsEnabled ? staggerContainer : undefined}
+            className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6"
+          >
+            {steps.map((step) => (
+              <motion.div
+                key={step.number}
+                variants={animationsEnabled ? staggerItem : undefined}
+                className="glass card-subtle rounded-2xl p-6 relative"
+                whileHover={animationsEnabled ? { y: -6, scale: 1.02 } : undefined}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              >
+                <div className="absolute -top-4 left-6 w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white text-sm font-bold flex items-center justify-center shadow-md">
+                  {step.number}
+                </div>
+                <div className="flex justify-center mb-4 mt-2">
+                  <div className="p-3 rounded-xl bg-primary/10">
+                    <step.icon className="w-6 h-6 text-primary" />
+                  </div>
+                </div>
+                <h4 className="font-semibold text-foreground mb-2 text-center">
+                  {step.title}
+                </h4>
+                <p className="text-sm text-foreground/60 leading-relaxed text-center">
+                  {step.desc}
+                </p>
+              </motion.div>
+            ))}
           </motion.div>
         </motion.div>
       </main>

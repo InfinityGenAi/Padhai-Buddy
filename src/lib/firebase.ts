@@ -14,21 +14,34 @@ let app: FirebaseApp | undefined;
 let auth: Auth | undefined;
 let db: Firestore | undefined;
 let initPromise: Promise<void> | undefined;
+let persistenceApplied = false;
+
+async function initializeFirebase(): Promise<void> {
+  if (typeof window === "undefined") return;
+
+  const existing = getApps();
+  app = existing.length > 0 ? existing[0] : initializeApp(firebaseConfig);
+  if (!app) throw new Error("Firebase app initialization failed");
+  auth = getAuth(app);
+  db = getFirestore(app);
+  if (!auth) throw new Error("Firebase Auth initialization failed");
+
+  if (!persistenceApplied) {
+    persistenceApplied = true;
+    setPersistence(auth, browserLocalPersistence).catch((persistErr) => {
+      console.warn("[Firebase] Local persistence could not be enabled:", persistErr);
+    });
+  }
+}
 
 function ensureInitialized(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
   if (initPromise) return initPromise;
 
-  initPromise = (async () => {
-    if (!app) {
-      app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-      auth = getAuth(app);
-      db = getFirestore(app);
-    }
-    if (auth) {
-      await setPersistence(auth, browserLocalPersistence).catch(() => {});
-    }
-  })();
+  initPromise = initializeFirebase().catch((err) => {
+    console.error("[Firebase] Initialization error:", err);
+    throw err;
+  });
 
   return initPromise;
 }

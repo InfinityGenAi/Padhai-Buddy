@@ -2,10 +2,14 @@ import { test, expect } from "@playwright/test";
 import { mockSessionsRoute } from "../utils/test-helpers";
 
 test.describe("L. Profile/Settings Tests", () => {
+  let lastPostedBody: Record<string, unknown> | null = null;
+
   test.beforeEach(async ({ page }) => {
+    lastPostedBody = null;
     await mockSessionsRoute(page);
     await page.route("/api/profile", async (route) => {
       if (route.request().method() === "POST") {
+        lastPostedBody = route.request().postDataJSON();
         await route.fulfill({
           status: 200,
           contentType: "application/json",
@@ -42,6 +46,7 @@ test.describe("L. Profile/Settings Tests", () => {
     await page.click("button:has-text('Save Profile')");
 
     await expect(page.locator("text=Profile").first()).toBeAttached();
+    await expect.poll(() => lastPostedBody?.name ?? null).toBe("Updated Test User");
   });
 
   test("settings modal opens from profile menu", async ({ page }) => {

@@ -7,6 +7,8 @@ import {
   PhotoIcon,
   ClockIcon,
   HomeIcon,
+  AcademicCapIcon,
+  EllipsisHorizontalIcon,
 } from "@heroicons/react/24/outline";
 import { motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,8 +17,9 @@ const navItems = [
   { name: "Home", href: "/dashboard", icon: HomeIcon },
   { name: "Chat", href: "/dashboard/chat", icon: ChatBubbleLeftEllipsisIcon },
   { name: "Photo", href: "/dashboard/photo-doubt", icon: PhotoIcon },
-  { name: "Quiz", href: "/dashboard/quiz", icon: ClockIcon },
+  { name: "Quiz", href: "/dashboard/quiz", icon: AcademicCapIcon },
   { name: "History", href: "/dashboard/history", icon: ClockIcon },
+  { name: "More", href: "/dashboard/more", icon: EllipsisHorizontalIcon },
 ];
 
 export default function BottomNav() {
@@ -27,14 +30,14 @@ export default function BottomNav() {
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-card/90 border-t border-border z-40 backdrop-blur-xl">
-      <div className="flex justify-around py-1.5">
+      <div className="flex py-1">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
           return (
-            <Link key={item.name} href={item.href}>
+            <Link key={item.name} href={item.href} className="flex-1">
               <motion.div
-                className={`flex flex-col items-center justify-center w-14 h-14 rounded-xl text-[11px] font-medium transition-all ${
+                className={`flex flex-col items-center justify-center h-14 rounded-xl text-[10px] font-medium transition-all ${
                   isActive
                     ? "text-primary bg-primary/10"
                     : "text-foreground/45 hover:text-foreground hover:bg-foreground/5"

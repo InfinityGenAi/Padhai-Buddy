@@ -1,15 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   EnvelopeIcon,
-  SparklesIcon,
   CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import AnimatedBackground from "@/components/AnimatedBackground";
+import BrandLogo from "@/components/BrandLogo";
+
+const RESEND_COOLDOWN_SECONDS = 60;
 
 const staggerContainer = {
   hidden: { opacity: 0 },
@@ -33,7 +35,18 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSent, setIsSent] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const { sendPasswordReset, preferences } = useAuth();
+
+  const isResendCooldownActive = resendCooldown > 0;
+
+  useEffect(() => {
+    if (!isResendCooldownActive) return;
+    const timer = window.setInterval(() => {
+      setResendCooldown((prev) => (prev > 1 ? prev - 1 : 0));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isResendCooldownActive]);
 
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
@@ -56,6 +69,7 @@ export default function ForgotPasswordPage() {
     try {
       await sendPasswordReset(email.trim());
       setIsSent(true);
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (err: unknown) {
       if (err instanceof Error) {
         const message = err.message.toLowerCase();
@@ -66,6 +80,33 @@ export default function ForgotPasswordPage() {
         }
       } else {
         setError("Failed to send recovery email. Please try again.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (resendCooldown > 0 || isSubmitting) return;
+    if (!email.trim()) {
+      setError("Please enter your email address");
+      return;
+    }
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      await sendPasswordReset(email.trim());
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        const message = err.message.toLowerCase();
+        if (message.includes("user-not-found") || message.includes("no user record")) {
+          setError("If an account exists for this email, we sent recovery instructions.");
+        } else {
+          setError(err.message || "Failed to resend recovery email. Please try again.");
+        }
+      } else {
+        setError("Failed to resend recovery email. Please try again.");
       }
     } finally {
       setIsSubmitting(false);
@@ -83,16 +124,14 @@ export default function ForgotPasswordPage() {
       >
         <motion.div
           variants={animationsEnabled ? staggerItem : undefined}
-          className="glass-strong card-subtle rounded-2xl p-8 shadow-xl"
+          className="auth-card p-8"
         >
           <div className="text-center mb-6">
             <motion.div
               variants={animationsEnabled ? staggerItem : undefined}
               className="flex justify-center mb-4"
             >
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg">
-                <SparklesIcon className="w-8 h-8 text-white" />
-              </div>
+              <BrandLogo size={56} />
             </motion.div>
             <motion.h1
               variants={animationsEnabled ? staggerItem : undefined}
@@ -136,14 +175,15 @@ export default function ForgotPasswordPage() {
               </div>
               <div className="flex flex-col gap-2">
                 <button
-                  onClick={() => {
-                    setIsSent(false);
-                    setEmail("");
-                    setError(null);
-                  }}
-                  className="w-full btn-primary py-2.5 rounded-xl font-medium"
+                  onClick={handleResend}
+                  disabled={resendCooldown > 0 || isSubmitting}
+                  className="w-full btn-primary py-2.5 rounded-xl font-medium disabled:opacity-60"
                 >
-                  Resend Email
+                  {isSubmitting
+                    ? "Sending..."
+                    : resendCooldown > 0
+                      ? `Resend Email (${resendCooldown}s)`
+                      : "Resend Email"}
                 </button>
                 <Link
                   href="/login"
@@ -159,14 +199,14 @@ export default function ForgotPasswordPage() {
                 <label className="block text-sm font-medium mb-1.5">
                   Email
                 </label>
-                <div className="relative">
-                  <EnvelopeIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
+                <div className="auth-input-wrapper">
+                  <EnvelopeIcon className="auth-input-icon" />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
-                    className="w-full pl-10 pr-4 py-2.5 input-field"
+                    className="auth-input"
                     required
                     autoFocus
                   />

@@ -47,6 +47,7 @@ import {
 } from "firebase/firestore";
 import type { UserPreferences, UserSession, Conversation } from "@/types";
 import { playPasswordChange, playSessionLogout, playSuccess } from "@/lib/sounds";
+import BrandLogo from "./BrandLogo";
 
 export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const router = useRouter();
@@ -117,6 +118,15 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
     loadSessions();
     loadConversations();
   }, [isOpen, user?.uid]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   const handleUpdate = useCallback(
     (updates: Partial<UserPreferences>) => {
@@ -275,10 +285,13 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
             className="glass-strong rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col"
           >
             <div className="flex items-center justify-between p-6 pb-4 flex-shrink-0">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Cog6ToothIcon className="w-5 h-5 text-primary" />
-                Settings
-              </h3>
+              <div className="flex items-center gap-3">
+                <BrandLogo size={28} />
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Cog6ToothIcon className="w-5 h-5 text-primary" />
+                  Settings
+                </h3>
+              </div>
               <button
                 onClick={onClose}
                 className="p-1.5 rounded-lg hover:bg-foreground/5 transition-colors"
