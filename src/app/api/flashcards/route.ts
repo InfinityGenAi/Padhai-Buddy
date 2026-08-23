@@ -2,11 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import type { Firestore } from "firebase-admin/firestore";
 
+const BATCH_SIZE = 450;
+
 async function deleteCollection(db: Firestore, path: string): Promise<void> {
-  const collectionRef = db.collection(path);
-  const snapshot = await collectionRef.get();
-  const deletes = snapshot.docs.map((d) => d.ref.delete());
-  await Promise.all(deletes);
+  // Delete in chunks so decks with many cards never exceed Firestore
+  // write quotas or cause a write storm.
+  for (;;) {
+    const snapshot = await db.collection(path).limit(BATCH_SIZE).get();
+    if (snapshot.empty) return;
+    const batch = db.batch();
+    snapshot.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
 }
 
 export async function GET(req: NextRequest) {

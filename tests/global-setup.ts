@@ -1,5 +1,5 @@
 import { chromium } from "@playwright/test";
-import { readFileSync, existsSync, unlinkSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
@@ -98,7 +98,8 @@ export default async function globalSetup() {
   const storageStatePath = resolve(__dirname, "../storageState.json");
 
   if (existsSync(storageStatePath)) {
-    unlinkSync(storageStatePath);
+    console.log("Global setup - reusing existing storageState.json");
+    return;
   }
 
   await ensureTestUser();

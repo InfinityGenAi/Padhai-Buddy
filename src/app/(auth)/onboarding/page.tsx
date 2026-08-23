@@ -76,12 +76,13 @@ export default function OnboardingPage() {
         initial={animationsEnabled ? { opacity: 0, y: 20 } : false}
         animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
         transition={animationsEnabled ? { duration: 0.6, ease: "easeOut" } : undefined}
-        className="relative z-10 w-full max-w-md mx-auto p-6">
+        className="relative z-10 w-full max-w-md mx-auto p-6"
+      >
         <motion.div
           initial={animationsEnabled ? { opacity: 0, y: 20 } : false}
           animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
           transition={animationsEnabled ? { duration: 0.6, ease: "easeOut" } : undefined}
-          className="auth-card p-8"
+          className="bg-white dark:bg-dark border border-border rounded-xl p-6"
         >
           <div className="text-center mb-6">
             <BrandLogo size={48} className="mx-auto mb-2" />
@@ -89,7 +90,7 @@ export default function OnboardingPage() {
               Welcome to Padhai Buddy!
             </h1>
             <p className="text-sm text-foreground/60">
-              Let&apos;s set up your profile to give you the best learning experience
+              Let us set up your profile to give you the best learning experience
             </p>
           </div>
 

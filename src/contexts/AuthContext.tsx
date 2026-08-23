@@ -67,7 +67,13 @@ interface AuthContextType {
   needsOnboarding: boolean;
   reloadProfile: () => void;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (name: string, email: string, password: string, cls?: UserClass, board?: UserBoard) => Promise<void>;
+  signUp: (
+    name: string,
+    email: string,
+    password: string,
+    cls?: UserClass,
+    board?: UserBoard,
+  ) => Promise<{ emailVerificationSent: boolean }>;
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   completeOnboarding: (cls: UserClass, board: UserBoard) => Promise<void>;
@@ -169,7 +175,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthError(null);
       })
       .catch((err) => {
-        setAuthError(err instanceof Error ? err.message : String(err));
+        console.error("[AuthContext] Failed to load profile:", err);
+        setAuthError("We couldn't load your profile right now. Please refresh the page and try again.");
         setNeedsOnboarding(false);
       })
       .finally(() => {
@@ -220,57 +227,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithEmailAndPassword(auth, email, password);
   }, []);
 
-  const signUp = useCallback(async (name: string, email: string, password: string, cls?: UserClass, board?: UserBoard) => {
-    await waitForFirebaseInit();
-    const auth = getFirebaseAuth();
-    if (!auth) throw new Error("Firebase not initialized");
-    signingUpRef.current = true;
-    setLoading(true);
-    try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(cred.user, { displayName: name });
+  const signUp = useCallback(
+    async (
+      name: string,
+      email: string,
+      password: string,
+      cls?: UserClass,
+      board?: UserBoard,
+    ): Promise<{ emailVerificationSent: boolean }> => {
+      await waitForFirebaseInit();
+      const auth = getFirebaseAuth();
+      if (!auth) throw new Error("Firebase not initialized");
+      signingUpRef.current = true;
+      setLoading(true);
       try {
-        await sendEmailVerification(cred.user);
-      } catch (verifyErr) {
-        console.warn("[AuthContext] Failed to send verification email:", verifyErr);
-      }
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        await updateProfile(cred.user, { displayName: name });
 
-      if (cls && board) {
-        const db = getFirestoreDb();
-        if (db) {
-          const updated: UserProfile = {
-            uid: cred.user.uid,
-            name,
-            email: cred.user.email || email,
-            class: cls,
-            board,
-            createdAt: Date.now(),
-            preferences: { ...DEFAULT_PREFERENCES },
-          };
-          await setDoc(doc(db, "users", cred.user.uid), updated, { merge: true });
-          setUser(updated);
-          setNeedsOnboarding(false);
-        }
-      }
-    } catch (err) {
-      if (auth.currentUser) {
+        let emailVerificationSent = false;
         try {
-          await auth.currentUser.delete();
-        } catch (cleanupErr) {
-          console.error("[AuthContext] Failed to cleanup Firebase user after signup failure:", cleanupErr);
+          await sendEmailVerification(cred.user);
+          emailVerificationSent = true;
+        } catch (verifyErr) {
+          // Do not claim the email was sent. The account was created and the
+          // user is authenticated, so the caller must show a recoverable
+          // message and offer to resend instead of failing the signup.
+          console.error("[AuthContext] Failed to send verification email:", verifyErr);
         }
+
+        if (cls && board) {
+          const db = getFirestoreDb();
+          if (db) {
+            const updated: UserProfile = {
+              uid: cred.user.uid,
+              name,
+              email: cred.user.email || email,
+              class: cls,
+              board,
+              createdAt: Date.now(),
+              preferences: { ...DEFAULT_PREFERENCES },
+            };
+            await setDoc(doc(db, "users", cred.user.uid), updated, { merge: true });
+            setUser(updated);
+            setNeedsOnboarding(false);
+          }
+        }
+
+        return { emailVerificationSent };
+      } catch (err) {
+        if (auth.currentUser) {
+          try {
+            await auth.currentUser.delete();
+          } catch (cleanupErr) {
+            console.error("[AuthContext] Failed to cleanup Firebase user after signup failure:", cleanupErr);
+          }
+        }
+        setUser(null);
+        setNeedsOnboarding(false);
+        throw err;
+      } finally {
+        signingUpRef.current = false;
+        if (!cls || !board) {
+          setNeedsOnboarding(true);
+        }
+        setLoading(false);
       }
-      setUser(null);
-      setNeedsOnboarding(false);
-      throw err;
-    } finally {
-      signingUpRef.current = false;
-      if (!cls || !board) {
-        setNeedsOnboarding(true);
-      }
-      setLoading(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   const signInWithGoogle = useCallback(async () => {
     await waitForFirebaseInit();

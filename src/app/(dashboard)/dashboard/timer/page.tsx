@@ -145,11 +145,19 @@ export default function TimerPage() {
 
   const currentTime = mode === "stopwatch" ? elapsed : timeLeft;
 
+  const timerTotal = mode === "stopwatch" ? 3600 : Math.max(getDuration(), 1);
+  const timerProgress =
+    mode === "stopwatch"
+      ? Math.min(elapsed / timerTotal, 1)
+      : timeLeft > 0
+        ? (timerTotal - timeLeft) / timerTotal
+        : 1;
+
   return (
-    <motion.div initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined} animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined} className="space-y-5 w-full">
+    <motion.div initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined} animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined} className="space-y-6 w-full">
       <div className="flex items-center gap-2">
         <ClockIcon className="w-6 h-6 text-primary" />
-        <h1 className="text-xl font-semibold">Study Timer</h1>
+        <h1 className="text-xl font-semibold">Timer</h1>
       </div>
 
       <div className="flex gap-2">
@@ -168,8 +176,33 @@ export default function TimerPage() {
       )}
 
       <div className="subtle-card rounded-2xl p-8 text-center">
-        <div className="text-6xl font-mono font-bold text-foreground tracking-tight">{formatTime(currentTime)}</div>
-        <p className="text-xs text-foreground/50 mt-2">
+        <div className="relative inline-flex items-center justify-center mb-4">
+          <svg className="-rotate-90 w-56 h-56" viewBox="0 0 120 120">
+            <circle
+              cx="60" cy="60" r="52"
+              fill="none" strokeWidth="10"
+              className="stroke-foreground/8"
+            />
+            <motion.circle
+              cx="60" cy="60" r="52"
+              fill="none" strokeWidth="10" strokeLinecap="round"
+              stroke="url(#timerGradient)"
+              strokeDasharray="326.7"
+              animate={{ strokeDashoffset: 326.7 * (1 - timerProgress) }}
+              transition={animationsEnabled ? { type: "spring", stiffness: 60, damping: 20 } : undefined}
+            />
+            <defs>
+              <linearGradient id="timerGradient" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#8b5cf6" />
+                <stop offset="100%" stopColor="#14b8a6" />
+              </linearGradient>
+            </defs>
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-6xl font-mono font-bold text-foreground tracking-tight">{formatTime(currentTime)}</div>
+          </div>
+        </div>
+        <p className="text-xs text-foreground/50 -mt-2">
           {mode === "pomodoro" ? "Focus time — stay concentrated!" : mode === "stopwatch" ? "Track your study time" : "Custom timer"}
         </p>
       </div>

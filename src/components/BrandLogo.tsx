@@ -13,14 +13,14 @@ export default function BrandLogo({
   href,
   alt = "Padhai Buddy",
 }: BrandLogoProps) {
-  const src = "/brand/padhai-buddy-logo.png";
+  const src = "/brand/padhai-buddy-logo.svg";
   const content = (
     <Image
       src={src}
       alt={alt}
       width={size}
       height={size}
-      className={`rounded-xl ${className}`}
+      className={className}
       priority
     />
   );

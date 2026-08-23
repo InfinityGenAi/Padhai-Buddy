@@ -27,6 +27,9 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   AcademicCapIcon,
+  ArrowDownOnSquareIcon,
+  ChevronDoubleDownIcon,
+  ArrowTopRightOnSquareIcon,
 } from "@heroicons/react/24/outline";
 import {
   revokeSession,
@@ -39,11 +42,11 @@ import {
 import { getFirestoreDb } from "@/lib/firebase";
 import {
   collection,
-  deleteDoc,
   doc,
   getDocs,
   query,
   orderBy,
+  writeBatch,
 } from "firebase/firestore";
 import type { UserPreferences, UserSession, Conversation } from "@/types";
 import { playPasswordChange, playSessionLogout, playSuccess } from "@/lib/sounds";
@@ -237,17 +240,35 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
     const db = getFirestoreDb();
     if (!db || !user?.uid) return;
 
-    const deletePromises = conversations.map(async (c) => {
-      const convRef = doc(db, "users", user.uid, "conversations", c.id);
-      const messagesRef = collection(convRef, "messages");
-      const messagesSnap = await getDocs(query(messagesRef, orderBy("createdAt", "asc")));
-      const messageDeletePromises = messagesSnap.docs.map((d) => deleteDoc(d.ref));
-      await Promise.all(messageDeletePromises);
-      await deleteDoc(convRef);
-    });
-
     try {
-      await Promise.all(deletePromises);
+      // Use batched writes (chunked at 400 ops) instead of one delete per
+      // document, so clearing large chat histories stays within Firestore
+      // batch limits and does not cause a write storm.
+      let batch = writeBatch(db);
+      let ops = 0;
+      for (const c of conversations) {
+        const convRef = doc(db, "users", user.uid, "conversations", c.id);
+        const messagesRef = collection(convRef, "messages");
+        const messagesSnap = await getDocs(query(messagesRef, orderBy("createdAt", "asc")));
+        for (const d of messagesSnap.docs) {
+          batch.delete(d.ref);
+          ops++;
+          if (ops >= 400) {
+            await batch.commit();
+            batch = writeBatch(db);
+            ops = 0;
+          }
+        }
+        batch.delete(convRef);
+        ops++;
+        if (ops >= 400) {
+          await batch.commit();
+          batch = writeBatch(db);
+          ops = 0;
+        }
+      }
+      await batch.commit();
+
       setConversations([]);
       setNotification({ type: "success", text: "All chat history cleared" });
       setTimeout(() => setNotification(null), 3000);
@@ -564,6 +585,62 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
 
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
+                      <ArrowDownOnSquareIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">Enter to Send</p>
+                        <p className="text-xs text-foreground/50 truncate">
+                          Press Enter to send a message in chat
+                        </p>
+                      </div>
+                    </div>
+                    <motion.button
+                      role="switch"
+                      aria-checked={preferences.enterToSend}
+                      aria-label="Enter to Send"
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleUpdate({ enterToSend: !preferences.enterToSend })}
+                      className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+                        preferences.enterToSend ? "bg-primary" : "bg-foreground/20"
+                      }`}
+                    >
+                      <motion.div
+                        animate={{ x: preferences.enterToSend ? 20 : 2 }}
+                        transition={{ type: "spring", damping: 15, stiffness: 200 }}
+                        className="w-5 h-5 bg-white rounded-full shadow-md absolute top-0.5"
+                      />
+                    </motion.button>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <ChevronDoubleDownIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">Auto-scroll to Latest</p>
+                        <p className="text-xs text-foreground/50 truncate">
+                          Follow the conversation automatically
+                        </p>
+                      </div>
+                    </div>
+                    <motion.button
+                      role="switch"
+                      aria-checked={preferences.autoScroll}
+                      aria-label="Auto-scroll to Latest"
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleUpdate({ autoScroll: !preferences.autoScroll })}
+                      className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+                        preferences.autoScroll ? "bg-primary" : "bg-foreground/20"
+                      }`}
+                    >
+                      <motion.div
+                        animate={{ x: preferences.autoScroll ? 20 : 2 }}
+                        transition={{ type: "spring", damping: 15, stiffness: 200 }}
+                        className="w-5 h-5 bg-white rounded-full shadow-md absolute top-0.5"
+                      />
+                    </motion.button>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
                       <GlobeAltIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
                       <div className="min-w-0">
                         <p className="text-sm font-medium">Preferred Language</p>
@@ -774,6 +851,27 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                   >
                     <TrashIcon className="w-4 h-4" />
                     Delete Account
+                  </button>
+                </div>
+              </div>
+
+              {/* ABOUT */}
+              <div className="subtle-card rounded-xl p-4">
+                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40 mb-3">
+                  About
+                </h4>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-foreground/60">App Version</span>
+                    <span className="text-xs font-medium text-foreground/40 bg-foreground/5 px-2.5 py-1 rounded-lg">1.0.0</span>
+                  </div>
+                  <button className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium text-foreground/70 hover:bg-foreground/5 transition-colors">
+                    <span>Privacy Policy</span>
+                    <ArrowTopRightOnSquareIcon className="w-4 h-4 text-foreground/30" />
+                  </button>
+                  <button className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium text-foreground/70 hover:bg-foreground/5 transition-colors">
+                    <span>Terms of Service</span>
+                    <ArrowTopRightOnSquareIcon className="w-4 h-4 text-foreground/30" />
                   </button>
                 </div>
               </div>

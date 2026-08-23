@@ -143,6 +143,18 @@ export default function QuizPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to submit quiz");
       if (preferences.soundEnabled) playQuizComplete();
+      try {
+        const prevQuizzes = Number(localStorage.getItem("pb-quizzes-taken")) || 0;
+        localStorage.setItem("pb-quizzes-taken", String(prevQuizzes + 1));
+        const score = Number(data.attempt?.score);
+        if (Number.isFinite(score)) {
+          const prevAvg = Number(localStorage.getItem("pb-avg-score")) || 0;
+          const newAvg = Math.round((prevAvg * prevQuizzes + score) / (prevQuizzes + 1));
+          localStorage.setItem("pb-avg-score", String(newAvg));
+        }
+      } catch {
+        // ignore storage errors
+      }
       setAttempt(data.attempt);
       setState("result");
     } catch (err: unknown) {
@@ -164,11 +176,11 @@ export default function QuizPage() {
     <motion.div
       initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined}
       animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined}
-      className="space-y-5 w-full"
+      className="space-y-6 w-full"
     >
       <div className="flex items-center gap-2">
         <BookOpenIcon className="w-6 h-6 text-primary" />
-        <h1 className="text-xl font-semibold">Quick Quiz</h1>
+        <h1 className="text-xl font-semibold">Quiz</h1>
       </div>
 
       {error && (

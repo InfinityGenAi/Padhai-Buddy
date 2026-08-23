@@ -63,6 +63,7 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   createdAt?: number;
+  tempId?: string;
 }
 
 export interface Conversation {

@@ -11,7 +11,7 @@ test.describe("B. Dashboard Tests", () => {
 
   test("stats cards are visible", async ({ page }) => {
     await expect(page.locator("text=Doubts Solved").first()).toBeVisible();
-    await expect(page.locator("text=Study Plans Completed").first()).toBeVisible();
+    await expect(page.locator("text=Study Time").first()).toBeVisible();
   });
 
   test("weekly chart renders", async ({ page }) => {

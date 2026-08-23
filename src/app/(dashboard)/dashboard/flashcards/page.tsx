@@ -212,6 +212,14 @@ export default function FlashcardsPage() {
 
   const markCard = async (status: CardStatus) => {
     if (!activeDeckId || !currentCard) return;
+    if (status === "known") {
+      try {
+        const learned = Number(localStorage.getItem("pb-flashcards-learned")) || 0;
+        localStorage.setItem("pb-flashcards-learned", String(learned + 1));
+      } catch {
+        // ignore storage errors
+      }
+    }
     const optimistic = { ...currentCard, status };
     setCards(cards.map((c) => (c.id === currentCard.id ? optimistic : c)));
     if (currentCardIndex < cards.length - 1) {
@@ -271,7 +279,7 @@ export default function FlashcardsPage() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="space-y-5 w-full"
+        className="space-y-6 w-full"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -336,7 +344,7 @@ export default function FlashcardsPage() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="space-y-5 w-full"
+        className="space-y-6 w-full"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -468,7 +476,7 @@ export default function FlashcardsPage() {
     <motion.div
       initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined}
       animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined}
-      className="space-y-5 w-full"
+      className="space-y-6 w-full"
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">

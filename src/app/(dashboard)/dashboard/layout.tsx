@@ -102,7 +102,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen overflow-hidden relative z-10">
         <Sidebar />
         <div className="flex-1 flex flex-col overflow-hidden">
-          <header className="hidden sm:flex items-center justify-between px-6 py-3 border-b border-border/40">
+          <header className="hidden sm:flex items-center justify-between px-6 h-16 border-b border-border/40">
             <DashboardGreeting animationsEnabled={animationsEnabled} />
             <div className="flex items-center gap-2 sm:gap-3">
               {/* Notifications */}
@@ -207,7 +207,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
               )}
             </div>
           </header>
-          <header className="sm:hidden flex items-center justify-between px-4 py-3 border-b border-border/40">
+          <header className="sm:hidden flex items-center justify-between px-4 h-14 border-b border-border/40">
             <BrandLogo size={28} />
             <div className="flex items-center gap-2">
               {user && (

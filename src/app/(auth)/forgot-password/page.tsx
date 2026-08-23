@@ -114,17 +114,17 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      <AnimatedBackground animate={animationsEnabled} />
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
+      <AnimatedBackground animate={animationsEnabled} variant="auth" />
       <motion.div
         variants={animationsEnabled ? staggerContainer : undefined}
         initial={animationsEnabled ? "hidden" : false}
         animate={animationsEnabled ? "visible" : false}
-        className="relative z-10 w-full max-w-md mx-auto p-6"
+        className="relative z-10 w-full max-w-md mx-auto"
       >
         <motion.div
           variants={animationsEnabled ? staggerItem : undefined}
-          className="auth-card p-8"
+          className="bg-card border border-border rounded-2xl p-6 shadow-xl"
         >
           <div className="text-center mb-6">
             <motion.div
@@ -135,7 +135,7 @@ export default function ForgotPasswordPage() {
             </motion.div>
             <motion.h1
               variants={animationsEnabled ? staggerItem : undefined}
-              className="text-3xl font-bold text-primary mb-1"
+              className="text-3xl font-bold text-foreground mb-1"
             >
               {isSent ? "Check Your Email" : "Forgot Password?"}
             </motion.h1>
@@ -165,25 +165,27 @@ export default function ForgotPasswordPage() {
               className="text-center space-y-4"
             >
               <div className="flex flex-col items-center gap-3 py-4">
-                <CheckCircleIcon className="w-12 h-12 text-green-500" />
+                <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-950/30 flex items-center justify-center">
+                  <CheckCircleIcon className="w-6 h-6 text-green-600 dark:text-green-400" />
+                </div>
                 <p className="text-sm text-foreground/70">
                   If an account exists for <span className="font-medium">{email}</span>, we sent recovery instructions.
                 </p>
                 <p className="text-xs text-foreground/50">
-                  Didn&apos;t receive it? Check your spam folder or try again.
+                  Did not receive it? Check your spam folder or try again.
                 </p>
               </div>
               <div className="flex flex-col gap-2">
                 <button
                   onClick={handleResend}
                   disabled={resendCooldown > 0 || isSubmitting}
-                  className="w-full btn-primary py-2.5 rounded-xl font-medium disabled:opacity-60"
+                  className="w-full btn-primary py-3 rounded-xl font-medium disabled:opacity-50 focus-ring"
                 >
                   {isSubmitting
                     ? "Sending..."
                     : resendCooldown > 0
-                      ? `Resend Email (${resendCooldown}s)`
-                      : "Resend Email"}
+                    ? `Resend Email (${resendCooldown}s)`
+                    : "Resend Email"}
                 </button>
                 <Link
                   href="/login"
@@ -196,19 +198,20 @@ export default function ForgotPasswordPage() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <motion.div variants={animationsEnabled ? staggerItem : undefined}>
-                <label className="block text-sm font-medium mb-1.5">
+                <label className="block text-sm font-medium mb-1.5 text-foreground/70">
                   Email
                 </label>
-                <div className="auth-input-wrapper">
-                  <EnvelopeIcon className="auth-input-icon" />
+                <div className="relative">
+                  <EnvelopeIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className="auth-input"
+                    placeholder="Enter your email"
+                    className="w-full bg-background border border-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                     required
                     autoFocus
+                    autoComplete="email"
                   />
                 </div>
               </motion.div>
@@ -216,7 +219,7 @@ export default function ForgotPasswordPage() {
               <motion.button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full btn-primary py-2.5 rounded-xl font-medium"
+                className="w-full btn-primary py-3 rounded-xl font-medium focus-ring"
                 whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
                 whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
                 variants={animationsEnabled ? staggerItem : undefined}

@@ -17,33 +17,55 @@ test.describe("A. Public/Auth Tests", () => {
     expect(filterCriticalErrors(errors)).toEqual([]);
   });
 
-  test("login page loads without critical errors", async ({ page }) => {
-    const errors: string[] = [];
-    page.on("console", (msg) => {
-      if (msg.type() === "error") errors.push(msg.text());
+  test.describe("login page (fresh session)", () => {
+    test.use({ storageState: "tests/fixtures/empty-storage.json" });
+
+    test("login page loads without critical errors", async ({ page }) => {
+      const errors: string[] = [];
+      page.on("console", (msg) => {
+        if (msg.type() === "error") errors.push(msg.text());
+      });
+      page.on("pageerror", (err) => errors.push(err.message));
+
+      await mockSessionsRoute(page);
+      await page.goto("http://localhost:3000/login");
+      await page.waitForLoadState("domcontentloaded");
+      await expect(page.locator("text=Welcome Back")).toBeAttached();
+
+      expect(filterCriticalErrors(errors)).toEqual([]);
     });
-    page.on("pageerror", (err) => errors.push(err.message));
-
-    await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/login");
-    await page.waitForLoadState("domcontentloaded");
-    await expect(page.locator("text=Welcome Back")).toBeAttached();
-
-    expect(filterCriticalErrors(errors)).toEqual([]);
   });
 
-  test("real login flow works", async ({ page }) => {
-    await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/login");
-    await page.waitForLoadState("domcontentloaded");
-    await page.fill('input[type="email"]', "test@padhai-buddy.test");
-    await page.fill('input[type="password"]', "TestPassword123!");
-    await page.evaluate(() => {
-      const form = document.querySelector('form');
-      if (form) form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  test.describe("real login flow (fresh session)", () => {
+    test.use({ storageState: "tests/fixtures/empty-storage.json" });
+
+    test("real login flow works", async ({ page }) => {
+      await mockSessionsRoute(page);
+
+      // Under full-suite parallel load the auth-loading state can flicker and
+      // re-render the form, detaching inputs mid-fill — retry the whole flow.
+      let loggedIn = false;
+      for (let attempt = 0; attempt < 3 && !loggedIn; attempt++) {
+        await page.goto("http://localhost:3000/login");
+        await page.waitForLoadState("domcontentloaded");
+        try {
+          const emailInput = page.locator('input[type="email"]');
+          await expect(emailInput).toBeVisible({ timeout: 15000 });
+          await emailInput.fill("test@padhai-buddy.test");
+          await page.fill('input[type="password"]', "TestPassword123!", { timeout: 15000 });
+          await page.evaluate(() => {
+            const form = document.querySelector("form");
+            if (form) form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+          });
+await expect(page).toHaveURL("http://localhost:3000/dashboard", { timeout: 15000 });
+        await expect(page.locator("text=Hi,").first()).toBeAttached();
+        loggedIn = true;
+      } catch (e) {
+        console.log(`[login-flow] attempt ${attempt} failed: ${(e as Error).message?.split("\n")[0]} url=${page.url()}`);
+      }
+      }
+      expect(loggedIn).toBe(true);
     });
-    await expect(page).toHaveURL("http://localhost:3000/dashboard", { timeout: 15000 });
-    await expect(page.locator("text=Hi,").first()).toBeAttached();
   });
 
   test("dashboard greeting shows user name", async ({ page }) => {

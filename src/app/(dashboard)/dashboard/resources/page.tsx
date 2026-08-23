@@ -10,6 +10,11 @@ import {
   TrashIcon,
   MagnifyingGlassIcon,
   GlobeAltIcon,
+  PlayCircleIcon,
+  DocumentTextIcon,
+  BookOpenIcon,
+  LinkIcon,
+  PhotoIcon,
 } from "@heroicons/react/24/outline";
 import { playSaveSuccess, playDeleteSuccess } from "@/lib/sounds";
 import type { Resource, ResourceType } from "@/types";
@@ -104,10 +109,16 @@ export default function ResourcesPage() {
     setShowAdd(true);
   };
 
-  const typeIcons: Record<ResourceType, string> = { video: "🎬", article: "📄", pdf: "📕", link: "🔗", notes: "📝" };
+  const typeIcons: Record<ResourceType, React.ComponentType<{ className?: string }>> = {
+    video: PlayCircleIcon,
+    article: DocumentTextIcon,
+    pdf: BookOpenIcon,
+    link: LinkIcon,
+    notes: PhotoIcon,
+  };
 
   return (
-    <motion.div initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined} animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined} className="space-y-5 w-full">
+    <motion.div initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined} animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined} className="space-y-6 w-full">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <SpeakerWaveIcon className="w-6 h-6 text-primary" />
@@ -141,7 +152,9 @@ export default function ResourcesPage() {
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">{typeIcons[resource.type]}</span>
+                    <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                      {(() => { const Icon = typeIcons[resource.type]; return <Icon className="w-4 h-4" />; })()}
+                    </span>
                     <h3 className="font-semibold text-sm truncate">{resource.title}</h3>
                   </div>
                   <p className="text-xs text-foreground/50 mt-0.5">{resource.subject} — {resource.type}</p>

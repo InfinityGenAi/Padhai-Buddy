@@ -73,7 +73,7 @@ export default function ProgressPage() {
   ];
 
   return (
-    <motion.div initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined} animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined} className="space-y-5 w-full">
+    <motion.div initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined} animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined} className="space-y-6 w-full">
       <div className="flex items-center gap-2">
         <ChartBarIcon className="w-6 h-6 text-primary" />
         <h1 className="text-xl font-semibold">Progress</h1>
@@ -112,8 +112,8 @@ export default function ProgressPage() {
           <div className="subtle-card rounded-xl p-5">
             <h3 className="text-sm font-semibold text-foreground/75 mb-3">Study Summary</h3>
             <div className="space-y-2 text-sm text-foreground/60">
-              <p>Total study time: <span className="font-semibold text-foreground">{Math.floor((stats?.totalStudyMinutes || 0) / 60)}h {(stats?.totalStudyMinutes || 0) % 60}m</span></p>
-              <p>Plans completed: <span className="font-semibold text-foreground">{stats?.plansCompleted || 0} / {stats?.plansTotal || 0}</span></p>
+              <p>Total Study Time: <span className="font-semibold text-foreground">{Math.floor((stats?.totalStudyMinutes || 0) / 60)}h {(stats?.totalStudyMinutes || 0) % 60}m</span></p>
+              <p>Plans Completed: <span className="font-semibold text-foreground">{stats?.plansCompleted || 0} / {stats?.plansTotal || 0}</span></p>
               <p>Flashcards reviewed: <span className="font-semibold text-foreground">{stats?.flashcardsReviewed || 0}</span></p>
             </div>
           </div>

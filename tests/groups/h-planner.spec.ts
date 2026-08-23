@@ -75,11 +75,11 @@ test.describe("H. Planner Tests", () => {
 
     await page.goto("http://localhost:3000/dashboard/planner");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.locator("h1:has-text('Study Planner')").first()).toBeAttached();
+    await expect(page.locator("h1:has-text('Planner')").first()).toBeAttached();
   });
 
   test("planner page loads", async ({ page }) => {
-    await expect(page.locator("h1:has-text('Study Planner')").first()).toBeAttached();
+    await expect(page.locator("h1:has-text('Planner')").first()).toBeAttached();
   });
 
   test("add task button is visible", async ({ page }) => {

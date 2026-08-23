@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { flushSync } from "react-dom";
+import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSearchParams, useRouter } from "next/navigation";
 import { getFirebaseIdToken } from "@/lib/auth-utils";
@@ -29,6 +30,7 @@ import {
   Bars3Icon,
   PencilSquareIcon,
   DocumentDuplicateIcon,
+  PhotoIcon,
 } from "@heroicons/react/24/outline";
 import { playSend, playReceive, playCopy, playError } from "@/lib/sounds";
 import type { ChatMessage, Conversation } from "@/types";
@@ -142,10 +144,14 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingMessages = useRef<Map<string, ChatMessage>>(new Map());
+  const pendingConversationId = useRef<string | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
   const isInitialLoadRef = useRef(false);
   const userScrolledUpRef = useRef(false);
+  const lastScrollTopRef = useRef(0);
+  const pinnedScrollTopRef = useRef<number | null>(null);
+  const messagesRef = useRef<ChatMessage[]>([]);
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -160,17 +166,14 @@ export default function ChatPage() {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   }, []);
 
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior });
-    }
-  }, []);
-
-  const checkIfNearBottom = useCallback(() => {
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
     const container = chatContainerRef.current;
-    if (!container) return true;
-    const threshold = 80;
-    return container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+    if (behavior === "smooth" && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
   }, []);
 
   useEffect(() => {
@@ -178,19 +181,55 @@ export default function ChatPage() {
     if (!container) return;
 
     const handleScroll = () => {
-      const nearBottom = checkIfNearBottom();
-      userScrolledUpRef.current = !nearBottom;
-      shouldAutoScrollRef.current = nearBottom;
+      const container = chatContainerRef.current;
+      if (!container) return;
+      const scrollTop = container.scrollTop;
+      const prevScrollTop = lastScrollTopRef.current;
+      lastScrollTopRef.current = scrollTop;
+      if (scrollTop < prevScrollTop) {
+        shouldAutoScrollRef.current = false;
+        userScrolledUpRef.current = true;
+        pinnedScrollTopRef.current = scrollTop;
+      } else if (scrollTop > prevScrollTop) {
+        const atBottom =
+          container.scrollHeight - scrollTop - container.clientHeight <= 2;
+        shouldAutoScrollRef.current = atBottom;
+        userScrolledUpRef.current = !atBottom;
+        if (atBottom) {
+          pinnedScrollTopRef.current = null;
+        } else {
+          pinnedScrollTopRef.current = scrollTop;
+        }
+      } else {
+        // Same scrollTop as before (scroll events can coalesce): only keep
+        // auto-scroll if we are actually at the very bottom.
+        const atBottom =
+          container.scrollHeight - scrollTop - container.clientHeight <= 2;
+        if (!atBottom) {
+          shouldAutoScrollRef.current = false;
+          userScrolledUpRef.current = true;
+          pinnedScrollTopRef.current = scrollTop;
+        }
+      }
     };
 
     container.addEventListener("scroll", handleScroll, { passive: true });
     return () => container.removeEventListener("scroll", handleScroll);
-  }, [checkIfNearBottom]);
+  }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!preferences.autoScroll) return;
     if (shouldAutoScrollRef.current) {
-      scrollToBottom("smooth");
+      scrollToBottom("auto");
+    } else if (pinnedScrollTopRef.current !== null) {
+      const container = chatContainerRef.current;
+      if (container && container.scrollTop !== pinnedScrollTopRef.current) {
+        container.scrollTop = pinnedScrollTopRef.current;
+      }
+      const input = textareaRef.current;
+      if (input && document.activeElement === input) {
+        input.blur();
+      }
     }
   }, [messages, isTyping, preferences.autoScroll, scrollToBottom]);
 
@@ -246,6 +285,7 @@ export default function ChatPage() {
           role: data.role,
           content: data.content,
           createdAt: getTimestampMs(data.createdAt),
+          tempId: data.tempId,
         };
         msgs.push(msg);
 
@@ -256,11 +296,42 @@ export default function ChatPage() {
 
       syncedTempIds.forEach((tempId) => pendingMessages.current.delete(tempId));
 
-      const remainingPending = Array.from(pendingMessages.current.values());
-      const merged = [...msgs, ...remainingPending].sort(
-        (a, b) => (a.createdAt || 0) - (b.createdAt || 0),
-      );
+      const prev = messagesRef.current;
+      const pendingById = new Map(pendingMessages.current);
+      const merged: ChatMessage[] = [];
 
+      for (const prevMsg of prev) {
+        const tempId = prevMsg.tempId;
+        const isTemp = !!tempId && tempId === prevMsg.id;
+        if (isTemp && !syncedTempIds.has(tempId) && !pendingById.has(prevMsg.id)) {
+          continue;
+        }
+        if (isTemp && syncedTempIds.has(tempId)) {
+          const twin = msgs.find((m) => m.tempId === tempId);
+          if (twin) merged.push(twin);
+        } else {
+          merged.push(prevMsg);
+        }
+      }
+
+      const mergedIds = new Set(merged.map((m) => m.id));
+      const newDocs = msgs.filter((m) => !mergedIds.has(m.id));
+      newDocs.sort((a, b) => {
+        const ta = a.createdAt || 0;
+        const tb = b.createdAt || 0;
+        if (ta !== tb) return ta - tb;
+        const ra = a.role === "user" ? 0 : 1;
+        const rb = b.role === "user" ? 0 : 1;
+        if (ra !== rb) return ra - rb;
+        return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+      });
+      merged.push(...newDocs);
+
+      for (const pendingMsg of pendingById.values()) {
+        if (!mergedIds.has(pendingMsg.id)) merged.push(pendingMsg);
+      }
+
+      messagesRef.current = merged;
       setMessages(merged);
       setMessagesLoaded(true);
 
@@ -268,8 +339,7 @@ export default function ChatPage() {
         isInitialLoadRef.current = false;
         shouldAutoScrollRef.current = true;
         scrollToBottom("auto");
-      }
-    });
+      }    });
 
     return () => unsub();
   }, [user?.uid, activeConversationId, scrollToBottom]);
@@ -277,11 +347,15 @@ export default function ChatPage() {
   const startNewChat = useCallback(() => {
     setActiveConversationId(null);
     setMessages([]);
+    messagesRef.current = [];
     setMessagesLoaded(true);
     pendingMessages.current.clear();
+    pendingConversationId.current = null;
     setSidebarOpen(false);
     shouldAutoScrollRef.current = true;
     userScrolledUpRef.current = false;
+    lastScrollTopRef.current = 0;
+    pinnedScrollTopRef.current = null;
     isInitialLoadRef.current = false;
     textareaRef.current?.focus();
   }, []);
@@ -304,12 +378,16 @@ export default function ChatPage() {
   const selectConversation = useCallback((id: string) => {
     setActiveConversationId(id);
     setMessages([]);
+    messagesRef.current = [];
     setMessagesLoaded(false);
     pendingMessages.current.clear();
+    pendingConversationId.current = null;
     setSidebarOpen(false);
     isInitialLoadRef.current = true;
     shouldAutoScrollRef.current = true;
     userScrolledUpRef.current = false;
+    lastScrollTopRef.current = 0;
+    pinnedScrollTopRef.current = null;
   }, []);
 
   const renameConversation = async (conversationId: string, newTitle: string) => {
@@ -329,8 +407,12 @@ export default function ChatPage() {
     const messagesRef = collection(convRef, "messages");
 
     const messagesSnap = await getDocs(query(messagesRef, orderBy("createdAt", "asc")));
-    const deletePromises = messagesSnap.docs.map((d) => deleteDoc(d.ref));
-    await Promise.all(deletePromises);
+    const refs = messagesSnap.docs.map((d) => d.ref);
+    for (let i = 0; i < refs.length; i += 450) {
+      const batch = writeBatch(db);
+      refs.slice(i, i + 450).forEach((r) => batch.delete(r));
+      await batch.commit();
+    }
     await deleteDoc(convRef);
   };
 
@@ -342,6 +424,7 @@ export default function ChatPage() {
       if (activeConversationId === conversationId) {
         setActiveConversationId(null);
         setMessages([]);
+        messagesRef.current = [];
         pendingMessages.current.clear();
       }
     } catch {
@@ -354,27 +437,36 @@ export default function ChatPage() {
     if (!input.trim() || isTyping || !user) return;
 
     if (!user.class || !user.board) {
-      setMessages((prev) => [...prev, {
+      const profileMsg: ChatMessage = {
         id: generateId(),
         role: "assistant",
         content: "Please complete your profile by selecting your class and board in settings.",
         createdAt: Date.now(),
-      }]);
+      };
+      messagesRef.current = [...messagesRef.current, profileMsg];
+      setMessages((prev) => [...prev, profileMsg]);
       shouldAutoScrollRef.current = true;
       return;
     }
 
     shouldAutoScrollRef.current = true;
     userScrolledUpRef.current = false;
+    lastScrollTopRef.current = 0;
+    pinnedScrollTopRef.current = null;
 
     let conversationId = activeConversationId;
     const db = getFirestoreDb();
     if (!db) return;
 
     if (!conversationId) {
-      const conversationsCol = collection(db, "users", user.uid, "conversations");
-      const newConvRef = doc(conversationsCol);
-      conversationId = newConvRef.id;
+      if (pendingConversationId.current) {
+        conversationId = pendingConversationId.current;
+      } else {
+        const conversationsCol = collection(db, "users", user.uid, "conversations");
+        const newConvRef = doc(conversationsCol);
+        conversationId = newConvRef.id;
+        pendingConversationId.current = conversationId;
+      }
     }
 
     const userMessage: ChatMessage = {
@@ -383,7 +475,9 @@ export default function ChatPage() {
       content: input.trim(),
       createdAt: Date.now(),
     };
+    userMessage.tempId = userMessage.id;
     pendingMessages.current.set(userMessage.id, userMessage);
+    messagesRef.current = [...messagesRef.current, userMessage];
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsTyping(true);
@@ -421,9 +515,11 @@ export default function ChatPage() {
         content: data.answer,
         createdAt: Date.now(),
       };
+      aiMessage.tempId = aiMessage.id;
       pendingMessages.current.set(aiMessage.id, aiMessage);
       if (aiMessage) {
         const msg = aiMessage;
+        messagesRef.current = [...messagesRef.current, msg];
         setMessages((prev) => [...prev, msg]);
       }
 
@@ -448,6 +544,7 @@ export default function ChatPage() {
             : "Sorry, I couldn't connect to the AI service. Please check your connection and try again.",
         createdAt: Date.now(),
       };
+      messagesRef.current = [...messagesRef.current, errorMsg];
       setMessages((prev) => [...prev, errorMsg]);
       setIsTyping(false);
       return;
@@ -459,36 +556,48 @@ export default function ChatPage() {
     }
 
     try {
-      const messagesCol = collection(db, "users", user.uid, "conversations", conversationId, "messages");
-      const userMsgRef = doc(messagesCol);
-      const aiMsgRef = doc(messagesCol);
       const convRef = doc(db, "users", user.uid, "conversations", conversationId);
+      const messagesCol = collection(db, "users", user.uid, "conversations", conversationId, "messages");
 
-      const batch = writeBatch(db);
-
+      // Persist the user message (and the conversation doc for a new chat)
+      // FIRST, so it survives even if the AI save fails afterwards, and so
+      // the two commits receive strictly increasing server timestamps.
+      const userBatch = writeBatch(db);
       if (!activeConversationId) {
-        batch.set(convRef, {
+        userBatch.set(convRef, {
           title: generateConversationTitle(userMessage.content),
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-          lastMessage: aiMessage.content.slice(0, 60),
+          lastMessage: userMessage.content.slice(0, 60),
         });
       }
+      userBatch.set(doc(messagesCol), {
+        ...userMessage,
+        createdAt: serverTimestamp(),
+        tempId: userMessage.id,
+      });
+      await userBatch.commit();
+      setActiveConversationId(conversationId);
+      pendingConversationId.current = null;
 
-      batch.set(userMsgRef, { ...userMessage, createdAt: serverTimestamp(), tempId: userMessage.id });
-      batch.set(aiMsgRef, { ...aiMessage, createdAt: serverTimestamp(), tempId: aiMessage.id });
-      batch.update(convRef, {
+      // Then persist the AI answer and refresh the conversation metadata.
+      const aiBatch = writeBatch(db);
+      aiBatch.set(doc(messagesCol), {
+        ...aiMessage,
+        createdAt: serverTimestamp(),
+        tempId: aiMessage.id,
+      });
+      aiBatch.update(convRef, {
         updatedAt: serverTimestamp(),
         lastMessage: aiMessage.content.slice(0, 60),
       });
-
-      await batch.commit();
-      setActiveConversationId(conversationId);
+      await aiBatch.commit();
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       if (preferences.soundEnabled) {
         playError();
       }
+      pendingMessages.current.delete(userMessage.id);
       pendingMessages.current.delete(aiMessage.id);
       if (process.env.NODE_ENV === "development") {
         console.error("[CHAT CLIENT] Firestore save failed:", error);
@@ -499,6 +608,7 @@ export default function ChatPage() {
         content: "Answer generated, but conversation could not be saved. Please try again.",
         createdAt: Date.now(),
       };
+      messagesRef.current = [...messagesRef.current, warningMsg];
       setMessages((prev) => [...prev, warningMsg]);
     } finally {
       setIsTyping(false);
@@ -705,8 +815,18 @@ export default function ChatPage() {
           >
             <Bars3Icon className="w-5 h-5" />
           </button>
-          <SparklesIcon className="w-6 h-6 text-primary flex-shrink-0" />
-          <h1 className="text-xl font-semibold truncate">Chat Doubt</h1>
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center shadow-md flex-shrink-0">
+            <SparklesIcon className="w-5 h-5 text-white" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold truncate text-foreground">
+              Padhai Buddy AI Tutor
+            </h1>
+            <div className="flex items-center gap-1.5 -mt-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+              <p className="text-[11px] text-foreground/45">Online</p>
+            </div>
+          </div>
           <div className="ml-auto flex items-center gap-1">
             <motion.button
               whileHover={animationsEnabled ? { scale: 1.1 } : undefined}
@@ -741,15 +861,15 @@ export default function ChatPage() {
           )}
 
           <AnimatePresence initial={false}>
-            {messages.map((msg, idx) => {
+            {messages.map((msg) => {
               const isUser = msg.role === "user";
               return (
                 <motion.div
-                  key={msg.id}
-                  initial={animationsEnabled ? { opacity: 0, y: 8 } : false}
-                  animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
+                  key={msg.tempId || msg.id}
+                  initial={animationsEnabled ? { opacity: 0 } : false}
+                  animate={animationsEnabled ? { opacity: 1 } : false}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2, delay: animationsEnabled ? Math.min(idx * 0.03, 0.3) : 0 }}
+                  transition={{ duration: 0.2 }}
                   className={`flex gap-2.5 ${
                     isUser ? "justify-end" : "justify-start"
                   }`}
@@ -848,6 +968,14 @@ export default function ChatPage() {
               maxLength={1000}
               disabled={isTyping}
             />
+            <Link
+              href="/dashboard/photo-doubt"
+              className="p-2.5 rounded-xl text-foreground/50 hover:text-primary hover:bg-primary/10 transition-colors flex-shrink-0 self-end mb-0.5"
+              aria-label="Photo doubt"
+              title="Solve a photo doubt"
+            >
+              <PhotoIcon className="w-5 h-5" />
+            </Link>
             <motion.button
               whileHover={animationsEnabled ? { scale: 1.08 } : undefined}
               whileTap={animationsEnabled ? { scale: 0.92 } : undefined}

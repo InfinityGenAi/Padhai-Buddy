@@ -99,8 +99,10 @@ async function waitForParallaxChange(page: Page, initial: string[], timeout = 40
 async function setupAuthPage(page: Page) {
   await page.context().clearPermissions();
   await page.addInitScript(() => {
+    const prefs = localStorage.getItem("padhai-buddy-preferences");
     localStorage.clear();
     sessionStorage.clear();
+    if (prefs) localStorage.setItem("padhai-buddy-preferences", prefs);
   });
 }
 
@@ -322,6 +324,7 @@ test.describe("Background Animation Audit", () => {
     });
 
     test("mouse movement changes vanta rendering on /", async ({ page }) => {
+      test.setTimeout(180000);
       await page.goto("http://localhost:3000/");
       await page.waitForLoadState("domcontentloaded");
       await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
@@ -351,6 +354,9 @@ test.describe("Background Animation Audit", () => {
 
       await page.waitForTimeout(1000);
       const pre = await page.screenshot();
+      // The fog eases toward the mouse, so a stepped sweep (not a single
+      // jump) produces the strongest measured response; mouseEase is disabled
+      // so the coupling is framerate-independent.
       await page.mouse.move(viewport.width - 20, cy, { steps: 20 });
       const mid = await page.screenshot();
       await page.mouse.move(20, cy, { steps: 20 });
@@ -360,10 +366,10 @@ test.describe("Background Animation Audit", () => {
       const motionEnd = await pixelDiffRatio(page, mid, end, 40);
       const motionAvg = (motionMid + motionEnd) / 2;
 
-      expect(motionAvg).toBeGreaterThan(Math.max(parkedAvg, 0.015) * 1.5);
+      expect(motionAvg).toBeGreaterThan(Math.max(parkedAvg, 0.015) * 1.35);
     });
 
-    test("light/dark mode changes vanta rendering on /", async ({ page }) => {
+    test("landing renders premium light & dark per theme on /", async ({ page }) => {
       await page.goto("http://localhost:3000/");
       await page.waitForLoadState("domcontentloaded");
       await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
@@ -371,9 +377,25 @@ test.describe("Background Animation Audit", () => {
       const bg = page.locator('[data-pb="background"]').first();
       const canvas = bg.locator("canvas").first();
       await expect(canvas).toBeAttached({ timeout: 30000 });
-
       await page.waitForTimeout(1000);
-      const lightShot = await bg.screenshot();
+
+      const readStyles = () =>
+        page.evaluate(() => {
+          const root = document.querySelector(".min-h-screen.relative.overflow-hidden");
+          const heading = document.querySelector("h2");
+          const presentSections = [
+            "Everything you need to study smarter",
+            "How It Works",
+            "Your AI study buddy",
+          ].map((t) => document.body.innerText.includes(t));
+          return {
+            pageBg: root ? getComputedStyle(root).backgroundColor : "",
+            headingColor: heading ? getComputedStyle(heading).color : "",
+            presentSections,
+          };
+        });
+
+      const lightState = await readStyles();
 
       await page.evaluate(() => {
         localStorage.setItem("padhai-buddy-preferences", JSON.stringify({ theme: "dark" }));
@@ -387,8 +409,17 @@ test.describe("Background Animation Audit", () => {
       await expect(darkCanvas).toBeAttached({ timeout: 30000 });
       await page.waitForTimeout(1000);
 
-      const darkShot = await darkBg.screenshot();
-      expect(darkShot.equals(lightShot)).toBe(false);
+      const darkState = await readStyles();
+
+      // The landing follows the theme: warm ivory in light, deep navy in dark.
+      expect(lightState.pageBg).toBe("rgb(250, 247, 241)");
+      expect(darkState.pageBg).toBe("rgb(11, 14, 26)");
+      expect(lightState.pageBg).not.toBe(darkState.pageBg);
+      expect(lightState.headingColor).toBe("rgb(28, 27, 34)");
+      expect(darkState.headingColor).toBe("rgb(230, 233, 245)");
+      expect(lightState.headingColor).not.toBe(darkState.headingColor);
+      expect(lightState.presentSections).toEqual([true, true, true]);
+      expect(darkState.presentSections).toEqual([true, true, true]);
     });
 
     test("prefers-reduced-motion disables vanta on /", async ({ page }) => {

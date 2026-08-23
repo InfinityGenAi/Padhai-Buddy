@@ -50,13 +50,13 @@ export default function MorePage() {
     },
     {
       icon: CalendarIcon,
-      title: "Study Planner",
+      title: "Planner",
       desc: "Plan your daily study tasks and track progress.",
       href: "/dashboard/planner",
     },
     {
       icon: ClockIcon,
-      title: "Study Timer",
+      title: "Timer",
       desc: "Use Pomodoro or custom timers to focus.",
       href: "/dashboard/timer",
     },
@@ -99,7 +99,7 @@ export default function MorePage() {
   ];
 
   return (
-    <motion.div initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined} animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined} className="space-y-5 w-full">
+    <motion.div initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined} animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined} className="space-y-6 w-full">
       <div className="flex items-center gap-2">
         <Squares2X2Icon className="w-6 h-6 text-primary" />
         <h1 className="text-xl font-semibold">More</h1>

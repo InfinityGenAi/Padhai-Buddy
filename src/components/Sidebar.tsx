@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   ChatBubbleLeftEllipsisIcon,
   PhotoIcon,
-  ClockIcon,
   HomeIcon,
   Cog6ToothIcon,
   ArrowLeftOnRectangleIcon,
@@ -13,10 +12,10 @@ import {
   SparklesIcon,
   DocumentTextIcon,
   CalendarIcon,
-  ChartBarIcon,
   SpeakerWaveIcon,
   TrophyIcon,
-  Squares2X2Icon,
+  BoltIcon,
+  UserIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettingsModal } from "@/contexts/SettingsModalContext";
@@ -26,18 +25,18 @@ import BrandLogo from "./BrandLogo";
 
 const mainNavItems = [
   { name: "Dashboard", href: "/dashboard", icon: HomeIcon, available: true },
-  { name: "Chat Doubt", href: "/dashboard/chat", icon: ChatBubbleLeftEllipsisIcon, available: true },
+  { name: "AI Chat", href: "/dashboard/chat", icon: ChatBubbleLeftEllipsisIcon, available: true },
   { name: "Photo Doubt", href: "/dashboard/photo-doubt", icon: PhotoIcon, available: true },
-  { name: "Quick Quiz", href: "/dashboard/quiz", icon: BookOpenIcon, available: true },
+  { name: "Quiz", href: "/dashboard/quiz", icon: BookOpenIcon, available: true },
   { name: "Flashcards", href: "/dashboard/flashcards", icon: SparklesIcon, available: true },
   { name: "Notes", href: "/dashboard/notes", icon: DocumentTextIcon, available: true },
-  { name: "Study Planner", href: "/dashboard/planner", icon: CalendarIcon, available: true },
-  { name: "Study Timer", href: "/dashboard/timer", icon: ClockIcon, available: true },
-  { name: "Progress", href: "/dashboard/progress", icon: ChartBarIcon, available: true },
-  { name: "History", href: "/dashboard/history", icon: ClockIcon, available: true },
+  { name: "Planner", href: "/dashboard/planner", icon: CalendarIcon, available: true },
+  { name: "Timer", href: "/dashboard/timer", icon: BoltIcon, available: true },
   { name: "Resources", href: "/dashboard/resources", icon: SpeakerWaveIcon, available: true },
   { name: "Leaderboard", href: "/dashboard/leaderboard", icon: TrophyIcon, available: true },
-  { name: "More", href: "/dashboard/more", icon: Squares2X2Icon, available: true },
+  { name: "Profile", href: "/dashboard/profile", icon: UserIcon, available: true },
+  { name: "Settings", href: "#", icon: Cog6ToothIcon, available: true, isAction: true },
+  { name: "Logout", href: "#", icon: ArrowLeftOnRectangleIcon, available: true, isAction: true },
 ];
 
 export default function Sidebar() {
@@ -58,14 +57,39 @@ export default function Sidebar() {
 
         <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
           {mainNavItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = !item.isAction && pathname === item.href;
+
+            if (item.isAction) {
+              return (
+                <motion.button
+                  key={item.name}
+                  onClick={() => {
+                    if (item.name === "Settings") {
+                      playSettings();
+                      open();
+                    } else if (item.name === "Logout") {
+                      playLogout();
+                      logout();
+                    }
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all relative focus-ring ${
+                    "text-foreground/65 hover:bg-foreground-subtle-hover hover:text-foreground"
+                  }`}
+                  whileHover={animationsEnabled ? { x: 2 } : undefined}
+                  whileTap={animationsEnabled ? { scale: 0.97 } : undefined}
+                >
+                  <item.icon className="w-[18px] h-[18px] flex-shrink-0" />
+                  <span className="truncate">{item.name}</span>
+                </motion.button>
+              );
+            }
 
             return (
               <Link key={item.name} href={item.href}>
                 <motion.div
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all relative focus-ring ${
                     isActive
-                      ? "bg-primary/10 text-primary"
+                      ? "bg-gradient-to-r from-primary/10 to-primary/5 text-primary shadow-sm"
                       : "text-foreground/65 hover:bg-foreground-subtle-hover hover:text-foreground"
                   }`}
                   whileHover={animationsEnabled ? { x: isActive ? 0 : 2 } : undefined}
@@ -85,30 +109,6 @@ export default function Sidebar() {
         </nav>
 
         <div className="border-t border-border/50 pt-3 pb-4 px-3 space-y-0.5 mt-auto">
-          <motion.button
-            onClick={() => {
-              playSettings();
-              open();
-            }}
-            whileHover={animationsEnabled ? { x: 2 } : undefined}
-            whileTap={animationsEnabled ? { scale: 0.97 } : undefined}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-foreground/65 hover:bg-foreground-subtle-hover hover:text-foreground transition-all w-full focus-ring"
-          >
-            <Cog6ToothIcon className="w-[18px] h-[18px] flex-shrink-0" />
-            <span>Settings</span>
-          </motion.button>
-          <motion.button
-            onClick={() => {
-              playLogout();
-              logout();
-            }}
-            whileHover={animationsEnabled ? { x: 2 } : undefined}
-            whileTap={animationsEnabled ? { scale: 0.97 } : undefined}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-foreground/65 hover:bg-foreground-subtle-hover hover:text-foreground transition-all w-full focus-ring"
-          >
-            <ArrowLeftOnRectangleIcon className="w-[18px] h-[18px] flex-shrink-0" />
-            <span>Logout</span>
-          </motion.button>
         </div>
       </div>
     </aside>

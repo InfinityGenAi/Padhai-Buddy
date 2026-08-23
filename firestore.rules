@@ -13,11 +13,13 @@ service cloud.firestore {
         && request.resource.data.createdAt is int
         && request.resource.data.preferences is map;
       allow update: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && !request.resource.data.keys().hasAny(['role', 'isAdmin', 'system'])
         && (!("name" in request.resource.data) || request.resource.data.name is string)
         && (!("email" in request.resource.data) || request.resource.data.email is string)
         && (!("class" in request.resource.data) || request.resource.data.class is int)
         && (!("board" in request.resource.data) || request.resource.data.board in ["CBSE", "ICSE", "State Board"])
-        && (!("createdAt" in request.resource.data) || request.resource.data.createdAt is int)
         && (!("preferences" in request.resource.data) || request.resource.data.preferences is map);
       allow delete: if false;
 

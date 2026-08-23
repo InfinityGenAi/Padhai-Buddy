@@ -14,7 +14,6 @@ let app: FirebaseApp | undefined;
 let auth: Auth | undefined;
 let db: Firestore | undefined;
 let initPromise: Promise<void> | undefined;
-let persistenceApplied = false;
 
 async function initializeFirebase(): Promise<void> {
   if (typeof window === "undefined") return;
@@ -26,11 +25,13 @@ async function initializeFirebase(): Promise<void> {
   db = getFirestore(app);
   if (!auth) throw new Error("Firebase Auth initialization failed");
 
-  if (!persistenceApplied) {
-    persistenceApplied = true;
-    setPersistence(auth, browserLocalPersistence).catch((persistErr) => {
-      console.warn("[Firebase] Local persistence could not be enabled:", persistErr);
-    });
+  try {
+    await setPersistence(auth, browserLocalPersistence);
+  } catch (err) {
+    // Persistence is a progressive enhancement. Await it so initialization
+    // reflects reality, but a transient failure must not mark it as applied
+    // forever — the next initialization attempt retries it.
+    console.warn("[Firebase] Local persistence could not be enabled:", err);
   }
 }
 
@@ -40,6 +41,9 @@ function ensureInitialized(): Promise<void> {
 
   initPromise = initializeFirebase().catch((err) => {
     console.error("[Firebase] Initialization error:", err);
+    // Do not cache a rejected promise forever: clear it so future callers
+    // can retry initialization instead of failing silently.
+    initPromise = undefined;
     throw err;
   });
 

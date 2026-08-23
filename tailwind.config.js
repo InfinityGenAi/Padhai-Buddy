@@ -14,7 +14,7 @@ module.exports = {
         foreground: "var(--foreground)",
       },
       fontFamily: {
-        sans: ["var(--font-geist-sans)", "Segoe UI", "Helvetica Neue", "Arial", "sans-serif"],
+        sans: ["var(--font-poppins)", "Segoe UI", "Helvetica Neue", "Arial", "sans-serif"],
         mono: ["var(--font-geist-mono)", "monospace"],
       },
       animation: {},

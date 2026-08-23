@@ -154,11 +154,11 @@ export default function PlannerPage() {
   const priorityColors: Record<PlanPriority, string> = { low: "bg-blue-100 dark:bg-blue-950/30 text-blue-700", medium: "bg-amber-100 dark:bg-amber-950/30 text-amber-700", high: "bg-red-100 dark:bg-red-950/30 text-red-700" };
 
   return (
-    <motion.div initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined} animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined} className="space-y-5 w-full">
+    <motion.div initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined} animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined} className="space-y-6 w-full">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <CalendarIcon className="w-6 h-6 text-primary" />
-          <h1 className="text-xl font-semibold">Study Planner</h1>
+          <h1 className="text-xl font-semibold">Planner</h1>
         </div>
         <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setShowAdd(true)} className="px-3 py-1.5 btn-primary rounded-lg text-sm font-medium flex items-center gap-1">
           <PlusIcon className="w-4 h-4" /> Add Task
@@ -188,9 +188,22 @@ export default function PlannerPage() {
         <div className="space-y-2">
           {plans.map((plan) => (
             <motion.div key={plan.id} className={`subtle-card rounded-xl p-4 flex items-center gap-3 ${plan.completed ? "opacity-60" : ""}`} whileHover={{ y: -1 }}>
-              <button onClick={() => handleToggle(plan)} className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${plan.completed ? "bg-primary border-primary" : "border-foreground/25 hover:border-primary/50"}`}>
-                {plan.completed && <CheckCircleIcon className="w-3 h-3 text-white" />}
-              </button>
+              <motion.button
+                  onClick={() => handleToggle(plan)}
+                  whileHover={{ scale: 1.15 }}
+                  whileTap={{ scale: 0.85 }}
+                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${plan.completed ? "bg-gradient-to-br from-purple-500 to-indigo-600 border-primary shadow-sm" : "border-foreground/25 hover:border-primary/50"}`}
+                  aria-label={plan.completed ? "Mark as not completed" : "Mark as completed"}
+                >
+                  <motion.span
+                    initial={false}
+                    animate={plan.completed ? { scale: [0, 1.2, 1], rotate: [0, 10, 0] } : { scale: 0 }}
+                    transition={{ duration: 0.35 }}
+                    className="flex"
+                  >
+                    <CheckCircleIcon className="w-3.5 h-3.5 text-white" />
+                  </motion.span>
+                </motion.button>
               <div className="flex-1 min-w-0">
                 <p className={`text-sm truncate ${plan.completed ? "text-foreground/35 line-through" : "text-foreground/75"}`}>{plan.title}</p>
                 <p className="text-xs text-foreground/50">{plan.subject} — {plan.durationMinutes} min — {plan.plannedDate}</p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -54,10 +54,14 @@ export default function LoginPage() {
 
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
+  const emailInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (loading) return;
     if (!firebaseUser) return;
+    if (loading) {
+      router.replace("/dashboard");
+      return;
+    }
     if (needsOnboarding) {
       router.replace("/onboarding");
     } else if (user?.class && user?.board) {
@@ -83,7 +87,7 @@ export default function LoginPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center gap-3 bg-background">
+      <div className="flex h-screen w-full items-center justify-center gap-3 bg-background dark:bg-dark">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         <span className="text-sm text-foreground/60">Loading…</span>
       </div>
@@ -143,38 +147,38 @@ export default function LoginPage() {
   const showVerificationBanner = !!firebaseUser && !firebaseUser.emailVerified;
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      <AnimatedBackground animate={animationsEnabled} />
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
+      <AnimatedBackground animate={animationsEnabled} variant="auth" />
       <motion.div
         variants={animationsEnabled ? staggerContainer : undefined}
         initial={animationsEnabled ? "hidden" : false}
         animate={animationsEnabled ? "visible" : false}
-        className="relative z-10 w-full max-w-md mx-auto p-6"
+        className="relative z-10 w-full max-w-md mx-auto"
       >
-         <motion.div
-           variants={animationsEnabled ? staggerItem : undefined}
-           className="auth-card p-8"
-         >
-           {/* Logo */}
-           <motion.div
-             variants={animationsEnabled ? staggerItem : undefined}
-             className="flex justify-center mb-6"
-           >
-             <BrandLogo size={56} />
-           </motion.div>
+        <motion.div
+          variants={animationsEnabled ? staggerItem : undefined}
+          className="bg-card border border-border rounded-2xl p-6 shadow-xl"
+        >
+          {/* Logo */}
+          <motion.div
+            variants={animationsEnabled ? staggerItem : undefined}
+            className="flex justify-center mb-6"
+          >
+            <BrandLogo size={56} />
+          </motion.div>
 
           <div className="text-center mb-6">
             <motion.h1
               variants={animationsEnabled ? staggerItem : undefined}
-              className="text-3xl font-bold text-primary mb-1"
+              className="text-3xl font-bold text-foreground mb-1"
             >
-              Welcome Back
+              Welcome back!
             </motion.h1>
             <motion.p
               variants={animationsEnabled ? staggerItem : undefined}
               className="text-sm text-foreground/60"
             >
-              Login to continue your learning journey
+              Good to see you again
             </motion.p>
           </div>
 
@@ -209,7 +213,7 @@ export default function LoginPage() {
           <motion.button
             onClick={handleGoogle}
             disabled={isSubmitting}
-            className="w-full glass card-subtle border border-border rounded-xl py-2.5 font-medium flex items-center justify-center gap-2 hover:bg-foreground/5 transition-colors disabled:opacity-50"
+            className="w-full glass card-subtle border border-border rounded-xl py-3 font-medium flex items-center justify-center gap-2 hover:bg-foreground/5 transition-colors disabled:opacity-50 focus-ring"
             whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
             whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
             variants={animationsEnabled ? staggerItem : undefined}
@@ -218,55 +222,73 @@ export default function LoginPage() {
             Continue with Google
           </motion.button>
 
-          <div className="auth-divider">
-            <span>or</span>
+          <motion.button
+            disabled={isSubmitting}
+            className="w-full glass card-subtle border border-border rounded-xl py-3 font-medium flex items-center justify-center gap-2 hover:bg-foreground/5 transition-colors disabled:opacity-50 focus-ring"
+            whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
+            whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
+            variants={animationsEnabled ? staggerItem : undefined}
+          >
+            Continue with Email
+          </motion.button>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs text-foreground/50">
+              <span className="bg-card px-2">OR</span>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <motion.div variants={animationsEnabled ? staggerItem : undefined}>
-              <label className="block text-sm font-medium mb-1.5">
+              <label className="block text-sm font-medium mb-1.5 text-foreground/70">
                 Email
               </label>
-              <div className="auth-input-wrapper">
-                <EnvelopeIcon className="auth-input-icon" />
+              <div className="relative">
+                <EnvelopeIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
                 <input
+                  ref={emailInputRef}
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="auth-input"
+                  placeholder="Enter your email"
+                  className="w-full bg-background border border-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                   required
+                  autoComplete="email"
                 />
               </div>
             </motion.div>
 
             <motion.div variants={animationsEnabled ? staggerItem : undefined} className="flex items-center justify-between">
-              <label className="block text-sm font-medium">
+              <label className="block text-sm font-medium text-foreground/70">
                 Password
               </label>
               <Link
                 href="/forgot-password"
-                className="auth-link text-xs"
+                className="text-xs text-primary hover:underline font-medium"
               >
                 Forgot Password?
               </Link>
             </motion.div>
             <motion.div variants={animationsEnabled ? staggerItem : undefined}>
-              <div className="auth-input-wrapper">
-                <LockClosedIcon className="auth-input-icon" />
+              <div className="relative">
+                <LockClosedIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="auth-input"
+                  placeholder="Enter your password"
+                  className="w-full bg-background border border-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors pr-12"
                   required
                   minLength={6}
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="password-toggle"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground transition-colors"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
@@ -278,30 +300,43 @@ export default function LoginPage() {
               </div>
             </motion.div>
 
+            <motion.div variants={animationsEnabled ? staggerItem : undefined} className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="remember"
+                  className="w-4 h-4 rounded border-border text-primary focus:ring-primary/30"
+                />
+                <label htmlFor="remember" className="text-sm text-foreground/60 cursor-pointer">
+                  Remember me
+                </label>
+              </div>
+            </motion.div>
+
             <motion.button
               type="submit"
               disabled={isSubmitting}
-              className="w-full btn-primary py-2.5 rounded-xl font-medium"
+              className="w-full btn-primary py-3 rounded-xl font-medium focus-ring"
               whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
               whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
               variants={animationsEnabled ? staggerItem : undefined}
             >
               {isSubmitting ? "Logging in..." : "Login"}
             </motion.button>
-          </form>
 
-          <motion.p
-            variants={animationsEnabled ? staggerItem : undefined}
-            className="text-center text-sm text-foreground/60 mt-6"
-          >
-            Don&apos;t have an account?{" "}
-            <Link
-              href="/signup"
-              className="text-primary font-medium hover:underline"
+            <motion.p
+              variants={animationsEnabled ? staggerItem : undefined}
+              className="text-center text-sm text-foreground/60 mt-6"
             >
-              Sign Up
-            </Link>
-          </motion.p>
+              Don&apos;t have an account?{" "}
+              <Link
+                href="/signup"
+                className="text-primary font-medium hover:underline"
+              >
+                Sign Up
+              </Link>
+            </motion.p>
+          </form>
         </motion.div>
       </motion.div>
     </div>

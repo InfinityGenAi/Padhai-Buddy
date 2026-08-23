@@ -102,7 +102,7 @@ export default function NotesPage() {
 
   if (view === "editor") {
     return (
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5 w-full">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 w-full">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <DocumentTextIcon className="w-6 h-6 text-primary" />
@@ -141,7 +141,7 @@ export default function NotesPage() {
   }
 
   return (
-    <motion.div initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined} animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined} className="space-y-5 w-full">
+    <motion.div initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined} animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined} className="space-y-6 w-full">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <DocumentTextIcon className="w-6 h-6 text-primary" />

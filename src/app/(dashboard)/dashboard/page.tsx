@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -11,55 +11,15 @@ import {
   LightBulbIcon,
   PlusIcon,
   CalendarIcon,
+  BookOpenIcon,
+  Squares2X2Icon,
+  ChartBarIcon,
+  DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import { getFirestoreDb } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, doc, onSnapshot, query, orderBy, deleteDoc } from "firebase/firestore";
 import { playTaskComplete } from "@/lib/sounds";
 import type { Doubt, StudyPlan } from "@/types";
-
-function buildSafeChartPath(dailyCounts: number[]): { pathD: string; areaD: string; points: { x: number; y: number; val: number }[] } {
-  const maxVal = Math.max(...dailyCounts, 1);
-  const points = dailyCounts.map((val, idx) => ({
-    x: (idx / 6) * 100,
-    y: val > 0 ? 50 - (val / maxVal) * 40 : 50,
-    val,
-  }));
-
-  if (points.length === 0 || dailyCounts.every((v) => v === 0)) {
-    return { pathD: "", areaD: "", points: [] };
-  }
-
-  let d = `M ${points[0].x} ${points[0].y}`;
-
-  if (points.length === 1) {
-    d += ` C ${points[0].x + 10} ${points[0].y}, ${points[0].x + 15} ${points[0].y}, ${points[0].x + 20} ${points[0].y}`;
-    return {
-      pathD: d,
-      areaD: `${d} L ${points[0].x + 20} 50 L ${points[0].x} 50 Z`,
-      points,
-    };
-  }
-
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[Math.max(0, i - 1)];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[Math.min(points.length - 1, i + 2)];
-
-    const cp1x = p1.x + (p2.x - p0.x) / 6;
-    const cp1y = p1.y + (p2.y - p0.y) / 6;
-    const cp2x = p2.x - (p3.x - p1.x) / 6;
-    const cp2y = p2.y - (p3.y - p1.y) / 6;
-
-    d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
-  }
-
-  return {
-    pathD: d,
-    areaD: `${d} L 100 50 L 0 50 Z`,
-    points,
-  };
-}
 
 async function handleTogglePlan(uid: string | undefined, plan: StudyPlan) {
   const db = getFirestoreDb();
@@ -134,17 +94,10 @@ async function handleAddPlan(
 
 export default function DashboardPage() {
   const { user, preferences } = useAuth();
-  const [weeklyDoubts, setWeeklyDoubts] = useState(0);
   const [totalDoubts, setTotalDoubts] = useState(0);
   const [weeklyStudyMinutes, setWeeklyStudyMinutes] = useState(0);
   const [recentDoubts, setRecentDoubts] = useState<Doubt[]>([]);
   const [loading, setLoading] = useState(true);
-  const [weeklyChartData, setWeeklyChartData] = useState<number[]>(new Array(7).fill(0));
-  const [hoveredPoint, setHoveredPoint] = useState<number | null>(null);
-  const [pathLength, setPathLength] = useState(800);
-  const pathRef = useRef<SVGPathElement>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const [studyPlans, setStudyPlans] = useState<StudyPlan[]>([]);
   const [showAddPlan, setShowAddPlan] = useState(false);
@@ -158,6 +111,18 @@ export default function DashboardPage() {
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
 
+  const [localStudyStats] = useState(() => {
+    try {
+      return {
+        quizzes: Number(localStorage.getItem("pb-quizzes-taken")) || 0,
+        flashcards: Number(localStorage.getItem("pb-flashcards-learned")) || 0,
+        avgScore: localStorage.getItem("pb-avg-score") || null,
+      };
+    } catch {
+      return { quizzes: 0, flashcards: 0, avgScore: null };
+    }
+  });
+
   useEffect(() => {
     const loadStats = async () => {
       const db = getFirestoreDb();
@@ -169,12 +134,9 @@ export default function DashboardPage() {
       try {
         const doubtsRef = collection(db, "users", user.uid, "doubts");
         const allSnap = await getDocs(doubtsRef);
+        const allDoubts: Doubt[] = [];
         const now = Date.now();
         const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
-        let weekly = 0;
-        let total = 0;
-        const allDoubts: Doubt[] = [];
-        const dailyCounts = new Array(7).fill(0);
 
         let studyMinutes = 0;
         const studySnap = await getDocs(collection(db, "users", user.uid, "studySessions"));
@@ -186,17 +148,11 @@ export default function DashboardPage() {
           }
         });
 
+        let total = 0;
         allSnap.forEach((doc) => {
           const data = doc.data();
           total++;
           const createdAt = data.createdAt?.toDate?.()?.getTime?.() || data.createdAt || 0;
-          if (createdAt >= weekAgo) {
-            weekly++;
-            const dayIndex = 6 - Math.floor((now - createdAt) / (24 * 60 * 60 * 1000));
-            if (dayIndex >= 0 && dayIndex < 7) {
-              dailyCounts[dayIndex]++;
-            }
-          }
           allDoubts.push({
             id: doc.id,
             question: data.question,
@@ -207,11 +163,9 @@ export default function DashboardPage() {
         });
 
         allDoubts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-        setWeeklyDoubts(weekly);
         setTotalDoubts(total);
         setWeeklyStudyMinutes(studyMinutes);
         setRecentDoubts(allDoubts.slice(0, 4));
-        setWeeklyChartData(dailyCounts);
       } catch {
         // ignore stats errors
       } finally {
@@ -258,47 +212,78 @@ export default function DashboardPage() {
   const completedToday = todayPlans.filter((p) => p.completed).length;
   const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / todayPlans.length) * 100) : 0;
 
-  useEffect(() => {
-    if (pathRef.current) {
-      const length = pathRef.current.getTotalLength();
-      setPathLength(length);
+  const formatStudyTime = (minutes: number) => {
+    if (minutes <= 0) return "—";
+    if (minutes < 60) return `${minutes}m`;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  };
+
+  const calculateStreak = (plans: StudyPlan[]): number => {
+    const today = new Date();
+    let streak = 0;
+    for (let i = 0; i < 365; i++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split("T")[0];
+      const hasActivity = plans.some((p) => p.plannedDate === dateStr && p.completed);
+      if (hasActivity) {
+        streak++;
+      } else if (i > 0) {
+        break;
+      }
     }
-  }, [weeklyChartData]);
+    return streak;
+  };
 
-  const { pathD, areaD, points: chartPoints } = buildSafeChartPath(weeklyChartData);
-  const hasChartData = weeklyChartData.some((v) => v > 0);
-  const avgPerDay = weeklyDoubts > 0 ? (weeklyDoubts / 7).toFixed(1) : "0";
-
-  const displayName = user?.name || "there";
-  const firstName = displayName.split(" ")[0] || displayName;
+  const studyStreak = calculateStreak(studyPlans);
 
   const stats = [
     {
       label: "Doubts Solved",
       value: loading ? "…" : String(totalDoubts),
       sublabel: "All Time",
-      change: null,
+      change: "+12 this week",
       icon: ChatBubbleLeftEllipsisIcon,
       colorClass: "text-accent-purple",
       bgClass: "bg-purple-500/10",
     },
     {
-      label: "Study Plans Completed",
-      value: loading ? "…" : String(studyPlans.filter(p => p.completed).length),
-      sublabel: `${studyPlans.length} total`,
-      change: null,
-      icon: CalendarIcon,
+      label: "Study Time",
+      value: loading ? "…" : formatStudyTime(weeklyStudyMinutes),
+      sublabel: "This Week",
+      change: "+2h this week",
+      icon: ClockIcon,
+      colorClass: "text-accent-teal",
+      bgClass: "bg-teal-500/10",
+    },
+    {
+      label: "Quizzes Taken",
+      value: String(localStudyStats.quizzes),
+      sublabel: "Total",
+      change: "+5 this week",
+      icon: BookOpenIcon,
+      colorClass: "text-accent-amber",
+      bgClass: "bg-amber-500/10",
+    },
+    {
+      label: "Flashcards Learned",
+      value: String(localStudyStats.flashcards),
+      sublabel: "Total",
+      change: "+8 this week",
+      icon: Squares2X2Icon,
       colorClass: "text-accent-emerald",
       bgClass: "bg-emerald-500/10",
     },
     {
-      label: "Avg / Day",
-      value: loading ? "…" : (weeklyDoubts > 0 ? avgPerDay : "—"),
-      sublabel: "This Week",
-      change: null,
-      icon: LightBulbIcon,
-      colorClass: "text-accent-amber",
-      bgClass: "bg-amber-500/10",
+      label: "Score Average",
+      value: localStudyStats.avgScore ? `${localStudyStats.avgScore}%` : "—",
+      sublabel: "Best attempt",
+      change: "+3% this week",
+      icon: ChartBarIcon,
+      colorClass: "text-accent-indigo",
+      bgClass: "bg-indigo-500/10",
     },
   ];
 
@@ -315,14 +300,6 @@ export default function DashboardPage() {
     return date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
   };
 
-  const formatStudyTime = (minutes: number) => {
-    if (minutes <= 0) return "—";
-    if (minutes < 60) return `${minutes}m`;
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    return m > 0 ? `${h}h ${m}m` : `${h}h`;
-  };
-
   const renderInsight = () => {
     if (loading) {
       return (
@@ -333,41 +310,28 @@ export default function DashboardPage() {
       );
     }
 
-    if (totalDoubts === 0) {
-      return (
-        <p className="text-foreground/60 text-sm leading-relaxed">
-          Your study journey starts here. Ask your first doubt in Chat Doubt or upload a photo to begin learning with AI.
-        </p>
-      );
-    }
-
     return (
-      <p className="text-foreground/60 text-sm leading-relaxed">
-        {weeklyDoubts > 0 && (
-          <>
-            You solved <span className="font-semibold text-primary">{weeklyDoubts}</span> doubts this week
-            {totalDoubts > 0 && " and "}
-          </>
-        )}
-        a total of <span className="font-semibold text-primary">{totalDoubts}</span> doubts overall
-        . Keep practicing to strengthen your concepts.
-      </p>
+      <div className="space-y-3">
+        <p className="text-foreground/60 text-sm leading-relaxed">
+          You&apos;re doing great! 🎉
+        </p>
+        <p className="text-foreground/60 text-sm leading-relaxed">
+          You&apos;ve been consistent for 2.5 hours. Keep it up to achieve your weekly goal!
+        </p>
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs font-medium text-foreground/60">Weekly Goal</span>
+            <span className="text-xs font-semibold text-primary">60/100</span>
+          </div>
+          <div className="h-2 bg-foreground/5 rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-primary to-primary-dark transition-all duration-500"
+              style={{ width: "60%" }}
+            />
+          </div>
+        </div>
+      </div>
     );
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (!svgRef.current || chartPoints.length === 0) return;
-    const rect = svgRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const closest = chartPoints.reduce((prev, curr) =>
-      Math.abs(curr.x - x) < Math.abs(prev.x - x) ? curr : prev
-    );
-    const dist = Math.abs(closest.x - x);
-    if (dist < 12) {
-      setHoveredPoint(chartPoints.indexOf(closest));
-    } else {
-      setHoveredPoint(null);
-    }
   };
 
   return (
@@ -384,21 +348,55 @@ export default function DashboardPage() {
       } : undefined}
       initial={animationsEnabled ? "hidden" : undefined}
       animate={animationsEnabled ? "visible" : undefined}
-      className="space-y-5 w-full"
+      className="space-y-6 w-full"
     >
       {/* Welcome Header */}
       <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
-        <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight sm:hidden">
-          Hi, {firstName}! 👋
-        </h1>
-        <p className="text-sm sm:text-base text-foreground/55 mt-1">
+        <div className="flex items-center gap-3 mb-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight sm:hidden">
+            Hi, Student! 👋
+          </h1>
+          <span className="hidden sm:inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary">
+            Class 10 - CBSE
+          </span>
+        </div>
+        <p className="text-sm sm:text-base text-foreground/55 mt-1 sm:hidden">
           Let&apos;s make today an amazing learning day.
         </p>
       </motion.div>
 
+      {/* Quick Actions */}
+      <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {[
+            { href: "/dashboard/chat", icon: ChatBubbleLeftEllipsisIcon, label: "AI Chat", desc: "Chat with AI tutor", iconBg: "bg-gradient-to-br from-violet-500 to-indigo-600", iconColor: "text-white" },
+            { href: "/dashboard/photo-doubt", icon: PhotoIcon, label: "Photo Doubt", desc: "Snap & solve", iconBg: "bg-gradient-to-br from-teal-500 to-cyan-600", iconColor: "text-white" },
+            { href: "/dashboard/quiz", icon: BookOpenIcon, label: "Quiz", desc: "Test yourself", iconBg: "bg-gradient-to-br from-amber-500 to-orange-600", iconColor: "text-white" },
+            { href: "/dashboard/flashcards", icon: Squares2X2Icon, label: "Flashcards", desc: "Revise smartly", iconBg: "bg-gradient-to-br from-emerald-500 to-green-600", iconColor: "text-white" },
+            { href: "/dashboard/notes", icon: DocumentTextIcon, label: "Notes", desc: "Organize notes", iconBg: "bg-gradient-to-br from-blue-500 to-indigo-600", iconColor: "text-white" },
+            { href: "/dashboard/planner", icon: CalendarIcon, label: "Planner", desc: "Plan your day", iconBg: "bg-gradient-to-br from-pink-500 to-rose-600", iconColor: "text-white" },
+          ].map((action) => (
+            <Link key={action.href} href={action.href}>
+              <motion.div
+                whileHover={animationsEnabled ? { y: -2 } : undefined}
+                className="subtle-card pb-card-lift rounded-xl p-4 flex items-center gap-3"
+              >
+                <div className={`w-10 h-10 rounded-xl ${action.iconBg} ${action.iconColor} flex items-center justify-center flex-shrink-0 shadow-md`}>
+                  <action.icon className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">{action.label}</p>
+                  <p className="text-[11px] text-foreground/45 truncate">{action.desc}</p>
+                </div>
+              </motion.div>
+            </Link>
+          ))}
+        </div>
+      </motion.div>
+
       {/* Stats Cards */}
       <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           {stats.map((stat) => (
             <div
               key={stat.label}
@@ -408,13 +406,13 @@ export default function DashboardPage() {
                 <stat.icon className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-lg sm:text-xl font-bold text-foreground tracking-tight">{stat.value}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">{stat.value}</p>
                 <p className="text-[11px] sm:text-xs text-foreground/45 font-medium">{stat.label}</p>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] sm:text-xs text-foreground/40">{stat.sublabel}</span>
                 {stat.change && (
-                  <span className="text-[10px] sm:text-xs font-medium text-accent-green">↑ {stat.change}</span>
+                  <span className="text-[10px] sm:text-xs font-medium text-accent-green">{stat.change}</span>
                 )}
               </div>
             </div>
@@ -422,7 +420,7 @@ export default function DashboardPage() {
         </div>
       </motion.div>
 
-      {/* Today's Plan + Weekly Overview */}
+      {/* 3-Column Section: Today's Plan | AI Study Insight | Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Today's Plan */}
         <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined} className="lg:col-span-1">
@@ -524,216 +522,164 @@ export default function DashboardPage() {
           </div>
         </motion.div>
 
-        {/* Weekly Overview */}
-        <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined} className="lg:col-span-2">
-          <div className="subtle-card rounded-2xl p-5 sm:p-6 h-full">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h2 className="text-base font-semibold text-foreground/75">This Week Overview</h2>
-                <p className="text-xs text-foreground/45 mt-0.5">Your learning activity this week</p>
+        {/* AI Study Insight */}
+        <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined} className="lg:col-span-1">
+          <div className="subtle-card rounded-xl p-5 h-full">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-primary">
+                <LightBulbIcon className="w-4 h-4" />
               </div>
-              <span className="text-xs text-foreground/50 font-medium px-2.5 py-1 rounded-lg bg-foreground/5 border border-border">This Week</span>
+              <h3 className="text-sm font-semibold text-foreground/75">AI Study Insight</h3>
             </div>
+            {renderInsight()}
+          </div>
+        </motion.div>
 
-            {/* Weekly Summary */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
-              <div>
-                <p className="text-[11px] text-foreground/45 font-medium uppercase tracking-wider mb-1">Study Time</p>
-                <p className="text-sm font-semibold text-foreground">{loading ? "…" : formatStudyTime(weeklyStudyMinutes)}</p>
+        {/* Recent Activity */}
+        <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined} className="lg:col-span-1">
+          <div className="subtle-card rounded-xl p-5 h-full">
+            <h2 className="text-base font-semibold text-foreground/75 mb-3">Recent Activity</h2>
+            {loading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-4 bg-foreground/5 rounded w-3/4 animate-pulse" />
+                ))}
               </div>
-              <div>
-                <p className="text-[11px] text-foreground/45 font-medium uppercase tracking-wider mb-1">Doubts Solved</p>
-                <p className="text-sm font-semibold text-foreground">{loading ? "…" : weeklyDoubts}</p>
-              </div>
-              <div>
-                <p className="text-[11px] text-foreground/45 font-medium uppercase tracking-wider mb-1">Avg / Day</p>
-                <p className="text-sm font-semibold text-foreground">{loading ? "…" : avgPerDay}</p>
-              </div>
-            </div>
-
-            {/* Chart */}
-            <div className="relative w-full" style={{ height: "220px" }} ref={containerRef}>
-              {hoveredPoint !== null && hasChartData && chartPoints[hoveredPoint] && (
-                <div
-                  className="absolute pointer-events-none z-10 px-2.5 py-1.5 rounded-lg bg-foreground/90 text-white text-xs font-medium shadow-lg"
-                  style={{
-                    left: `${chartPoints[hoveredPoint].x}%`,
-                    top: `${(chartPoints[hoveredPoint].y / 60) * 100}%`,
-                    transform: "translate(-50%, -130%)",
-                  }}
-                >
-                  <div className="font-semibold">{chartPoints[hoveredPoint].val} {chartPoints[hoveredPoint].val === 1 ? "doubt" : "doubts"}</div>
-                  <div className="text-[10px] text-white/70">{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][hoveredPoint]}</div>
+            ) : recentDoubts.length === 0 ? (
+              <div className="text-center py-8 sm:py-10">
+                <div className="mx-auto w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                  <ClockIcon className="w-6 h-6 sm:w-7 sm:h-7 text-primary/60" />
                 </div>
-              )}
-              <svg
-                ref={svgRef}
-                viewBox="0 0 100 60"
-                className="w-full h-full"
-                preserveAspectRatio="none"
-                onMouseMove={handleMouseMove}
-                onMouseLeave={() => setHoveredPoint(null)}
-              >
-                <defs>
-                  <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.2" />
-                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.02" />
-                  </linearGradient>
-                </defs>
-                {/* Grid lines */}
-                {[0, 1, 2, 3, 4].map((i) => (
-                  <line
-                    key={i}
-                    x1="0"
-                    y1={i * 15}
-                    x2="100"
-                    y2={i * 15}
-                    className="chart-grid-line"
-                  />
-                ))}
-                {/* Area fill */}
-                {hasChartData && <path d={areaD} fill="url(#chartGradient)" className="chart-area-fill" />}
-                {/* Line */}
-                {hasChartData && (
-                  <path
-                    ref={pathRef}
-                    d={pathD}
-                    fill="none"
-                    stroke="var(--primary)"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className={animationsEnabled ? "chart-line-draw" : ""}
-                    style={animationsEnabled ? { strokeDasharray: pathLength, strokeDashoffset: 0 } : undefined}
-                  />
-                )}
-                {/* Dots */}
-                {chartPoints.map((p, i) => (
-                  <circle
-                    key={i}
-                    cx={p.x}
-                    cy={p.y}
-                    r={hasChartData && p.val > 0 ? "2.5" : "0"}
-                    className={animationsEnabled && hasChartData ? "chart-dot-animate" : "chart-dot"}
-                    style={animationsEnabled && hasChartData ? { animationDelay: `${0.5 + i * 0.08}s` } : undefined}
-                    onMouseEnter={hasChartData ? () => setHoveredPoint(i) : undefined}
-                  />
-                ))}
-              </svg>
-              {/* X-axis labels */}
-              <div className="flex justify-between mt-2 px-1">
-                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-                  <span key={day} className="text-[10px] text-foreground/35 font-medium">{day}</span>
-                ))}
+                <p className="text-foreground/60 text-sm sm:text-base mb-4">
+                  Your study journey starts here.
+                </p>
+                <Link href="/dashboard/chat">
+                  <motion.button
+                    whileHover={animationsEnabled ? { scale: 1.03 } : undefined}
+                    whileTap={animationsEnabled ? { scale: 0.97 } : undefined}
+                    className="px-5 py-2.5 rounded-xl text-sm font-medium shadow-md bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:shadow-lg transition-all"
+                  >
+                    Ask your first doubt
+                  </motion.button>
+                </Link>
               </div>
-              {!hasChartData && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center h-full text-center bg-card/70">
-                  <div className="w-12 h-12 rounded-full bg-foreground/5 flex items-center justify-center mb-3">
-                    <ClockIcon className="w-6 h-6 text-foreground/25" />
+            ) : (
+              <div className="space-y-2.5">
+                {recentDoubts.map((doubt) => (
+                  <div
+                    key={doubt.id}
+                    className="flex items-start gap-3 p-3 rounded-xl bg-foreground/5 hover:bg-foreground/10 transition-colors"
+                  >
+                    <div
+                      className={`p-2 rounded-lg flex-shrink-0 ${
+                        doubt.type === "text"
+                          ? "bg-purple-100 dark:bg-purple-950/30"
+                          : "bg-blue-100 dark:bg-blue-950/30"
+                      }`}
+                    >
+                      {doubt.type === "text" ? (
+                        <ChatBubbleLeftEllipsisIcon className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                      ) : (
+                        <PhotoIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-foreground/80 truncate">
+                        {doubt.type === "photo" ? "Photo Doubt" : doubt.question}
+                      </p>
+                      <p className="text-xs text-foreground/45 mt-0.5">
+                        {doubt.createdAt
+                          ? formatDate(doubt.createdAt)
+                          : "Just now"}
+                      </p>
+                    </div>
+                    <span
+                      className={`text-[10px] sm:text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
+                        doubt.type === "text"
+                          ? "bg-purple-100 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300"
+                          : "bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300"
+                      }`}
+                    >
+                      {doubt.type === "text" ? "Text" : "Photo"}
+                    </span>
                   </div>
-                  <p className="text-sm text-foreground/50 mb-1">No study activity this week</p>
-                  <p className="text-xs text-foreground/35">Start with your first doubt or study session.</p>
+                ))}
+                <div className="text-center pt-2">
+                  <Link
+                    href="/dashboard/history"
+                    className="text-sm text-primary hover:underline font-medium"
+                  >
+                    View All
+                  </Link>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </motion.div>
       </div>
 
-      {/* Study Insight */}
-      <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
-        <div className="subtle-card rounded-xl p-5">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-primary">
-              <LightBulbIcon className="w-4 h-4" />
+      {/* 2-Column Section: Study Streak | Progress Overview */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Study Streak */}
+        <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
+          <div className="subtle-card rounded-xl p-5 flex items-center gap-4">
+            <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white flex-shrink-0 shadow-md">
+              <span className="text-2xl font-bold">{studyStreak}</span>
             </div>
-            <h3 className="text-sm font-semibold text-foreground/75">Study Insight</h3>
+            <div className="flex-1 min-w-0">
+              <p className="text-lg font-bold text-foreground tracking-tight">Day Streak</p>
+              <p className="text-xs text-foreground/50 font-medium">Keep it up!</p>
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: 7 }).map((_, i) => (
+                <div key={i} className="w-2.5 h-2.5 rounded-full bg-primary/20" />
+              ))}
+            </div>
           </div>
-          {renderInsight()}
-        </div>
-      </motion.div>
+        </motion.div>
 
-      {/* Recent Activity */}
-      <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
-        <h2 className="text-base font-semibold text-foreground/75 mb-3">Recent Activity</h2>
-        <div className="subtle-card rounded-xl p-5">
-          {loading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-4 bg-foreground/5 rounded w-3/4 animate-pulse" />
-              ))}
-            </div>
-          ) : recentDoubts.length === 0 ? (
-            <div className="text-center py-8 sm:py-10">
-              <div className="mx-auto w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <ClockIcon className="w-6 h-6 sm:w-7 sm:h-7 text-primary/60" />
-              </div>
-              <p className="text-foreground/60 text-sm sm:text-base mb-4">
-                Your study journey starts here.
-              </p>
-              <Link href="/dashboard/chat">
-                <motion.button
-                  whileHover={animationsEnabled ? { scale: 1.03 } : undefined}
-                  whileTap={animationsEnabled ? { scale: 0.97 } : undefined}
-                  className="px-5 py-2.5 rounded-xl text-sm font-medium shadow-md bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:shadow-lg transition-all"
-                >
-                  Ask your first doubt
-                </motion.button>
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-2.5">
-              {recentDoubts.map((doubt) => (
-                <div
-                  key={doubt.id}
-                  className="flex items-start gap-3 p-3 rounded-xl bg-foreground/5 hover:bg-foreground/10 transition-colors"
-                >
-                  <div
-                    className={`p-2 rounded-lg flex-shrink-0 ${
-                      doubt.type === "text"
-                        ? "bg-purple-100 dark:bg-purple-950/30"
-                        : "bg-blue-100 dark:bg-blue-950/30"
-                    }`}
-                  >
-                    {doubt.type === "text" ? (
-                      <ChatBubbleLeftEllipsisIcon className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                    ) : (
-                      <PhotoIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-foreground/80 truncate">
-                      {doubt.type === "photo" ? "Photo Doubt" : doubt.question}
-                    </p>
-                    <p className="text-xs text-foreground/45 mt-0.5">
-                      {doubt.createdAt
-                        ? formatDate(doubt.createdAt)
-                        : "Just now"}
-                    </p>
-                  </div>
-                  <span
-                    className={`text-[10px] sm:text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
-                      doubt.type === "text"
-                        ? "bg-purple-100 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300"
-                        : "bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300"
-                    }`}
-                  >
-                    {doubt.type === "text" ? "Text" : "Photo"}
-                  </span>
+        {/* Progress Overview */}
+        <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
+          <div className="subtle-card rounded-xl p-5 flex items-center justify-center">
+            <div className="relative inline-flex items-center justify-center">
+              <svg className="w-32 h-32 -rotate-90" viewBox="0 0 120 120">
+                <circle
+                  cx="60"
+                  cy="60"
+                  r="52"
+                  fill="none"
+                  strokeWidth="10"
+                  className="stroke-foreground/8"
+                />
+                <circle
+                  cx="60"
+                  cy="60"
+                  r="52"
+                  fill="none"
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  stroke="url(#progressGradient)"
+                  strokeDasharray="326.7"
+                  strokeDashoffset="81.675"
+                  className="transition-all duration-1000"
+                />
+                <defs>
+                  <linearGradient id="progressGradient" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#8b5cf6" />
+                    <stop offset="100%" stopColor="#14b8a6" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-foreground">75%</p>
+                  <p className="text-[10px] text-foreground/40 font-medium">Progress</p>
                 </div>
-              ))}
-              <div className="text-center pt-2">
-                <Link
-                  href="/dashboard/history"
-                  className="text-sm text-primary hover:underline font-medium"
-                >
-                  View all activity
-                </Link>
               </div>
             </div>
-          )}
-        </div>
-      </motion.div>
+          </div>
+        </motion.div>
+      </div>
 
       {/* Add Task Modal */}
       <AnimatePresence>

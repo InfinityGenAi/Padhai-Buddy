@@ -7,8 +7,8 @@ function validateQuestions(questions: unknown[]): QuizQuestion[] | null {
   if (!Array.isArray(questions) || questions.length < 1 || questions.length > 20) {
     return null;
   }
-const parsed: QuizQuestion[] = [];
-    for (let i = 0; i < questions.length; i++) {
+  const parsed: QuizQuestion[] = [];
+  for (let i = 0; i < questions.length; i++) {
       const q = questions[i] as Record<string, unknown>;
       if (typeof q.question !== "string" || !q.question.trim()) return null;
       if (!Array.isArray(q.options) || q.options.length !== 4) return null;
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
 
     if (body.action === "submit") {
       const { attemptId, questions } = body;
-      if (!attemptId || !Array.isArray(questions)) {
+      if (!attemptId || typeof attemptId !== "string" || !Array.isArray(questions)) {
         return NextResponse.json({ error: "attemptId and questions are required" }, { status: 400 });
       }
 
@@ -84,38 +84,98 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Quiz attempt not found" }, { status: 404 });
       }
 
-      const validQs = validateQuestions(questions);
-      if (!validQs) {
-        return NextResponse.json({ error: "Quiz generation failed. Please try again." }, { status: 400 });
+      const attemptData = snap.data() as QuizAttempt;
+      if (attemptData.completedAt) {
+        return NextResponse.json({ error: "This quiz has already been submitted" }, { status: 409 });
       }
 
-      const totalQuestions = validQs.length;
+      const serverQuestions = Array.isArray(attemptData.questions) ? attemptData.questions : [];
+      if (serverQuestions.length < 1 || serverQuestions.length > 20) {
+        return NextResponse.json({ error: "Quiz attempt is invalid" }, { status: 400 });
+      }
+
+      // The submitted question set must exactly match what the server generated:
+      // same count, same IDs, same content, same order.
+      if (questions.length !== serverQuestions.length) {
+        return NextResponse.json(
+          { error: "Submitted answers do not match the quiz. Please try again." },
+          { status: 400 },
+        );
+      }
+
+      const selections: (number | undefined)[] = [];
+      for (let i = 0; i < serverQuestions.length; i++) {
+        const serverQ = serverQuestions[i];
+        const clientQ = questions[i] as Record<string, unknown> | null | undefined;
+        if (!clientQ || typeof clientQ !== "object") {
+          return NextResponse.json(
+            { error: "Submitted answers do not match the quiz. Please try again." },
+            { status: 400 },
+          );
+        }
+        const clientOptions = clientQ.options;
+        const contentMatches =
+          String(clientQ.id ?? "") === serverQ.id &&
+          String(clientQ.question ?? "") === serverQ.question &&
+          Array.isArray(clientOptions) &&
+          clientOptions.length === serverQ.options.length &&
+          serverQ.options.every((opt: string, idx: number) => clientOptions[idx] === opt) &&
+          String(clientQ.explanation ?? "") === serverQ.explanation;
+        if (!contentMatches) {
+          return NextResponse.json(
+            { error: "Submitted answers do not match the quiz. Please try again." },
+            { status: 400 },
+          );
+        }
+
+        let selectedIndex: number | undefined;
+        if (clientQ.selectedIndex !== undefined) {
+          if (
+            typeof clientQ.selectedIndex !== "number" ||
+            !Number.isInteger(clientQ.selectedIndex) ||
+            clientQ.selectedIndex < 0 ||
+            clientQ.selectedIndex > 3
+          ) {
+            return NextResponse.json(
+              { error: "Submitted answers are invalid. Please try again." },
+              { status: 400 },
+            );
+          }
+          selectedIndex = clientQ.selectedIndex;
+        }
+        selections.push(selectedIndex);
+      }
+
+      // Scoring uses ONLY the server-stored correct answers; the client's
+      // correctIndex is never trusted.
       let correctAnswers = 0;
-      for (let i = 0; i < totalQuestions; i++) {
-        const serverQ = (snap.data() as Record<string, unknown>).questions as QuizQuestion[];
-        const clientQ = validQs[i];
-        if (i < serverQ.length && clientQ.selectedIndex !== undefined && clientQ.selectedIndex === serverQ[i].correctIndex) {
+      const scoredQuestions = serverQuestions.map((q, i) => {
+        const sel = selections[i];
+        if (sel !== undefined && sel === q.correctIndex) {
           correctAnswers++;
         }
-      }
+        return sel === undefined ? q : { ...q, selectedIndex: sel };
+      });
 
-      const score = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+      const totalQuestions = serverQuestions.length;
+      const score = Math.round((correctAnswers / totalQuestions) * 100);
+      const completedAt = Date.now();
 
       await attemptRef.update({
-        questions: validQs,
+        questions: scoredQuestions,
         correctAnswers,
         score,
-        completedAt: Date.now(),
+        completedAt,
       });
 
       return NextResponse.json({
         attempt: {
+          ...attemptData,
           id: attemptId,
-          ...(snap.data() as Record<string, unknown>),
-          questions: validQs,
+          questions: scoredQuestions,
           correctAnswers,
           score,
-          completedAt: Date.now(),
+          completedAt,
         },
       });
     }

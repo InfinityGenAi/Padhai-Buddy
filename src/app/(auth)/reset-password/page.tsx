@@ -118,7 +118,7 @@ export default function ResetPasswordPage() {
         >
           <motion.div
             variants={animationsEnabled ? staggerItem : undefined}
-            className="auth-card p-8 text-center"
+            className="bg-white dark:bg-dark border border-border rounded-2xl p-6 text-center"
           >
             <motion.div
               variants={animationsEnabled ? staggerItem : undefined}
@@ -163,22 +163,22 @@ export default function ResetPasswordPage() {
         animate={animationsEnabled ? "visible" : false}
         className="relative z-10 w-full max-w-md mx-auto p-6"
       >
-         <motion.div
-           variants={animationsEnabled ? staggerItem : undefined}
-           className="auth-card p-8"
-         >
-           <div className="text-center mb-6">
-             <motion.div
-               variants={animationsEnabled ? staggerItem : undefined}
-               className="flex justify-center mb-4"
-             >
-               <BrandLogo size={56} />
-             </motion.div>
+        <motion.div
+          variants={animationsEnabled ? staggerItem : undefined}
+          className="bg-white dark:bg-dark border border-border rounded-xl p-6"
+        >
+          <div className="text-center mb-6">
+            <motion.div
+              variants={animationsEnabled ? staggerItem : undefined}
+              className="flex justify-center mb-4"
+            >
+              <BrandLogo size={56} />
+            </motion.div>
             <motion.h1
               variants={animationsEnabled ? staggerItem : undefined}
               className="text-3xl font-bold text-primary mb-1"
             >
-              Reset Password
+              Reset your password
             </motion.h1>
             <motion.p
               variants={animationsEnabled ? staggerItem : undefined}
@@ -209,7 +209,7 @@ export default function ResetPasswordPage() {
                   type={showNewPassword ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="At least 6 characters"
+                  placeholder="Enter new password"
                   className="auth-input"
                   required
                   minLength={6}
@@ -228,24 +228,6 @@ export default function ResetPasswordPage() {
                   )}
                 </button>
               </div>
-              {newPassword && (
-                <div className="mt-1.5 flex items-center gap-2">
-                  <div className="flex-1 h-1 bg-foreground/10 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-300 ${
-                        newPassword.length < 6
-                          ? "w-1/4 bg-red-500"
-                          : newPassword.length < 10
-                            ? "w-2/4 bg-amber-500"
-                            : "w-full bg-green-500"
-                      }`}
-                    />
-                  </div>
-                  <span className="text-[10px] text-foreground/50">
-                    {newPassword.length < 6 ? "Weak" : newPassword.length < 10 ? "Medium" : "Strong"}
-                  </span>
-                </div>
-              )}
             </motion.div>
 
             <motion.div variants={animationsEnabled ? staggerItem : undefined}>
@@ -254,15 +236,15 @@ export default function ResetPasswordPage() {
               </label>
               <div className="auth-input-wrapper">
                 <LockClosedIcon className="auth-input-icon" />
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Repeat your password"
-                  className="auth-input"
-                  required
-                  minLength={6}
-                />
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                    className="auth-input"
+                    required
+                    minLength={6}
+                  />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -294,10 +276,10 @@ export default function ResetPasswordPage() {
               className="text-center text-sm text-foreground/60"
             >
               <Link
-                href="/forgot-password"
+                href="/login"
                 className="text-primary font-medium hover:underline"
               >
-                Request a new link
+                Back to Login
               </Link>
             </motion.p>
           </form>

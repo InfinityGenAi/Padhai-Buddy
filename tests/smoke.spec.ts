@@ -17,19 +17,23 @@ test.describe("Quick Smoke Tests", () => {
     expect(filterCriticalErrors(errors)).toEqual([]);
   });
 
-  test("login page loads without critical console errors", async ({ page }) => {
-    const errors: string[] = [];
-    page.on("console", (msg) => {
-      if (msg.type() === "error") errors.push(msg.text());
+  test.describe("login page (fresh session)", () => {
+    test.use({ storageState: "tests/fixtures/empty-storage.json" });
+
+    test("login page loads without critical console errors", async ({ page }) => {
+      const errors: string[] = [];
+      page.on("console", (msg) => {
+        if (msg.type() === "error") errors.push(msg.text());
+      });
+      page.on("pageerror", (err) => errors.push(err.message));
+
+      await mockSessionsRoute(page);
+      await page.goto("http://localhost:3000/login");
+      await page.waitForLoadState("domcontentloaded");
+      await expect(page.locator("text=Welcome Back")).toBeAttached();
+
+      expect(filterCriticalErrors(errors)).toEqual([]);
     });
-    page.on("pageerror", (err) => errors.push(err.message));
-
-    await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/login");
-    await page.waitForLoadState("domcontentloaded");
-    await expect(page.locator("text=Welcome Back")).toBeAttached();
-
-    expect(filterCriticalErrors(errors)).toEqual([]);
   });
 
   test.describe("unauthenticated redirect tests", () => {

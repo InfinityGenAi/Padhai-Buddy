@@ -13,6 +13,8 @@ import {
   UserIcon,
   LockClosedIcon,
   EnvelopeIcon,
+  AcademicCapIcon,
+  DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import type { UserBoard, UserClass } from "@/types";
 import AnimatedBackground from "@/components/AnimatedBackground";
@@ -51,8 +53,8 @@ export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [selectedClass, setSelectedClass] = useState<UserClass | undefined>(undefined);
   const [selectedBoard, setSelectedBoard] = useState<UserBoard | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
@@ -113,9 +115,14 @@ export default function SignupPage() {
     setIsSubmitting(true);
 
     try {
-      await signUp(name, email, password, selectedClass, selectedBoard);
+      const result = await signUp(name, email, password, selectedClass, selectedBoard);
       playSignup();
       setVerificationSent(true);
+      if (!result.emailVerificationSent) {
+        setVerificationError(
+          "We couldn't send the verification email. Click \"Resend Email\" below to try again.",
+        );
+      }
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
@@ -150,12 +157,18 @@ export default function SignupPage() {
       setResendCooldown(60);
       setVerificationError(null);
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        if (err.message.toLowerCase().includes("too-many-requests")) {
-          setError("Too many requests. Please wait before resending.");
-        } else {
-          setError(err.message);
-        }
+      const msg = err instanceof Error ? err.message : "";
+      const code = (err as { code?: string })?.code;
+      if (code === "auth/too-many-requests" || msg.toLowerCase().includes("too-many-requests")) {
+        setVerificationError("Too many requests. Please wait a minute before resending.");
+      } else if (
+        code === "auth/network-request-failed" ||
+        msg.toLowerCase().includes("network")
+      ) {
+        setVerificationError("Network error. Please check your connection and try again.");
+      } else {
+        console.error("Resend verification email failed:", err);
+        setVerificationError("We couldn't resend the verification email. Please try again in a moment.");
       }
     }
   };
@@ -169,26 +182,35 @@ export default function SignupPage() {
         setVerified(true);
         await reloadProfile();
       } else {
-        setVerificationError("Verification link is invalid or expired. Please check your email or resend.");
+        setVerificationError(
+          "You haven't verified your email yet. Click the link we sent to your inbox, then press this button again.",
+        );
       }
-    } catch {
-      setVerificationError("Could not verify email. Please try again.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "";
+      const code = (err as { code?: string })?.code;
+      if (code === "auth/network-request-failed" || msg.toLowerCase().includes("network")) {
+        setVerificationError("Network error. Please check your connection and try again.");
+      } else {
+        console.error("Failed to check email verification:", err);
+        setVerificationError("Could not verify email. Please try again in a moment.");
+      }
     }
   };
 
   if (verificationSent && firebaseUser) {
     return (
-      <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-        <AnimatedBackground animate={animationsEnabled} />
-          <motion.div
-            variants={animationsEnabled ? staggerContainer : undefined}
-            initial={animationsEnabled ? "hidden" : false}
-            animate={animationsEnabled ? "visible" : false}
-            className="auth-card p-8 text-center"
-          >
+      <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
+        <AnimatedBackground animate={animationsEnabled} variant="auth" />
+        <motion.div
+          variants={animationsEnabled ? staggerContainer : undefined}
+          initial={animationsEnabled ? "hidden" : false}
+          animate={animationsEnabled ? "visible" : false}
+          className="relative z-10 w-full max-w-md mx-auto"
+        >
           <motion.div
             variants={animationsEnabled ? staggerItem : undefined}
-            className="glass-strong card-subtle rounded-2xl p-8 shadow-xl text-center"
+            className="bg-card border border-border rounded-2xl p-8 shadow-xl text-center"
           >
             <motion.div
               variants={animationsEnabled ? staggerItem : undefined}
@@ -201,14 +223,13 @@ export default function SignupPage() {
               variants={animationsEnabled ? staggerItem : undefined}
               className="text-3xl font-bold text-primary mb-1"
             >
-              Check Your Email
+              Check your email
             </motion.h1>
             <motion.p
               variants={animationsEnabled ? staggerItem : undefined}
               className="text-sm text-foreground/60 mb-6"
             >
-              We sent a verification link to:<br />
-              <span className="font-medium text-foreground">{email}</span>
+              We&apos;ve sent a verification link to <span className="font-medium text-foreground">{email}</span>
             </motion.p>
 
             {verificationError && (
@@ -221,30 +242,30 @@ export default function SignupPage() {
               </motion.div>
             )}
 
-            <motion.div variants={animationsEnabled ? staggerItem : undefined} className="space-y-3">
-              <button
-                onClick={handleVerified}
-                className="w-full btn-primary py-2.5 rounded-xl font-medium"
-              >
-                I&apos;ve Verified — Continue
-              </button>
-              <button
-                onClick={handleResend}
-                disabled={resendCooldown > 0}
-                className="w-full py-2.5 rounded-xl font-medium text-sm text-foreground/70 hover:text-foreground hover:bg-foreground/5 transition-colors disabled:opacity-50"
-              >
-                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Email"}
-              </button>
-              <button
-                onClick={() => window.open("https://mail.google.com/", "_blank")}
-                className="w-full py-2.5 rounded-xl font-medium text-sm text-foreground/70 hover:text-foreground hover:bg-foreground/5 transition-colors"
-              >
-                Open Gmail
-              </button>
-              <p className="text-xs text-foreground/40">
-                Check your spam or promotions folder if you don&apos;t see it.
-              </p>
-            </motion.div>
+              <motion.div variants={animationsEnabled ? staggerItem : undefined} className="space-y-3">
+                <button
+                  onClick={handleVerified}
+                  className="w-full btn-primary py-3 rounded-xl font-medium focus-ring"
+                >
+                  I&apos;ve Verified
+                </button>
+                <button
+                  onClick={handleResend}
+                  disabled={resendCooldown > 0}
+                  className="w-full py-2.5 rounded-xl font-medium text-sm text-foreground/70 hover:text-foreground hover:bg-foreground/5 transition-colors disabled:opacity-50"
+                >
+                  {resendCooldown > 0 ? `Resend Email (${resendCooldown.toString().padStart(2, '0')}s)` : "Resend Email"}
+                </button>
+                <button
+                  onClick={() => window.open("https://mail.google.com/", "_blank")}
+                  className="w-full py-2.5 rounded-xl font-medium text-sm text-foreground/70 hover:text-foreground hover:bg-foreground/5 transition-colors"
+                >
+                  Open Email
+                </button>
+                <p className="text-xs text-foreground/40">
+                  Check your spam or promotions folder if you do not see it.
+                </p>
+              </motion.div>
           </motion.div>
         </motion.div>
       </div>
@@ -253,7 +274,7 @@ export default function SignupPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center gap-3 bg-background">
+      <div className="flex h-screen w-full items-center justify-center gap-3 bg-background dark:bg-dark">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         <span className="text-sm text-foreground/60">Loading…</span>
       </div>
@@ -261,14 +282,17 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      <AnimatedBackground animate={animationsEnabled} />
-      <div className="relative z-10 w-full max-w-md mx-auto p-6">
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
+      <AnimatedBackground animate={animationsEnabled} variant="auth" />
+      <motion.div
+        variants={animationsEnabled ? staggerContainer : undefined}
+        initial={animationsEnabled ? "hidden" : false}
+        animate={animationsEnabled ? "visible" : false}
+        className="relative z-10 w-full max-w-md mx-auto"
+      >
         <motion.div
-          variants={animationsEnabled ? staggerContainer : undefined}
-          initial={animationsEnabled ? "hidden" : false}
-          animate={animationsEnabled ? "visible" : false}
-          className="auth-card p-8"
+          variants={animationsEnabled ? staggerItem : undefined}
+          className="bg-card border border-border rounded-2xl p-6 shadow-xl"
         >
           <div className="text-center mb-6">
             <motion.div
@@ -279,15 +303,15 @@ export default function SignupPage() {
             </motion.div>
             <motion.h1
               variants={animationsEnabled ? staggerItem : undefined}
-              className="text-3xl font-bold text-primary mb-1"
+              className="text-3xl font-bold text-foreground mb-1"
             >
-              Create Account
+              Create your account
             </motion.h1>
             <motion.p
               variants={animationsEnabled ? staggerItem : undefined}
               className="text-sm text-foreground/60"
             >
-              Join Padhai Buddy and start solving doubts today
+              Start your learning journey today
             </motion.p>
           </div>
 
@@ -304,19 +328,33 @@ export default function SignupPage() {
           <motion.button
             onClick={handleGoogle}
             disabled={isSubmitting}
-            className="w-full glass card-subtle border border-border rounded-xl py-2.5 font-medium flex items-center justify-center gap-2 hover:bg-foreground/5 transition-colors disabled:opacity-50"
+            className="w-full glass card-subtle border border-border rounded-xl py-3 font-medium flex items-center justify-center gap-2 hover:bg-foreground/5 transition-colors disabled:opacity-50 focus-ring"
             whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
             whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
             variants={animationsEnabled ? staggerItem : undefined}
           >
             <GoogleIcon />
-            Sign up with Google
+            Continue with Google
           </motion.button>
 
-          <div className="my-6 flex items-center">
-            <div className="flex-1 border-t border-border"></div>
-            <span className="px-3 text-xs text-foreground/50">or</span>
-            <div className="flex-1 border-t border-border"></div>
+          <motion.button
+            disabled={isSubmitting}
+            className="w-full glass card-subtle border border-border rounded-xl py-3 font-medium flex items-center justify-center gap-2 hover:bg-foreground/5 transition-colors disabled:opacity-50 focus-ring"
+            whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
+            whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
+            variants={animationsEnabled ? staggerItem : undefined}
+          >
+            <EnvelopeIcon className="w-5 h-5 text-foreground/60" />
+            Continue with Email
+          </motion.button>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs text-foreground/50">
+              <span className="bg-card px-2">OR</span>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -324,18 +362,19 @@ export default function SignupPage() {
               <motion.div
                 variants={animationsEnabled ? staggerItem : undefined}
               >
-                <label className="block text-sm font-medium mb-1.5">
+                <label className="block text-sm font-medium mb-1.5 text-foreground/70">
                   Full Name
                 </label>
-                <div className="auth-input-wrapper">
-                  <UserIcon className="auth-input-icon" />
+                <div className="relative">
+                  <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Enter your name"
-                    className="auth-input"
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                     required
+                    autoComplete="name"
                   />
                 </div>
               </motion.div>
@@ -343,18 +382,19 @@ export default function SignupPage() {
               <motion.div
                 variants={animationsEnabled ? staggerItem : undefined}
               >
-                <label className="block text-sm font-medium mb-1.5">
+                <label className="block text-sm font-medium mb-1.5 text-foreground/70">
                   Email
                 </label>
-                <div className="auth-input-wrapper">
-                  <EnvelopeIcon className="auth-input-icon" />
+                <div className="relative">
+                  <EnvelopeIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className="auth-input"
+                    placeholder="Enter your email"
+                    className="w-full bg-background border border-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                     required
+                    autoComplete="email"
                   />
                 </div>
               </motion.div>
@@ -362,24 +402,25 @@ export default function SignupPage() {
               <motion.div
                 variants={animationsEnabled ? staggerItem : undefined}
               >
-                <label className="block text-sm font-medium mb-1.5">
+                <label className="block text-sm font-medium mb-1.5 text-foreground/70">
                   Password
                 </label>
-                <div className="auth-input-wrapper">
-                  <LockClosedIcon className="auth-input-icon" />
+                <div className="relative">
+                  <LockClosedIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
                   <input
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="At least 6 characters"
-                    className="auth-input"
+                    placeholder="Create a password"
+                    className="w-full bg-background border border-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors pr-12"
                     required
                     minLength={6}
+                    autoComplete="new-password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="password-toggle"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground transition-colors"
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? (
@@ -394,67 +435,83 @@ export default function SignupPage() {
               <motion.div
                 variants={animationsEnabled ? staggerItem : undefined}
               >
-                <label className="block text-sm font-medium mb-1.5">
+                <label className="block text-sm font-medium mb-1.5 text-foreground/70">
                   Confirm Password
                 </label>
-                <div className="auth-input-wrapper">
-                  <LockClosedIcon className="auth-input-icon" />
+                <div className="relative">
+                  <LockClosedIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
                   <input
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Repeat your password"
-                    className="auth-input"
+                    placeholder="Confirm your password"
+                    className="w-full bg-background border border-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                     required
                     minLength={6}
+                    autoComplete="new-password"
                   />
                 </div>
               </motion.div>
 
               <motion.div
                 variants={animationsEnabled ? staggerItem : undefined}
+                className="grid grid-cols-1 md:grid-cols-2 gap-4"
               >
-                <label className="block text-sm font-medium mb-1.5">
-                  Class
-                </label>
-                <select
-                  value={selectedClass ?? ""}
-                  onChange={(e) => setSelectedClass(e.target.value ? Number(e.target.value) as UserClass : undefined)}
-                  className="auth-select"
-                >
-                  <option value="">Select class</option>
-                  {CLASSES.map((c) => (
-                    <option key={c} value={c}>
-                      Class {c}
-                    </option>
-                  ))}
-                </select>
-              </motion.div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5 text-foreground/70">
+                    Class
+                  </label>
+                  <div className="relative">
+                    <AcademicCapIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
+                    <select
+                      value={selectedClass ?? ""}
+                      onChange={(e) => setSelectedClass(e.target.value ? Number(e.target.value) as UserClass : undefined)}
+                      className="w-full bg-background border border-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors appearance-none pr-10"
+                      required
+                    >
+                      <option value="">Select Class</option>
+                      {CLASSES.map((c) => (
+                        <option key={c} value={c}>
+                          Class {c}
+                        </option>
+                      ))}
+                    </select>
+                    <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
 
-              <motion.div
-                variants={animationsEnabled ? staggerItem : undefined}
-              >
-                <label className="block text-sm font-medium mb-1.5">
-                  Board
-                </label>
-                <select
-                  value={selectedBoard ?? ""}
-                  onChange={(e) => setSelectedBoard(e.target.value ? e.target.value as UserBoard : undefined)}
-                  className="auth-select"
-                >
-                  <option value="">Select board</option>
-                  {BOARDS.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                </select>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5 text-foreground/70">
+                    Board
+                  </label>
+                  <div className="relative">
+                    <DocumentTextIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
+                    <select
+                      value={selectedBoard ?? ""}
+                      onChange={(e) => setSelectedBoard(e.target.value ? e.target.value as UserBoard : undefined)}
+                      className="w-full bg-background border border-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors appearance-none pr-10"
+                      required
+                    >
+                      <option value="">Select Board</option>
+                      {BOARDS.map((b) => (
+                        <option key={b} value={b}>
+                          {b}
+                        </option>
+                      ))}
+                    </select>
+                    <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
               </motion.div>
 
               <motion.button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full btn-primary py-2.5 rounded-xl font-medium"
+                className="w-full btn-primary py-3 rounded-xl font-medium focus-ring"
                 whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
                 whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
                 variants={animationsEnabled ? staggerItem : undefined}
@@ -477,7 +534,7 @@ export default function SignupPage() {
             </Link>
           </motion.p>
         </motion.div>
-      </div>
+      </motion.div>
     </div>
   );
 }

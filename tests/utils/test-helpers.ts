@@ -1,4 +1,9 @@
 import { type Page } from "@playwright/test";
+import { readFileSync } from "fs";
+import { resolve } from "path";
+import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 
 export async function pixelDiffRatio(
   page: Page,
@@ -181,4 +186,86 @@ export async function waitForDashboardReady(page: Page) {
 
 export async function waitForPageReady(page: Page, heading: string) {
   await page.waitForSelector(`text=${heading}`, { timeout: 15000 });
+}
+
+const TEST_EMAIL = "test@padhai-buddy.test";
+
+function loadEnvForAdmin() {
+  try {
+    const envPath = resolve(__dirname, "../../.env.local");
+    const content = readFileSync(envPath, "utf-8");
+    for (const line of content.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eq = trimmed.indexOf("=");
+      if (eq > 0) {
+        const key = trimmed.slice(0, eq).trim();
+        if (!process.env[key]) {
+          process.env[key] = trimmed.slice(eq + 1).trim();
+        }
+      }
+    }
+  } catch {
+    // .env.local missing — the helper will be a no-op
+  }
+}
+
+let adminReady = false;
+let testUid: string | null = null;
+
+/**
+ * Waits until a conversation with the given title has at least `expectedCount`
+ * persisted messages. Uses the Admin SDK directly, so it is a true signal that
+ * the client-side Firestore writes have landed (not just the optimistic UI).
+ */
+export async function waitForPersistedMessages(
+  title: string,
+  expectedCount: number,
+  timeoutMs = 15000,
+): Promise<void> {
+  if (!adminReady) {
+    loadEnvForAdmin();
+    const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
+    if (!privateKey) {
+      console.warn("[test-helpers] FIREBASE_ADMIN_PRIVATE_KEY not set; skipping persistence wait.");
+      return;
+    }
+    if (getApps().length === 0) {
+      initializeApp({
+        credential: cert({
+          projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+          privateKey: privateKey.replace(/\\n/g, "\n"),
+        }),
+      });
+    }
+    try {
+      const userRecord = await getAuth().getUserByEmail(TEST_EMAIL);
+      testUid = userRecord.uid;
+    } catch {
+      return;
+    }
+    adminReady = true;
+  }
+  if (!testUid) return;
+
+  const db = getFirestore();
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const convSnap = await db
+      .collection("users")
+      .doc(testUid)
+      .collection("conversations")
+      .where("title", "==", title)
+      .get();
+    for (const conv of convSnap.docs) {
+      const msgSnap = await conv.ref.collection("messages").get();
+      if (msgSnap.size >= expectedCount) return;
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  throw new Error(
+    `Timed out waiting for ${expectedCount} persisted messages in conversation "${title}"`,
+  );
 }

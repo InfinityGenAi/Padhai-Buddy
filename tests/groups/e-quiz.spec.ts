@@ -112,7 +112,7 @@ test.describe("E. Quiz Tests", () => {
   });
 
   test("quiz page loads", async ({ page }) => {
-    await expect(page.locator("h1:has-text('Quick Quiz')").first()).toBeAttached();
+    await expect(page.locator("h1:has-text('Quiz')").first()).toBeAttached();
   });
 
   test("quiz setup form is visible", async ({ page }) => {

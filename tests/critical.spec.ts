@@ -38,7 +38,7 @@ test.describe("Critical UI/UX Tests", () => {
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
     await expect(page.locator("text=Doubts Solved").first()).toBeVisible();
-    await expect(page.locator("text=Study Plans Completed").first()).toBeVisible();
+    await expect(page.locator("text=Study Time").first()).toBeVisible();
   });
 
   test("dashboard chart renders", async ({ page }) => {
@@ -93,7 +93,7 @@ test.describe("Critical UI/UX Tests", () => {
     await page.goto("http://localhost:3000/dashboard/chat");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
-    await expect(page.locator("text=Chat Doubt").first()).toBeAttached();
+    await expect(page.locator("text=AI Chat").first()).toBeAttached();
   });
 
   test("history page loads", async ({ page }) => {
@@ -101,6 +101,8 @@ test.describe("Critical UI/UX Tests", () => {
     await page.goto("http://localhost:3000/dashboard/history");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
-    await expect(page.locator("text=Doubt History").first()).toBeAttached();
+    await expect(page.locator("text=History").first()).toBeAttached();
+    await expect(page.locator("text=Doubts (").first()).toBeAttached();
+    await expect(page.locator("text=Chats (").first()).toBeAttached();
   });
 });
