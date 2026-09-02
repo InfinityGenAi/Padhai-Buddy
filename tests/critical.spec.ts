@@ -3,15 +3,15 @@ import { mockSessionsRoute, filterCriticalErrors } from "./utils/test-helpers";
 
 const ROUTES = [
   "/",
-  "/login",
-  "/signup",
-  "/onboarding",
-  "/forgot-password",
-  "/reset-password",
-  "/dashboard",
-  "/dashboard/chat",
-  "/dashboard/history",
-  "/dashboard/photo-doubt",
+  "/login/",
+  "/signup/",
+  "/onboarding/",
+  "/forgot-password/",
+  "/reset-password/",
+  "/dashboard/",
+  "/dashboard/chat/",
+  "/dashboard/history/",
+  "/dashboard/photo-doubt/",
 ];
 
 test.describe("Critical UI/UX Tests", () => {
@@ -34,26 +34,24 @@ test.describe("Critical UI/UX Tests", () => {
 
   test("dashboard shows stats cards", async ({ page }) => {
     await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/dashboard");
+    await page.goto("http://localhost:3000/dashboard/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
     await expect(page.locator("text=Doubts Solved").first()).toBeVisible();
     await expect(page.locator("text=Study Time").first()).toBeVisible();
   });
 
-  test("dashboard chart renders", async ({ page }) => {
+  test("dashboard shows this week overview", async ({ page }) => {
     await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/dashboard");
+    await page.goto("http://localhost:3000/dashboard/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
-    const chart = page.locator("svg[viewBox='0 0 100 60']");
-    await expect(chart).toBeAttached();
-    await expect(chart).toBeVisible();
+    await expect(page.locator("text=This Week Overview").first()).toBeAttached();
   });
 
   test("notification button opens popover", async ({ page }) => {
     await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/dashboard");
+    await page.goto("http://localhost:3000/dashboard/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
 
@@ -70,7 +68,7 @@ test.describe("Critical UI/UX Tests", () => {
 
   test("profile button opens menu", async ({ page }) => {
     await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/dashboard");
+    await page.goto("http://localhost:3000/dashboard/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
 
@@ -90,15 +88,15 @@ test.describe("Critical UI/UX Tests", () => {
 
   test("chat page loads", async ({ page }) => {
     await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/dashboard/chat");
+    await page.goto("http://localhost:3000/dashboard/chat/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
-    await expect(page.locator("text=AI Chat").first()).toBeAttached();
+    await expect(page.locator("text=Padhai Buddy AI Tutor").first()).toBeAttached();
   });
 
   test("history page loads", async ({ page }) => {
     await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/dashboard/history");
+    await page.goto("http://localhost:3000/dashboard/history/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
     await expect(page.locator("text=History").first()).toBeAttached();

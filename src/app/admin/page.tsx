@@ -1,22 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import { signInWithCustomToken, signOut } from "firebase/auth";
 import { useAuth } from "@/contexts/AuthContext";
-import { useReducedMotion } from "framer-motion";
 import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { HomeIcon, ChartBarIcon, UserIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
 
 export default function AdminDashboard() {
-  const { firebaseUser, loading, isAdmin, authError } = useAuth();
-  const router = useRouter();
-  const [customToken, setCustomToken] = useState<string | null>(null);
+  const { loading, isAdmin, authError } = useAuth();
   const [selectedSection, setSelectedSection] = useState<string>("overview");
-  const reducedMotion = useReducedMotion();
 
-  // Handle admin login
   const handleLogin = async (password: string) => {
     try {
       const res = await fetch("/api/admin/login", {
@@ -40,9 +34,9 @@ export default function AdminDashboard() {
       const auth = getFirebaseAuth();
       if (!auth) throw new Error("Firebase auth not initialized");
       if (data.customToken) {
-        await signInWithCustomToken(auth, data.customToken);
+        const cred = await signInWithCustomToken(auth, data.customToken);
+        await cred.user.getIdTokenResult(true);
       }
-      setCustomToken(data.customToken || null);
     } catch (err) {
       console.error("Admin login error:", err);
     }
@@ -166,7 +160,7 @@ export default function AdminDashboard() {
                   ? "bg-primary text-white shadow-lg shadow-primary/20"
                   : "text-foreground/60 hover:bg-foreground/5 hover:text-foreground"
               }`}
-              aria-selected={selectedSection === "overview"}
+              aria-pressed={selectedSection === "overview"}
             >
               <HomeIcon className="w-4 h-4 mr-2" /> Overview
             </button>
@@ -177,7 +171,7 @@ export default function AdminDashboard() {
                   ? "bg-primary text-white shadow-lg shadow-primary/20"
                   : "text-foreground/60 hover:bg-foreground/5 hover:text-foreground"
               }`}
-              aria-selected={selectedSection === "analytics"}
+              aria-pressed={selectedSection === "analytics"}
             >
               <ChartBarIcon className="w-4 h-4 mr-2" /> Analytics
             </button>
@@ -188,7 +182,7 @@ export default function AdminDashboard() {
                   ? "bg-primary text-white shadow-lg shadow-primary/20"
                   : "text-foreground/60 hover:bg-foreground/5 hover:text-foreground"
               }`}
-              aria-selected={selectedSection === "users"}
+              aria-pressed={selectedSection === "users"}
             >
               <UserIcon className="w-4 h-4 mr-2" /> Users
             </button>
@@ -199,7 +193,7 @@ export default function AdminDashboard() {
                   ? "bg-primary text-white shadow-lg shadow-primary/20"
                   : "text-foreground/60 hover:bg-foreground/5 hover:text-foreground"
               }`}
-              aria-selected={selectedSection === "downloads"}
+              aria-pressed={selectedSection === "downloads"}
             >
               <DocumentTextIcon className="w-4 h-4 mr-2" /> Downloads
             </button>
@@ -210,7 +204,7 @@ export default function AdminDashboard() {
                   ? "bg-primary text-white shadow-lg shadow-primary/20"
                   : "text-foreground/60 hover:bg-foreground/5 hover:text-foreground"
               }`}
-              aria-selected={selectedSection === "update"}
+              aria-pressed={selectedSection === "update"}
             >
               Update
             </button>
@@ -218,18 +212,18 @@ export default function AdminDashboard() {
         </div>
 
         {/* Selected Section Content */}
-        {selectedSection === "overview" && <OverviewSection onLogout={handleLogout} />}
-        {selectedSection === "analytics" && <AnalyticsSection onLogout={handleLogout} />}
-        {selectedSection === "users" && <UsersSection onLogout={handleLogout} />}
-        {selectedSection === "downloads" && <DownloadsSection onLogout={handleLogout} />}
-        {selectedSection === "update" && <UpdateSection onLogout={handleLogout} />}
+        {selectedSection === "overview" && <OverviewSection />}
+        {selectedSection === "analytics" && <AnalyticsSection />}
+        {selectedSection === "users" && <UsersSection />}
+        {selectedSection === "downloads" && <DownloadsSection />}
+        {selectedSection === "update" && <UpdateSection />}
       </main>
     </div>
   );
 }
 
 /* --- Overview Section --- */
-function OverviewSection({ onLogout }: { onLogout: () => void }) {
+function OverviewSection() {
   const [stats, setStats] = useState({
     todayVisitors: 0,
     totalVisitors: 0,
@@ -374,7 +368,7 @@ Today&apos;s Analytics
 }
 
 /* --- Analytics Section --- */
-function AnalyticsSection({ onLogout }: { onLogout: () => void }) {
+function AnalyticsSection() {
   return (
     <div className="min-h-screen bg-background">
       <h1 className="text-4xl font-bold text-foreground mb-8">
@@ -390,7 +384,7 @@ function AnalyticsSection({ onLogout }: { onLogout: () => void }) {
 }
 
 /* --- Users Section --- */
-function UsersSection({ onLogout }: { onLogout: () => void }) {
+function UsersSection() {
   return (
     <div className="min-h-screen bg-background">
       <h1 className="text-4xl font-bold text-foreground mb-8">
@@ -406,7 +400,7 @@ function UsersSection({ onLogout }: { onLogout: () => void }) {
 }
 
 /* --- Downloads Section --- */
-function DownloadsSection({ onLogout }: { onLogout: () => void }) {
+function DownloadsSection() {
   return (
     <div className="min-h-screen bg-background">
       <h1 className="text-4xl font-bold text-foreground mb-8">
@@ -422,7 +416,7 @@ function DownloadsSection({ onLogout }: { onLogout: () => void }) {
 }
 
 /* --- Update Section --- */
-function UpdateSection({ onLogout }: { onLogout: () => void }) {
+function UpdateSection() {
   return (
     <div className="min-h-screen bg-background">
       <h1 className="text-4xl font-bold text-foreground mb-8">
@@ -433,149 +427,6 @@ function UpdateSection({ onLogout }: { onLogout: () => void }) {
           Update management - preserves existing UpdateAvailable.tsx system.
         </p>
       </div>
-    </div>
-  );
-}
-
-/* --- Most Used Features Section --- */
-function MostUsedFeaturesSection({ onLogout }: { onLogout: () => void }) {
-  const { isAdmin } = useAuth();
-  const db = getFirestoreDb();
-  const [features, setFeatures] = useState({
-    aiChat: { total: 0, today: 0, weekly: 0, monthly: 0 },
-    photoDoubt: { total: 0, today: 0, weekly: 0, monthly: 0 },
-    quiz: { total: 0, today: 0, weekly: 0, monthly: 0 },
-    flashcards: { total: 0, today: 0, weekly: 0, monthly: 0 },
-    notes: { total: 0, today: 0, weekly: 0, monthly: 0 },
-    planner: { total: 0, today: 0, weekly: 0, monthly: 0 },
-    timer: { total: 0, today: 0, weekly: 0, monthly: 0 },
-    progress: { total: 0, today: 0, weekly: 0, monthly: 0 },
-    resources: { total: 0, today: 0, weekly: 0, monthly: 0 },
-    history: { total: 0, today: 0, weekly: 0, monthly: 0 },
-    profile: { total: 0, today: 0, weekly: 0, monthly: 0 },
-    settings: { total: 0, today: 0, weekly: 0, monthly: 0 },
-    leaderboard: { total: 0, today: 0, weekly: 0, monthly: 0 },
-    downloads: { total: 0, today: 0, weekly: 0, monthly: 0 },
-    appInstall: { total: 0, today: 0, weekly: 0, monthly: 0 },
-    studyModes: { total: 0, today: 0, weekly: 0, monthly: 0 },
-  });
-const [loading, setLoading] = useState(true);
-
-  const KNOWN_FEATURES = [
-    "aiChat",
-    "photoDoubt",
-    "quiz",
-    "flashcards",
-    "notes",
-    "planner",
-    "timer",
-    "progress",
-    "resources",
-    "history",
-    "profile",
-    "settings",
-    "leaderboard",
-    "downloads",
-    "appInstall",
-    "studyModes",
-  ];
-
-  useEffect(() => {
-    const fetchFeatures = async () => {
-      const db = getFirestoreDb();
-      if (!db) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        // Use a simple approach: fetch the daily analytics doc which may have feature usage,
-        // or initialize with known features
-        const dailyRef = doc(db, "dailyAnalytics", "current");
-        const snap = await getDoc(dailyRef);
-
-        if (snap.exists() === true) {
-          const data = snap.data();
-          // Try to get feature usage from daily analytics
-          KNOWN_FEATURES.forEach((key) => {
-            const total = data?.[`total_${key}`] || 0;
-            const today = data?.[`today_${key}`] || 0;
-            const weekly = data?.[`weekly_${key}`] || 0;
-            const monthly = data?.[`monthly_${key}`] || 0;
-            // @ts-expect-error - dynamically setting properties
-            features[key] = { total, today, weekly, monthly };
-          });
-        } else {
-          // No data yet - keep defaults
-        }
-      } catch (err) {
-        console.error("Error fetching features:", err);
-      }
-      setLoading(false);
-    };
-
-    fetchFeatures();
-  }, [db]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="max-w-7xl mx-auto p-4 md:p-8">
-          <h1 className="text-4xl font-bold text-foreground mb-8">
-            Most Used Features
-          </h1>
-          <div className="bg-card border border-rounded-2xl p-8 shadow-xl text-center">
-            <p className="text-foreground/60">
-              Loading most used features...
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Rank features by total usage
-  const rankedFeatures = Object.entries(features)
-    .sort((a, b) => b[1].total - a[1].total)
-    .slice(0, 10);
-
-  return (
-    <div className="min-h-screen bg-background">
-      <h1 className="text-4xl font-bold text-foreground mb-8">
-        Most Used Features
-      </h1>
-
-      <div className="bg-card border border-rounded-2xl p-6 mb-8 shadow-xl">
-        <p className="text-sm text-foreground/60 mb-4">
-          Features ranked by total usage count. Cooldown: 5 minutes to prevent
-          refresh inflation.
-        </p>
-      </div>
-
-      {rankedFeatures.length === 0 ? (
-        <p className="text-foreground/60">No usage data available yet.</p>
-      ) : (
-        <ol className="grid grid-cols-2 gap-4">
-          {rankedFeatures.map(([key, data]) => {
-            const rank = rankedFeatures.indexOf([key, data]) + 1;
-            const label = key.replace(/[A-Z]/g, " $&").trim();
-            return (
-              <li
-                key={key}
-                className="flex items-center gap-3 px-3 py-2 rounded-bg text-sm"
-              >
-                <span className="font-medium">{rank}.</span>
-                <span className="text-foreground">
-                  {label}
-                </span>
-                <span className="ml-auto text-foreground/60">
-                  {data.total}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-      )}
     </div>
   );
 }

@@ -4,14 +4,14 @@ import { mockSessionsRoute, enableConsoleErrorTracking, filterCriticalErrors, wa
 export { mockSessionsRoute, enableConsoleErrorTracking, filterCriticalErrors, waitForDashboardReady, waitForPageReady };
 
 export async function setupDashboard(page: Page) {
-  await page.goto("http://localhost:3000/dashboard");
+  await page.goto("http://localhost:3000/dashboard/");
   await page.waitForLoadState("domcontentloaded");
   await waitForDashboardReady(page);
 }
 
 export async function setupWithMockedSessions(page: Page) {
   await mockSessionsRoute(page);
-  await page.goto("http://localhost:3000/dashboard");
+  await page.goto("http://localhost:3000/dashboard/");
   await page.waitForLoadState("domcontentloaded");
   await waitForDashboardReady(page);
 }

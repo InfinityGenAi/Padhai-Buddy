@@ -73,7 +73,7 @@ test.describe("H. Planner Tests", () => {
       });
     });
 
-    await page.goto("http://localhost:3000/dashboard/planner");
+    await page.goto("http://localhost:3000/dashboard/planner/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("h1:has-text('Planner')").first()).toBeAttached();
   });

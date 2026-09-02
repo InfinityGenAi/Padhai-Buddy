@@ -5,7 +5,7 @@ test.describe("N. Mobile Tests", () => {
   test("dashboard loads on mobile", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/dashboard");
+    await page.goto("http://localhost:3000/dashboard/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
   });
@@ -13,7 +13,7 @@ test.describe("N. Mobile Tests", () => {
   test("bottom nav is visible on mobile", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/dashboard");
+    await page.goto("http://localhost:3000/dashboard/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
     await expect(page.locator("text=Home").first()).toBeAttached();
@@ -22,7 +22,7 @@ test.describe("N. Mobile Tests", () => {
   test("no horizontal overflow on mobile", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/dashboard");
+    await page.goto("http://localhost:3000/dashboard/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
     const overflowX = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);

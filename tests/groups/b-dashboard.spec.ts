@@ -4,7 +4,7 @@ import { mockSessionsRoute } from "../utils/test-helpers";
 test.describe("B. Dashboard Tests", () => {
   test.beforeEach(async ({ page }) => {
     await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/dashboard");
+    await page.goto("http://localhost:3000/dashboard/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
   });
@@ -14,10 +14,10 @@ test.describe("B. Dashboard Tests", () => {
     await expect(page.locator("text=Study Time").first()).toBeVisible();
   });
 
-  test("weekly chart renders", async ({ page }) => {
-    const chart = page.locator("svg[viewBox='0 0 100 60']");
-    await expect(chart).toBeAttached();
-    await expect(chart).toBeVisible();
+  test("this week overview is visible", async ({ page }) => {
+    await expect(page.locator("text=This Week Overview").first()).toBeAttached();
+    await expect(page.locator("text=Minutes").first()).toBeAttached();
+    await expect(page.locator("text=Subjects").first()).toBeAttached();
   });
 
   test("notification popover opens and closes", async ({ page }) => {

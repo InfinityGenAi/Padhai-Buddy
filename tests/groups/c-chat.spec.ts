@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { mockSessionsRoute, waitForPersistedMessages } from "../utils/test-helpers";
 
 async function openChatPage(page: Page) {
-  await page.goto("http://localhost:3000/dashboard/chat");
+  await page.goto("http://localhost:3000/dashboard/chat/");
   await page.waitForLoadState("domcontentloaded");
   await mockSessionsRoute(page);
 }

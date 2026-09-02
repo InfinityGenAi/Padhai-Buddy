@@ -269,7 +269,7 @@ export default async function globalSetup() {
     await page.click('button[type="submit"]', { force: true });
 
     console.log("Global setup - waiting for dashboard...");
-    await page.waitForURL("http://localhost:3000/dashboard", { timeout: 120000 });
+    await page.waitForURL(/\/dashboard/, { timeout: 120000 });
     await page.waitForLoadState("domcontentloaded", { timeout: 60000 });
 
     const dashboardText = await page.locator("body").innerText();

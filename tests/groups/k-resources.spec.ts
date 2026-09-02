@@ -59,7 +59,7 @@ test.describe("K. Resources Tests", () => {
       });
     });
 
-    await page.goto("http://localhost:3000/dashboard/resources");
+    await page.goto("http://localhost:3000/dashboard/resources/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("h1:has-text('Resources')").first()).toBeAttached();
   });

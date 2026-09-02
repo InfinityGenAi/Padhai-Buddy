@@ -103,7 +103,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
   );
   const signingUpRef = useRef(false);
 
-  const loadUserProfile = (fbUser: FirebaseUser | null) => {
+  const loadUserProfile = useCallback(async (fbUser: FirebaseUser | null) => {
     if (!fbUser) {
       setUser(null);
       setAuthError(null);
@@ -121,6 +121,15 @@ function AuthProvider({ children }: { children: ReactNode }) {
       setIsAdmin(false);
       return;
     }
+
+    try {
+      const tokenResult = await fbUser.getIdTokenResult();
+      const claims = tokenResult.claims as Record<string, unknown>;
+      setIsAdmin(claims.admin === true);
+    } catch {
+      setIsAdmin(false);
+    }
+
     getDoc(doc(db, "users", fbUser.uid))
       .then((snap) => {
         if (snap.exists()) {
@@ -159,17 +168,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         }
       });
-
-    // Update admin status from Firebase custom claims
-    // Note: setState in effect is allowed here as this synchronizes auth state
-    const claims = (fbUser as FirebaseUser & { customClaims?: Record<string, unknown> })
-      .customClaims;
-    if (claims && Object.keys(claims).includes('admin')) {
-      setIsAdmin(true);
-    } else {
-      setIsAdmin(false);
-    }
-  };
+  }, []);
 
   useEffect(() => {
     let unsub: (() => void) | undefined;
@@ -195,7 +194,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       if (unsub) unsub();
     };
-  }, []);
+  }, [loadUserProfile]);
 
   const reloadProfile = useCallback(() => {
     if (firebaseUser) {
@@ -203,7 +202,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
       setAuthError(null);
       loadUserProfile(firebaseUser);
     }
-  }, [firebaseUser]);
+  }, [firebaseUser, loadUserProfile]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     await waitForFirebaseInit();

@@ -29,7 +29,7 @@ test.describe("I. Timer Tests", () => {
       });
     });
 
-    await page.goto("http://localhost:3000/dashboard/timer");
+    await page.goto("http://localhost:3000/dashboard/timer/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("h1:has-text('Timer')").first()).toBeAttached();
   });

@@ -28,7 +28,7 @@ test.describe("A. Public/Auth Tests", () => {
       page.on("pageerror", (err) => errors.push(err.message));
 
       await mockSessionsRoute(page);
-      await page.goto("http://localhost:3000/login");
+      await page.goto("http://localhost:3000/login/");
       await page.waitForLoadState("domcontentloaded");
       await expect(page.locator("text=Welcome Back")).toBeAttached();
 
@@ -46,7 +46,7 @@ test.describe("A. Public/Auth Tests", () => {
       // re-render the form, detaching inputs mid-fill — retry the whole flow.
       let loggedIn = false;
       for (let attempt = 0; attempt < 3 && !loggedIn; attempt++) {
-        await page.goto("http://localhost:3000/login");
+        await page.goto("http://localhost:3000/login/");
         await page.waitForLoadState("domcontentloaded");
         try {
           const emailInput = page.locator('input[type="email"]');
@@ -57,7 +57,7 @@ test.describe("A. Public/Auth Tests", () => {
             const form = document.querySelector("form");
             if (form) form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
           });
-await expect(page).toHaveURL("http://localhost:3000/dashboard", { timeout: 15000 });
+await expect(page).toHaveURL("http://localhost:3000/dashboard/", { timeout: 15000 });
         await expect(page.locator("text=Hi,").first()).toBeAttached();
         loggedIn = true;
       } catch (e) {
@@ -70,14 +70,14 @@ await expect(page).toHaveURL("http://localhost:3000/dashboard", { timeout: 15000
 
   test("dashboard greeting shows user name", async ({ page }) => {
     await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/dashboard", { timeout: 30000 });
+    await page.goto("http://localhost:3000/dashboard/", { timeout: 30000 });
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
   });
 
   test("logout works", async ({ page }) => {
     await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/dashboard");
+    await page.goto("http://localhost:3000/dashboard/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
 
@@ -90,7 +90,7 @@ await expect(page).toHaveURL("http://localhost:3000/dashboard", { timeout: 15000
     await expect(profileBtn).toBeAttached();
     await profileBtn.click({ force: true });
     await page.locator("text=Logout").first().click();
-    await expect(page).toHaveURL("http://localhost:3000/login", { timeout: 15000 });
+    await expect(page).toHaveURL("http://localhost:3000/login/", { timeout: 15000 });
   });
 
   test.describe("unauthenticated redirect", () => {
@@ -104,44 +104,44 @@ await expect(page).toHaveURL("http://localhost:3000/dashboard", { timeout: 15000
     });
 
     test("dashboard redirects to login", async ({ page }) => {
-      await page.goto("http://localhost:3000/dashboard");
-      await expect(page).toHaveURL("http://localhost:3000/login", { timeout: 15000 });
+      await page.goto("http://localhost:3000/dashboard/");
+      await expect(page).toHaveURL("http://localhost:3000/login/", { timeout: 15000 });
     });
 
     test("chat redirects to login", async ({ page }) => {
-      await page.goto("http://localhost:3000/dashboard/chat");
-      await expect(page).toHaveURL("http://localhost:3000/login", { timeout: 15000 });
+      await page.goto("http://localhost:3000/dashboard/chat/");
+      await expect(page).toHaveURL("http://localhost:3000/login/", { timeout: 15000 });
     });
 
     test("history redirects to login", async ({ page }) => {
-      await page.goto("http://localhost:3000/dashboard/history");
-      await expect(page).toHaveURL("http://localhost:3000/login", { timeout: 15000 });
+      await page.goto("http://localhost:3000/dashboard/history/");
+      await expect(page).toHaveURL("http://localhost:3000/login/", { timeout: 15000 });
     });
 
     test("profile redirects to login", async ({ page }) => {
-      await page.goto("http://localhost:3000/dashboard/profile");
-      await expect(page).toHaveURL("http://localhost:3000/login", { timeout: 15000 });
+      await page.goto("http://localhost:3000/dashboard/profile/");
+      await expect(page).toHaveURL("http://localhost:3000/login/", { timeout: 15000 });
     });
 
     test("settings modal redirects to login", async ({ page }) => {
-      await page.goto("http://localhost:3000/dashboard");
-      await expect(page).toHaveURL("http://localhost:3000/login", { timeout: 15000 });
+      await page.goto("http://localhost:3000/dashboard/");
+      await expect(page).toHaveURL("http://localhost:3000/login/", { timeout: 15000 });
     });
   });
 
   test("forgot password page loads from login link", async ({ page }) => {
     await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/login");
+    await page.goto("http://localhost:3000/login/");
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(3000);
-    await page.goto("http://localhost:3000/forgot-password", { timeout: 30000 });
+    await page.goto("http://localhost:3000/forgot-password/", { timeout: 30000 });
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("h1:has-text('Forgot Password?')")).toBeAttached();
   });
 
   test("forgot password page has email form", async ({ page }) => {
     await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/forgot-password", { timeout: 30000 });
+    await page.goto("http://localhost:3000/forgot-password/", { timeout: 30000 });
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(1500);
     await expect(page.locator("text=Send Reset Link")).toBeAttached();
@@ -150,7 +150,7 @@ await expect(page).toHaveURL("http://localhost:3000/dashboard", { timeout: 15000
 
   test("forgot password submits with empty email shows error", async ({ page }) => {
     await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/forgot-password", { timeout: 30000 });
+    await page.goto("http://localhost:3000/forgot-password/", { timeout: 30000 });
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(1500);
     await page.click("button:has-text('Send Reset Link')");
@@ -159,7 +159,7 @@ await expect(page).toHaveURL("http://localhost:3000/dashboard", { timeout: 15000
 
   test("forgot password submits with invalid email shows error", async ({ page }) => {
     await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/forgot-password", { timeout: 30000 });
+    await page.goto("http://localhost:3000/forgot-password/", { timeout: 30000 });
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(1500);
     await page.fill('input[type="email"]', "not-an-email");
@@ -179,7 +179,7 @@ await expect(page).toHaveURL("http://localhost:3000/dashboard", { timeout: 15000
 
     test("toggle works", async ({ page }) => {
       await mockSessionsRoute(page);
-      await page.goto("http://localhost:3000/login");
+      await page.goto("http://localhost:3000/login/");
       await page.waitForLoadState("domcontentloaded");
       await page.waitForTimeout(1500);
       const passwordInput = page.locator('input[type="password"]').first();
@@ -204,7 +204,7 @@ await expect(page).toHaveURL("http://localhost:3000/dashboard", { timeout: 15000
 
     test("toggle works", async ({ page }) => {
       await mockSessionsRoute(page);
-      await page.goto("http://localhost:3000/signup");
+      await page.goto("http://localhost:3000/signup/");
       await page.waitForLoadState("domcontentloaded");
       await page.waitForTimeout(1500);
       const passwordInput = page.locator('input[type="password"]').first();
@@ -219,7 +219,7 @@ await expect(page).toHaveURL("http://localhost:3000/dashboard", { timeout: 15000
 
   test("reset password with invalid link shows error", async ({ page }) => {
     await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/reset-password", { timeout: 30000 });
+    await page.goto("http://localhost:3000/reset-password/", { timeout: 30000 });
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(1500);
     await expect(page.locator("text=Invalid or expired reset link")).toBeAttached();

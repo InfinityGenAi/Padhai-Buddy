@@ -4,7 +4,7 @@ import { mockSessionsRoute } from "../utils/test-helpers";
 test.describe("M. Photo Doubt Tests", () => {
   test.beforeEach(async ({ page }) => {
     await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/dashboard/photo-doubt");
+    await page.goto("http://localhost:3000/dashboard/photo-doubt/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("h1:has-text('Photo Doubt')").first()).toBeAttached();
   });

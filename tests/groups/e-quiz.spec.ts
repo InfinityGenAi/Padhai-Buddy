@@ -107,7 +107,7 @@ test.describe("E. Quiz Tests", () => {
       });
     });
 
-    await page.goto("http://localhost:3000/dashboard/quiz");
+    await page.goto("http://localhost:3000/dashboard/quiz/");
     await page.waitForLoadState("domcontentloaded");
   });
 

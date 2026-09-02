@@ -28,7 +28,7 @@ test.describe("Quick Smoke Tests", () => {
       page.on("pageerror", (err) => errors.push(err.message));
 
       await mockSessionsRoute(page);
-      await page.goto("http://localhost:3000/login");
+      await page.goto("http://localhost:3000/login/");
       await page.waitForLoadState("domcontentloaded");
       await expect(page.locator("text=Welcome Back")).toBeAttached();
 
@@ -47,13 +47,13 @@ test.describe("Quick Smoke Tests", () => {
     });
 
     test("dashboard requires auth and redirects", async ({ page }) => {
-      await page.goto("http://localhost:3000/dashboard");
-      await expect(page).toHaveURL("http://localhost:3000/login", { timeout: 15000 });
+      await page.goto("http://localhost:3000/dashboard/");
+      await expect(page).toHaveURL("http://localhost:3000/login/", { timeout: 15000 });
     });
 
     test("chat page requires auth and redirects", async ({ page }) => {
-      await page.goto("http://localhost:3000/dashboard/chat");
-      await expect(page).toHaveURL("http://localhost:3000/login", { timeout: 15000 });
+      await page.goto("http://localhost:3000/dashboard/chat/");
+      await expect(page).toHaveURL("http://localhost:3000/login/", { timeout: 15000 });
     });
   });
 });

@@ -294,7 +294,7 @@ test.describe("Background Animation Audit", () => {
       await page.emulateMedia({ reducedMotion: "no-preference" });
     });
 
-    test("vanta background canvas renders on /", async ({ page }) => {
+    test("landing page renders static light background on /", async ({ page }) => {
       const consoleErrors: string[] = [];
       page.on("console", (msg) => {
         if (msg.type() === "error") consoleErrors.push(msg.text());
@@ -303,112 +303,52 @@ test.describe("Background Animation Audit", () => {
 
       await page.goto("http://localhost:3000/");
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
 
-      const bg = page.locator('[data-pb="background"]').first();
-      await expect(bg).toBeAttached();
+      // The landing page is intentionally a plain light background - no animated
+      // background component (no data-pb="background", no canvas) is rendered.
+      await expect(page.locator('[data-pb="background"]')).toHaveCount(0);
+      await expect(page.locator("canvas")).toHaveCount(0);
 
-      const box = await bg.boundingBox();
-      expect(box?.width || 0).toBeGreaterThan(0);
-      expect(box?.height || 0).toBeGreaterThan(0);
+      const content = page.locator("main, .relative.z-10, button").first();
+      await expect(content).toBeAttached();
+
+      const pageBg = await page.evaluate(() =>
+        getComputedStyle(document.body).backgroundColor
+      );
+      expect(pageBg).not.toBe("rgba(0, 0, 0, 0)");
 
       const criticalErrors = consoleErrors.filter(
         (e) => !e.includes("favicon") && !e.includes("Session register error") && !e.includes("Sessions list error") && !e.includes("Quota exceeded") && !e.includes("Failed to load resource: the server responded with a status of 500") && !e.includes("WebGL"),
       );
       expect(criticalErrors).toEqual([]);
+    });
+
+    test("landing page stays light-only (no dark theme toggle)", async ({ page }) => {
+      await page.goto("http://localhost:3000/");
+      await page.waitForLoadState("domcontentloaded");
 
       const content = page.locator("main, .relative.z-10, button").first();
       await expect(content).toBeAttached();
-    });
 
-    test("mouse movement changes rendering on /", async ({ page }) => {
-      test.setTimeout(180000);
-      await page.goto("http://localhost:3000/");
-      await page.waitForLoadState("domcontentloaded");
-      await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
-
-      const bg = page.locator('[data-pb="background"]').first();
-      await expect(bg).toBeAttached();
-
-      await page.waitForTimeout(500);
-
-      const parallaxCount = await page.locator('[data-pb="parallax"]').count();
-      expect(parallaxCount).toBeGreaterThan(0);
-
-      const initial = await getParallaxStates(page);
-      expect(initial.length).toBeGreaterThan(0);
-
-      await page.mouse.move(100, 100);
-      const tl = await waitForParallaxChange(page, initial);
-
-      await page.mouse.move(700, 450);
-      const afterSecond = await waitForParallaxChange(page, tl);
-
-      await page.mouse.move(1400, 800);
-      const br = await waitForParallaxChange(page, afterSecond);
-
-      let moved = false;
-      for (let i = 0; i < Math.min(initial.length, tl.length, br.length); i++) {
-        if (initial[i] !== tl[i] || initial[i] !== br[i]) {
-          moved = true;
-          break;
-        }
-      }
-      expect(moved).toBe(true);
-    });
-
-    test("landing renders premium light & dark per theme on /", async ({ page }) => {
-      await page.goto("http://localhost:3000/");
-      await page.waitForLoadState("domcontentloaded");
-      await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
-
-      const bg = page.locator('[data-pb="background"]').first();
-      await expect(bg).toBeAttached();
-      await page.waitForTimeout(1000);
-
-      const readStyles = () =>
-        page.evaluate(() => {
-          const root = document.querySelector(".min-h-screen.relative.overflow-hidden");
-          const heading = document.querySelector("h2");
-          const presentSections = [
-            "Everything you need to study smarter",
-            "How It Works",
-            "Your AI study buddy",
-          ].map((t) => document.body.innerText.includes(t));
-          return {
-            pageBg: root ? getComputedStyle(root).backgroundColor : "",
-            headingColor: heading ? getComputedStyle(heading).color : "",
-            presentSections,
-          };
-        });
-
-      const lightState = await readStyles();
-
+      // App is light-only: no dark class, no theme preference applied.
       await page.evaluate(() => {
         localStorage.setItem("padhai-buddy-preferences", JSON.stringify({ theme: "dark" }));
       });
       await page.reload();
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
 
-      const darkBg = page.locator('[data-pb="background"]').first();
-      await expect(darkBg).toBeAttached();
-      await page.waitForTimeout(1000);
+      await expect
+        .poll(() =>
+          page.evaluate(() =>
+            document.documentElement.classList.contains("dark")
+          )
+        )
+        .toBe(false);
 
-      const darkState = await readStyles();
-
-      // The landing follows the theme: warm ivory in light, deep navy in dark.
-      expect(lightState.pageBg).toBe("rgb(250, 250, 240)");
-      expect(darkState.pageBg).toBe("rgb(15, 15, 26)");
-      expect(lightState.pageBg).not.toBe(darkState.pageBg);
-      expect(lightState.headingColor).toBe("rgb(33, 33, 33)");
-      expect(darkState.headingColor).toBe("rgb(240, 240, 245)");
-      expect(lightState.headingColor).not.toBe(darkState.headingColor);
-      expect(lightState.presentSections).toEqual([true, true, true]);
-      expect(darkState.presentSections).toEqual([true, true, true]);
+      await expect(content).toBeAttached();
     });
 
-    test("prefers-reduced-motion disables vanta on /", async ({ page }) => {
+    test("landing page renders cleanly under reduced-motion", async ({ page }) => {
       const consoleErrors: string[] = [];
       page.on("console", (msg) => {
         if (msg.type() === "error") consoleErrors.push(msg.text());
@@ -419,10 +359,9 @@ test.describe("Background Animation Audit", () => {
 
       await page.goto("http://localhost:3000/");
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(500);
 
       await expect(page.locator('[data-pb="background"]')).toHaveCount(0);
-      await expect(page.locator("canvas")).toHaveCount(0);
 
       const content = page.locator("main, .relative.z-10, button").first();
       await expect(content).toBeAttached();

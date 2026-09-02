@@ -20,7 +20,7 @@ test.describe("L. Profile/Settings Tests", () => {
       });
     });
 
-    await page.goto("http://localhost:3000/dashboard/profile");
+    await page.goto("http://localhost:3000/dashboard/profile/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("h1:has-text('Profile')").first()).toBeAttached();
   });
@@ -48,7 +48,7 @@ test.describe("L. Profile/Settings Tests", () => {
   });
 
   test("settings modal opens from profile menu", async ({ page }) => {
-    await page.goto("http://localhost:3000/dashboard");
+    await page.goto("http://localhost:3000/dashboard/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
 
@@ -61,7 +61,7 @@ test.describe("L. Profile/Settings Tests", () => {
     await expect(profileBtn).toBeAttached();
     await profileBtn.click({ force: true });
     await page.locator("text=Settings").first().click();
-    await expect(page.locator("text=Theme").first()).toBeAttached();
+    await expect(page.locator("text=Animations").first()).toBeAttached();
   });
 
   test("profile save button exists", async ({ page }) => {

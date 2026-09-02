@@ -34,7 +34,7 @@ test.describe("J. Progress Tests", () => {
       });
     });
 
-    await page.goto("http://localhost:3000/dashboard/progress");
+    await page.goto("http://localhost:3000/dashboard/progress/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("h1:has-text('Progress')").first()).toBeAttached();
   });

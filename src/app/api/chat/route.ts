@@ -95,11 +95,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const validStudyModes = ["explain", "teach", "quiz", "hint", "simplify", "deep", "exam"];
+    const validatedStudyMode = studyMode !== undefined && studyMode !== null
+      ? validStudyModes.includes(String(studyMode))
+        ? (String(studyMode) as StudyMode)
+        : null
+      : null;
+
     const systemPrompt = buildSystemPrompt(String(studentClass), String(board), {
       responseStyle: responseStyle !== undefined ? String(responseStyle) : undefined,
       stepByStep: stepByStep !== undefined ? Boolean(stepByStep) : undefined,
       language: language !== undefined ? String(language) : undefined,
-      studyMode: studyMode !== undefined ? (studyMode as StudyMode) : undefined,
+      studyMode: validatedStudyMode,
     });
 
     let completion;

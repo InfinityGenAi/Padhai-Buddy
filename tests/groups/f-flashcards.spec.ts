@@ -130,7 +130,7 @@ test.describe("F. Flashcards Tests", () => {
       });
     });
 
-    await page.goto("http://localhost:3000/dashboard/flashcards");
+    await page.goto("http://localhost:3000/dashboard/flashcards/");
     await page.waitForLoadState("domcontentloaded");
   });
 

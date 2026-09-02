@@ -4,7 +4,7 @@ import { mockSessionsRoute, waitForPersistedMessages } from "../utils/test-helpe
 test.describe("D. History Tests", () => {
   test.beforeEach(async ({ page }) => {
     await mockSessionsRoute(page);
-    await page.goto("http://localhost:3000/dashboard/history");
+    await page.goto("http://localhost:3000/dashboard/history/");
     await page.waitForLoadState("domcontentloaded");
   });
 
@@ -36,7 +36,7 @@ test.describe("D. History Tests", () => {
       });
     });
 
-    await page.goto("http://localhost:3000/dashboard/chat");
+    await page.goto("http://localhost:3000/dashboard/chat/");
     await page.waitForLoadState("domcontentloaded");
 
     const input = page.locator("textarea, input[type='text']").first();
@@ -65,7 +65,7 @@ test.describe("D. History Tests", () => {
     ).toBeAttached({ timeout: 15000 });
     await waitForPersistedMessages("Persist me in history please", 2);
 
-    await page.goto("http://localhost:3000/dashboard/history");
+    await page.goto("http://localhost:3000/dashboard/history/");
     await page.waitForLoadState("domcontentloaded");
     await page.locator("button:has-text('Chats (')").first().click();
 

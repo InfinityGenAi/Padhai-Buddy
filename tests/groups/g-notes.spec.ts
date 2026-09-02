@@ -58,7 +58,7 @@ test.describe("G. Notes Tests", () => {
       });
     });
 
-    await page.goto("http://localhost:3000/dashboard/notes");
+    await page.goto("http://localhost:3000/dashboard/notes/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("h1:has-text('Notes')").first()).toBeAttached();
   });
