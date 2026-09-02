@@ -1,0 +1,41 @@
+[package]
+name = "padhai-buddy"
+version = "0.1.0"
+description = "Padhai Buddy - Your AI Study Buddy"
+authors = ["Padhai Buddy Team"]
+license = "MIT"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [
+  "notification",
+  "shell-open",
+  "dialog-open",
+  "dialog-message",
+  "dialog-confirm",
+  "fs-read-file",
+  "fs-write-file",
+  "fs-read-dir",
+  "fs-copy-file",
+  "fs-create-dir",
+  "fs-remove-file",
+  "fs-remove-dir",
+  "path-resolve",
+  "path-join",
+  "path-exists",
+  "notification",
+  "shell-open",
+  "dialog-open",
+  "dialog-message",
+  "dialog-confirm",
+] }
+tauri-plugin-notification = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"

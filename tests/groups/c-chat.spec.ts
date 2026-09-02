@@ -62,7 +62,7 @@ test.describe("C. Chat Tests", () => {
   });
 
   test("chat page loads", async ({ page }) => {
-    await expect(page.locator("h1:has-text('AI Chat')").first()).toBeAttached();
+    await expect(page.locator("h1:has-text('Padhai Buddy AI Tutor')").first()).toBeAttached();
   });
 
   test("new conversation can be started", async ({ page }) => {

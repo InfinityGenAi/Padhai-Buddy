@@ -1,0 +1,67 @@
+{
+  "name": "Padhai Buddy",
+  "short_name": "Padhai Buddy",
+  "description": "Your AI study buddy for every doubt, every subject, every board.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#0B0F14",
+  "theme_color": "#0D9488",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/brand/favicon-16.png",
+      "sizes": "16x16",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/brand/favicon-32.png",
+      "sizes": "32x32",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/brand/favicon-48.png",
+      "sizes": "48x48",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/brand/favicon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/brand/favicon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Chat",
+      "short_name": "Chat",
+      "description": "Chat with AI Tutor",
+      "url": "/dashboard/chat",
+      "icons": [{ "src": "/brand/favicon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Quiz",
+      "short_name": "Quiz",
+      "description": "Take a quiz",
+      "url": "/dashboard/quiz",
+      "icons": [{ "src": "/brand/favicon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Flashcards",
+      "short_name": "Flashcards",
+      "description": "Study flashcards",
+      "url": "/dashboard/flashcards",
+      "icons": [{ "src": "/brand/favicon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

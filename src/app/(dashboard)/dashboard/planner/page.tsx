@@ -151,7 +151,7 @@ export default function PlannerPage() {
     }
   };
 
-  const priorityColors: Record<PlanPriority, string> = { low: "bg-blue-100 dark:bg-blue-950/30 text-blue-700", medium: "bg-amber-100 dark:bg-amber-950/30 text-amber-700", high: "bg-red-100 dark:bg-red-950/30 text-red-700" };
+  const priorityColors: Record<PlanPriority, string> = { low: "bg-blue-950/30 text-blue-300", medium: "bg-amber-950/30 text-amber-300", high: "bg-red-950/30 text-red-300" };
 
   return (
     <motion.div initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined} animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined} className="space-y-6 w-full">
@@ -166,7 +166,7 @@ export default function PlannerPage() {
       </div>
 
       {error && (
-        <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">{error}</motion.div>
+        <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="p-3 rounded-xl bg-red-950/30 border border-red-800/50 text-red-400 text-sm">{error}</motion.div>
       )}
 
       <div className="flex gap-2 overflow-x-auto pb-2">

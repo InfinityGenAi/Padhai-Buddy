@@ -118,7 +118,7 @@ export default function ResetPasswordPage() {
         >
           <motion.div
             variants={animationsEnabled ? staggerItem : undefined}
-            className="bg-white dark:bg-dark border border-border rounded-2xl p-6 text-center"
+            className="bg-card border border-border rounded-2xl p-6 text-center"
           >
             <motion.div
               variants={animationsEnabled ? staggerItem : undefined}
@@ -165,7 +165,7 @@ export default function ResetPasswordPage() {
       >
         <motion.div
           variants={animationsEnabled ? staggerItem : undefined}
-          className="bg-white dark:bg-dark border border-border rounded-xl p-6"
+          className="bg-card border border-border rounded-xl p-6"
         >
           <div className="text-center mb-6">
             <motion.div
@@ -192,7 +192,7 @@ export default function ResetPasswordPage() {
             <motion.div
               initial={animationsEnabled ? { opacity: 0, y: -5 } : false}
               animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
-              className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-xl p-3 mb-4 text-sm"
+              className="bg-red-950/30 border border-red-800/50 text-red-400 rounded-xl p-3 mb-4 text-sm"
             >
               {error}
             </motion.div>
@@ -203,14 +203,14 @@ export default function ResetPasswordPage() {
               <label className="block text-sm font-medium mb-1.5">
                 New Password
               </label>
-              <div className="auth-input-wrapper">
-                <LockClosedIcon className="auth-input-icon" />
+              <div className="relative">
+                <LockClosedIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
                 <input
                   type={showNewPassword ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Enter new password"
-                  className="auth-input"
+                  className="w-full bg-input-bg border border-input-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors pr-12"
                   required
                   minLength={6}
                   autoFocus
@@ -218,7 +218,7 @@ export default function ResetPasswordPage() {
                 <button
                   type="button"
                   onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="password-toggle"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground transition-colors"
                   aria-label={showNewPassword ? "Hide password" : "Show password"}
                 >
                   {showNewPassword ? (
@@ -234,21 +234,21 @@ export default function ResetPasswordPage() {
               <label className="block text-sm font-medium mb-1.5">
                 Confirm New Password
               </label>
-              <div className="auth-input-wrapper">
-                <LockClosedIcon className="auth-input-icon" />
+              <div className="relative">
+                <LockClosedIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
                   <input
                     type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirm new password"
-                    className="auth-input"
+                    className="w-full bg-input-bg border border-input-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors pr-12"
                     required
                     minLength={6}
                   />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="password-toggle"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground transition-colors"
                   aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                 >
                   {showConfirmPassword ? (

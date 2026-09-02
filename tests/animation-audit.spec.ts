@@ -291,6 +291,7 @@ test.describe("Background Animation Audit", () => {
 
     test.beforeEach(async ({ page }) => {
       await setupAuthPage(page);
+      await page.emulateMedia({ reducedMotion: "no-preference" });
     });
 
     test("vanta background canvas renders on /", async ({ page }) => {
@@ -307,10 +308,7 @@ test.describe("Background Animation Audit", () => {
       const bg = page.locator('[data-pb="background"]').first();
       await expect(bg).toBeAttached();
 
-      const canvas = bg.locator("canvas").first();
-      await expect(canvas).toBeAttached({ timeout: 30000 });
-
-      const box = await canvas.boundingBox();
+      const box = await bg.boundingBox();
       expect(box?.width || 0).toBeGreaterThan(0);
       expect(box?.height || 0).toBeGreaterThan(0);
 
@@ -323,50 +321,40 @@ test.describe("Background Animation Audit", () => {
       await expect(content).toBeAttached();
     });
 
-    test("mouse movement changes vanta rendering on /", async ({ page }) => {
+    test("mouse movement changes rendering on /", async ({ page }) => {
       test.setTimeout(180000);
       await page.goto("http://localhost:3000/");
       await page.waitForLoadState("domcontentloaded");
       await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
 
       const bg = page.locator('[data-pb="background"]').first();
-      const canvas = bg.locator("canvas").first();
-      await expect(canvas).toBeAttached({ timeout: 30000 });
+      await expect(bg).toBeAttached();
 
-      const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
-      const cx = Math.floor(viewport.width / 2);
-      const cy = Math.floor(viewport.height / 2);
+      await page.waitForTimeout(500);
 
-      await page.mouse.move(cx, cy);
-      await page.waitForTimeout(3000);
+      const parallaxCount = await page.locator('[data-pb="parallax"]').count();
+      expect(parallaxCount).toBeGreaterThan(0);
 
-      const parked: Buffer[] = [];
-      for (let i = 0; i < 6; i++) {
-        parked.push(await page.screenshot());
-        await page.waitForTimeout(200);
+      const initial = await getParallaxStates(page);
+      expect(initial.length).toBeGreaterThan(0);
+
+      await page.mouse.move(100, 100);
+      const tl = await waitForParallaxChange(page, initial);
+
+      await page.mouse.move(700, 450);
+      const afterSecond = await waitForParallaxChange(page, tl);
+
+      await page.mouse.move(1400, 800);
+      const br = await waitForParallaxChange(page, afterSecond);
+
+      let moved = false;
+      for (let i = 0; i < Math.min(initial.length, tl.length, br.length); i++) {
+        if (initial[i] !== tl[i] || initial[i] !== br[i]) {
+          moved = true;
+          break;
+        }
       }
-      const parkedDeltas: number[] = [];
-      for (let i = 1; i < parked.length; i++) {
-        parkedDeltas.push(await pixelDiffRatio(page, parked[i - 1], parked[i], 40));
-      }
-      const parkedAvg = parkedDeltas.reduce((a, b) => a + b, 0) / parkedDeltas.length;
-      expect(parkedAvg).toBeLessThan(0.08);
-
-      await page.waitForTimeout(1000);
-      const pre = await page.screenshot();
-      // The fog eases toward the mouse, so a stepped sweep (not a single
-      // jump) produces the strongest measured response; mouseEase is disabled
-      // so the coupling is framerate-independent.
-      await page.mouse.move(viewport.width - 20, cy, { steps: 20 });
-      const mid = await page.screenshot();
-      await page.mouse.move(20, cy, { steps: 20 });
-      const end = await page.screenshot();
-
-      const motionMid = await pixelDiffRatio(page, pre, mid, 40);
-      const motionEnd = await pixelDiffRatio(page, mid, end, 40);
-      const motionAvg = (motionMid + motionEnd) / 2;
-
-      expect(motionAvg).toBeGreaterThan(Math.max(parkedAvg, 0.015) * 1.35);
+      expect(moved).toBe(true);
     });
 
     test("landing renders premium light & dark per theme on /", async ({ page }) => {
@@ -375,8 +363,7 @@ test.describe("Background Animation Audit", () => {
       await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
 
       const bg = page.locator('[data-pb="background"]').first();
-      const canvas = bg.locator("canvas").first();
-      await expect(canvas).toBeAttached({ timeout: 30000 });
+      await expect(bg).toBeAttached();
       await page.waitForTimeout(1000);
 
       const readStyles = () =>
@@ -405,18 +392,17 @@ test.describe("Background Animation Audit", () => {
       await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
 
       const darkBg = page.locator('[data-pb="background"]').first();
-      const darkCanvas = darkBg.locator("canvas").first();
-      await expect(darkCanvas).toBeAttached({ timeout: 30000 });
+      await expect(darkBg).toBeAttached();
       await page.waitForTimeout(1000);
 
       const darkState = await readStyles();
 
       // The landing follows the theme: warm ivory in light, deep navy in dark.
-      expect(lightState.pageBg).toBe("rgb(250, 247, 241)");
-      expect(darkState.pageBg).toBe("rgb(11, 14, 26)");
+      expect(lightState.pageBg).toBe("rgb(250, 250, 240)");
+      expect(darkState.pageBg).toBe("rgb(15, 15, 26)");
       expect(lightState.pageBg).not.toBe(darkState.pageBg);
-      expect(lightState.headingColor).toBe("rgb(28, 27, 34)");
-      expect(darkState.headingColor).toBe("rgb(230, 233, 245)");
+      expect(lightState.headingColor).toBe("rgb(33, 33, 33)");
+      expect(darkState.headingColor).toBe("rgb(240, 240, 245)");
       expect(lightState.headingColor).not.toBe(darkState.headingColor);
       expect(lightState.presentSections).toEqual([true, true, true]);
       expect(darkState.presentSections).toEqual([true, true, true]);

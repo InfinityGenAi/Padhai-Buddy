@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
   <defs>
     <linearGradient id="primaryGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#8b5cf6"/>
-      <stop offset="100%" stop-color="#a78bfa"/>
+      <stop offset="0%" stop-color="#0891b2"/>
+      <stop offset="100%" stop-color="#14b8a6"/>
     </linearGradient>
     <linearGradient id="leafGradient" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#14b8a6"/>
@@ -10,18 +10,15 @@
     </linearGradient>
   </defs>
   
-  <!-- Background circle (optional, for dark mode visibility) -->
-  <circle cx="64" cy="64" r="60" fill="url(#primaryGradient)" opacity="0.1"/>
+  <!-- Circular blue/teal gradient background -->
+  <circle cx="64" cy="64" r="60" fill="url(#primaryGradient)"/>
   
-  <!-- Letter P -->
-  <path d="M38 30 L38 98 L58 98 L58 78 L78 78 L78 58 L58 58 L58 38 L38 38 Z M42 42 L42 94 L74 94 L74 54 L58 54 L58 74 L46 74 L46 42 Z" fill="url(#primaryGradient)"/>
+  <!-- Letter P - white -->
+  <path d="M38 30 L38 98 L58 98 L58 78 L78 78 L78 58 L58 58 L58 38 L38 38 Z M42 42 L42 94 L74 94 L74 54 L58 54 L58 74 L46 74 L46 42 Z" fill="#ffffff"/>
   
   <!-- Leaf symbol -->
   <g transform="translate(85, 30)">
     <path d="M0 15 Q12 0 24 15 Q12 30 0 15 Z" fill="url(#leafGradient)"/>
     <path d="M0 15 Q8 10 16 15 Q8 20 0 15" fill="rgba(20, 184, 166, 0.4)"/>
   </g>
-  
-  <!-- Small sparkle on P -->
-  <circle cx="46" cy="46" r="3" fill="#a78bfa"/>
 </svg>

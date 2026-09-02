@@ -1,6 +1,7 @@
 import { type Page } from "@playwright/test";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
+import http from "http";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
@@ -47,7 +48,6 @@ export async function pixelDiffRatio(
     { a: `data:image/png;base64,${a.toString("base64")}`, b: `data:image/png;base64,${b.toString("base64")}`, threshold },
   );
 }
-
 
 export function filterCriticalErrors(errors: string[]): string[] {
   return errors.filter((e) => {
@@ -188,9 +188,18 @@ export async function waitForPageReady(page: Page, heading: string) {
   await page.waitForSelector(`text=${heading}`, { timeout: 15000 });
 }
 
-const TEST_EMAIL = "test@padhai-buddy.test";
+function isPortInUse(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const req = http.get(`http://localhost:${port}`, () => resolve(true));
+    req.on("error", () => resolve(false));
+    req.setTimeout(1000, () => {
+      req.destroy();
+      resolve(false);
+    });
+  });
+}
 
-function loadEnvForAdmin() {
+async function getProjectId(): Promise<string> {
   try {
     const envPath = resolve(__dirname, "../../.env.local");
     const content = readFileSync(envPath, "utf-8");
@@ -200,51 +209,101 @@ function loadEnvForAdmin() {
       const eq = trimmed.indexOf("=");
       if (eq > 0) {
         const key = trimmed.slice(0, eq).trim();
-        if (!process.env[key]) {
-          process.env[key] = trimmed.slice(eq + 1).trim();
+        if (key === "FIREBASE_ADMIN_PROJECT_ID") {
+          return trimmed.slice(eq + 1).trim();
         }
       }
     }
   } catch {
-    // .env.local missing — the helper will be a no-op
+    // ignore
+  }
+  return "infinity-gen-ai";
+}
+
+async function initAdminForEmulator() {
+  if (getApps().length > 0) return;
+  const projectId = await getProjectId();
+  initializeApp({ projectId });
+}
+
+async function initAdminForProduction() {
+  if (getApps().length > 0) return;
+  try {
+    const envPath = resolve(__dirname, "../../.env.local");
+    const content = readFileSync(envPath, "utf-8");
+    for (const line of content.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eq = trimmed.indexOf("=");
+      if (eq > 0) {
+        const key = trimmed.slice(0, eq).trim();
+        const val = trimmed.slice(eq + 1).trim();
+        if (!process.env[key]) process.env[key] = val;
+      }
+    }
+  } catch {
+    // .env.local missing
+  }
+  const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
+  if (!privateKey) return;
+  initializeApp({
+    credential: cert({
+      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+      privateKey: privateKey.replace(/\\n/g, "\n"),
+    }),
+  });
+}
+
+async function getTestUid(): Promise<string | null> {
+  const metaPath = resolve(__dirname, "../test-user-meta.json");
+  if (existsSync(metaPath)) {
+    try {
+      const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
+      if (meta.uid) return meta.uid;
+    } catch {
+      // ignore
+    }
+  }
+
+  const firestoreInUse = await isPortInUse(8080);
+  if (firestoreInUse) {
+    await initAdminForEmulator();
+    const auth = getAuth();
+    try {
+      const userRecord = await auth.getUserByEmail("test@padhai-buddy.test");
+      return userRecord.uid;
+    } catch {
+      return null;
+    }
+  }
+
+  await initAdminForProduction();
+  const auth = getAuth();
+  try {
+    const userRecord = await auth.getUserByEmail("test@padhai-buddy.test");
+    return userRecord.uid;
+  } catch {
+    return null;
   }
 }
 
 let adminReady = false;
 let testUid: string | null = null;
 
-/**
- * Waits until a conversation with the given title has at least `expectedCount`
- * persisted messages. Uses the Admin SDK directly, so it is a true signal that
- * the client-side Firestore writes have landed (not just the optimistic UI).
- */
 export async function waitForPersistedMessages(
   title: string,
   expectedCount: number,
   timeoutMs = 15000,
 ): Promise<void> {
   if (!adminReady) {
-    loadEnvForAdmin();
-    const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
-    if (!privateKey) {
-      console.warn("[test-helpers] FIREBASE_ADMIN_PRIVATE_KEY not set; skipping persistence wait.");
-      return;
+    const firestoreInUse = await isPortInUse(8080);
+    if (firestoreInUse) {
+      await initAdminForEmulator();
+    } else {
+      await initAdminForProduction();
     }
-    if (getApps().length === 0) {
-      initializeApp({
-        credential: cert({
-          projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-          privateKey: privateKey.replace(/\\n/g, "\n"),
-        }),
-      });
-    }
-    try {
-      const userRecord = await getAuth().getUserByEmail(TEST_EMAIL);
-      testUid = userRecord.uid;
-    } catch {
-      return;
-    }
+    testUid = await getTestUid();
     adminReady = true;
   }
   if (!testUid) return;

@@ -1,6 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Admin-only data - protected by custom claim 'admin'
+    match /admin/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid != null
+        && request.auth.token.admin == true;
+    }
+
     match /users/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow create: if request.auth != null && request.auth.uid == userId
@@ -155,6 +161,40 @@ service cloud.firestore {
           && request.resource.data.createdAt is number
           && request.resource.data.updatedAt is number;
         allow update: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /users/{userId}/topicMastery/{masteryId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.subject is string
+          && request.resource.data.topic is string
+          && request.resource.data.mastery is number
+          && request.resource.data.totalQuestions is number
+          && request.resource.data.correctAnswers is number
+          && request.resource.data.lastPracticed is number
+          && request.resource.data.updatedAt is number;
+        allow update: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.uid is string
+          && request.resource.data.uid == userId;
+        allow delete: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /users/{userId}/mistakeBank/{entryId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.source in ["quiz", "flashcard", "chat"]
+          && request.resource.data.sourceId is string
+          && request.resource.data.subject is string
+          && request.resource.data.topic is string
+          && request.resource.data.question is string
+          && request.resource.data.userAnswer is string
+          && request.resource.data.correctAnswer is string
+          && request.resource.data.explanation is string
+          && request.resource.data.createdAt is number;
+        allow update: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.uid is string
+          && request.resource.data.uid == userId;
         allow delete: if request.auth != null && request.auth.uid == userId;
       }
     }

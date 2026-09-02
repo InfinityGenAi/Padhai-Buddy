@@ -1,8 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { flushSync } from "react-dom";
 import Link from "next/link";
+import React from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSearchParams, useRouter } from "next/navigation";
 import { getFirebaseIdToken } from "@/lib/auth-utils";
@@ -19,6 +20,7 @@ import {
   getDocs,
   writeBatch,
   Timestamp,
+  addDoc,
 } from "firebase/firestore";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
@@ -31,6 +33,15 @@ import {
   PencilSquareIcon,
   DocumentDuplicateIcon,
   PhotoIcon,
+  LightBulbIcon,
+  AcademicCapIcon,
+  QuestionMarkCircleIcon,
+  MagnifyingGlassIcon,
+  SparklesIcon as SparklesSolidIcon,
+  DocumentTextIcon,
+  TrophyIcon,
+  BookmarkIcon,
+  ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 import { playSend, playReceive, playCopy, playError } from "@/lib/sounds";
 import type { ChatMessage, Conversation } from "@/types";
@@ -94,7 +105,28 @@ async function copyToClipboard(text: string, msgId: string, onCopied: (id: strin
   }
 }
 
-function ChatEmptyState() {
+async function saveItem(
+  uid: string,
+  content: string,
+  type: "explanation" | "question",
+  sourceMessageId: string,
+  conversationId: string
+) {
+  const db = getFirestoreDb();
+  if (!db) return;
+  const savedRef = collection(db, "users", uid, "savedItems");
+  await addDoc(savedRef, {
+    content,
+    type,
+    sourceMessageId,
+    conversationId,
+    createdAt: Date.now(),
+  });
+}
+
+
+
+function ChatEmptyState({ studyModes }: { studyModes: readonly { id: string; label: string }[] }) {
   const reduced = useReducedMotion();
   const anim = !reduced;
   return (
@@ -108,19 +140,38 @@ function ChatEmptyState() {
         animate={anim ? { y: [0, -10, 0] } : undefined}
         transition={anim ? { duration: 5, repeat: Infinity, ease: "easeInOut" } : undefined}
       >
-        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg">
+        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center shadow-lg">
           <SparklesIcon className="w-10 h-10 text-white" />
         </div>
         <motion.div
-          className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 opacity-20 blur-xl"
+          className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-primary to-indigo-600 opacity-20 blur-xl"
           animate={anim ? { scale: [1, 1.15, 1] } : undefined}
           transition={anim ? { duration: 4, repeat: Infinity, ease: "easeInOut" } : undefined}
         />
       </motion.div>
       <h3 className="text-lg font-semibold text-foreground mb-1">Start a New Conversation</h3>
-      <p className="text-sm text-foreground/60 max-w-sm">
-        Ask Padhai Buddy any study question — we&apos;ll explain it step by step, tailored to your class and board.
+      <p className="text-sm text-foreground/60 max-w-sm mb-6">
+        Ask Padhai Buddy any study question â€” we&apos;ll explain it step by step, tailored to your class and board.
       </p>
+      <div className="w-full max-w-sm space-y-2 text-left">
+        <p className="text-xs font-medium text-foreground/60">Try asking:</p>
+        <ul className="space-y-1.5 text-sm text-foreground/70" role="list">
+          <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-primary/30 flex-shrink-0" />&ldquo;Explain photosynthesis for Class 10&rdquo;</li>
+          <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-primary/30 flex-shrink-0" />&ldquo;Help me solve this quadratic equation&rdquo;</li>
+          <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-primary/30 flex-shrink-0" />&ldquo;Quiz me on periodic table trends&rdquo;</li>
+        </ul>
+        <div className="mt-4 pt-4 border-t border-border/50">
+          <p className="text-xs font-medium text-foreground/60 mb-2">Choose a Study Mode:</p>
+          <div className="flex flex-wrap gap-1.5 justify-center">
+            {studyModes.slice(0, 4).map((mode) => (
+              <span key={mode.id} className="px-2 py-1 text-[10px] bg-card-subtle rounded-full text-foreground/70">
+                {mode.label}
+              </span>
+            ))}
+            <span className="px-2 py-1 text-[10px] bg-card-subtle rounded-full text-foreground/50">+3 more</span>
+          </div>
+        </div>
+      </div>
     </motion.div>
   );
 }
@@ -140,6 +191,9 @@ export default function ChatPage() {
   const [tempTitle, setTempTitle] = useState("");
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [studyMode, setStudyMode] = useState<string | null>(null);
+  const [savedMsgIds, setSavedMsgIds] = useState<Set<string>>(new Set());
+  const [generatingSimilar, setGeneratingSimilar] = useState<Set<string>>(new Set());
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -175,6 +229,16 @@ export default function ChatPage() {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, []);
+
+  const studyModes = [
+    { id: "explain", label: "Explain", description: "Clear, simple explanation", icon: LightBulbIcon },
+    { id: "teach", label: "Teach Me", description: "Step-by-step teaching with questions", icon: AcademicCapIcon },
+    { id: "quiz", label: "Quiz Me", description: "Interactive quiz on the topic", icon: QuestionMarkCircleIcon },
+    { id: "hint", label: "Give Hint", description: "Gentle clue to guide thinking", icon: MagnifyingGlassIcon },
+    { id: "simplify", label: "Simplify", description: "Simple analogies & everyday examples", icon: SparklesSolidIcon },
+    { id: "deep", label: "Deep Explanation", description: "Thorough with derivations & context", icon: DocumentTextIcon },
+    { id: "exam", label: "Exam Mode", description: "Exam-oriented key points & patterns", icon: TrophyIcon },
+  ] as const;
 
   useEffect(() => {
     const container = chatContainerRef.current;
@@ -344,6 +408,19 @@ export default function ChatPage() {
     return () => unsub();
   }, [user?.uid, activeConversationId, scrollToBottom]);
 
+  // Escape key handler for closing modals
+  useEffect(() => {
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        if (renameConvId) setRenameConvId(null);
+        if (deleteConfirmId) setDeleteConfirmId(null);
+        if (sidebarOpen) setSidebarOpen(false);
+      }
+    }
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [renameConvId, deleteConfirmId, sidebarOpen]);
+
   const startNewChat = useCallback(() => {
     setActiveConversationId(null);
     setMessages([]);
@@ -357,6 +434,7 @@ export default function ChatPage() {
     lastScrollTopRef.current = 0;
     pinnedScrollTopRef.current = null;
     isInitialLoadRef.current = false;
+    setStudyMode(null);
     textareaRef.current?.focus();
   }, []);
 
@@ -496,14 +574,15 @@ export default function ChatPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          message: userMessage.content,
-          class: user.class,
-          board: user.board,
-          responseStyle: preferences.responseStyle,
-          stepByStep: preferences.stepByStep,
-          language: preferences.language,
-        }),
+body: JSON.stringify({
+            message: userMessage.content,
+            class: user.class,
+            board: user.board,
+            responseStyle: preferences.responseStyle,
+            stepByStep: preferences.stepByStep,
+            language: preferences.language,
+            studyMode: studyMode,
+          }),
       });
 
       const data = await res.json();
@@ -622,6 +701,96 @@ export default function ChatPage() {
     }
   };
 
+  // Focus visible styles for better keyboard navigation
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      *:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+      }
+      button:focus-visible,
+      textarea:focus-visible,
+      input:focus-visible,
+      [role="button"]:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
+  const handleSave = async (msgId: string, content: string) => {
+    if (!user?.uid || !activeConversationId) return;
+    if (savedMsgIds.has(msgId)) {
+      // Would need to find the savedItemId to unsave - for now just toggle local state
+      // In a full implementation, we'd query the savedItems collection
+      setSavedMsgIds((prev) => {
+        const next = new Set(prev);
+        next.delete(msgId);
+        return next;
+      });
+      return;
+    }
+    try {
+      await saveItem(user.uid, content, "explanation", msgId, activeConversationId);
+      setSavedMsgIds((prev) => {
+        const next = new Set(prev);
+        next.add(msgId);
+        return next;
+      });
+    } catch {
+      setChatError("Failed to save. Please try again.");
+      setTimeout(() => setChatError(null), 4000);
+    }
+  };
+
+  const handleSimilarQuestion = async (msgId: string, content: string) => {
+    if (!user || !activeConversationId || !user.class || !user.board || isTyping) return;
+    setGeneratingSimilar((prev) => {
+      const next = new Set(prev);
+      next.add(msgId);
+      return next;
+    });
+    try {
+      const token = await getFirebaseIdToken();
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          message: `Generate a similar practice question based on this explanation. Make it a clear, standalone question that tests the same concept. Do not provide the answer, just the question.\n\nExplanation: ${content}`,
+          class: user.class,
+          board: user.board,
+          responseStyle: preferences.responseStyle,
+          stepByStep: preferences.stepByStep,
+          language: preferences.language,
+          studyMode,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate question");
+      const question = data.answer;
+      // Send the generated question as a user message to continue the conversation
+      setInput(question);
+      sendMessage();
+    } catch {
+      setChatError("Failed to generate similar question. Please try again.");
+      setTimeout(() => setChatError(null), 4000);
+    } finally {
+      setGeneratingSimilar((prev) => {
+        const next = new Set(prev);
+        next.delete(msgId);
+        return next;
+      });
+    }
+  };
+
   const sidebarContent = (
     <div className="flex flex-col h-full">
       <div className="p-3 border-b border-border/50">
@@ -630,7 +799,7 @@ export default function ChatPage() {
           whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
           whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
           onClick={startNewChat}
-          className="w-full flex items-center justify-center gap-2 bg-gradient-to-br from-purple-500 to-indigo-500 text-white rounded-xl py-2.5 font-medium text-sm hover:shadow-lg transition-shadow"
+          className="w-full flex items-center justify-center gap-2 bg-gradient-to-br from-primary to-indigo-600 text-white rounded-xl py-2.5 font-medium text-sm hover:shadow-lg transition-shadow"
         >
           <PlusIcon className="w-4 h-4" />
           New Chat
@@ -798,7 +967,7 @@ export default function ChatPage() {
           <motion.div
             initial={{ opacity: 0, y: -5 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-3 p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm"
+            className="mb-3 p-3 rounded-xl bg-red-950/30 border border-red-800/50 text-red-400 text-sm"
           >
             {chatError}
           </motion.div>
@@ -815,7 +984,7 @@ export default function ChatPage() {
           >
             <Bars3Icon className="w-5 h-5" />
           </button>
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center shadow-md flex-shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center shadow-md flex-shrink-0">
             <SparklesIcon className="w-5 h-5 text-white" />
           </div>
           <div className="min-w-0">
@@ -841,6 +1010,31 @@ export default function ChatPage() {
           </div>
         </motion.div>
 
+        {/* Study Mode Selector */}
+        <motion.div
+          variants={animationsEnabled ? { hidden: { opacity: 0, y: -8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3 } } } : undefined}
+          className="mb-3"
+        >
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:px-6">
+            {studyModes.map((mode) => (
+              <button
+                key={mode.id}
+                onClick={() => setStudyMode(studyMode === mode.id ? null : mode.id)}
+                className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
+                  studyMode === mode.id
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "bg-card-subtle text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+                }`}
+                aria-pressed={studyMode === mode.id}
+                title={mode.description}
+              >
+                <mode.icon className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{mode.label}</span>
+              </button>
+            ))}
+          </div>
+        </motion.div>
+
         {/* Messages area */}
         <div ref={chatContainerRef} className="flex-1 overflow-y-auto space-y-3 pb-6">
           {!messagesLoaded && messages.length === 0 && (
@@ -851,13 +1045,13 @@ export default function ChatPage() {
                   <p>Loading messages...</p>
                 </div>
               ) : (
-                <ChatEmptyState />
+                <ChatEmptyState studyModes={studyModes} />
               )}
             </div>
           )}
 
           {messagesLoaded && messages.length === 0 && !activeConversationId && (
-            <ChatEmptyState />
+            <ChatEmptyState studyModes={studyModes} />
           )}
 
           <AnimatePresence initial={false}>
@@ -883,30 +1077,83 @@ export default function ChatPage() {
                   )}
                   <div className={`group relative ${isUser ? "max-w-[75%] sm:max-w-[65%]" : "max-w-[75%] sm:max-w-[65%]"}`}>
                     <div
-                      className={`px-4 py-3 whitespace-pre-wrap text-sm ${
+                      className={`px-4 py-3 whitespace-pre-wrap text-sm prose prose-sm max-w-none ${
                         isUser
-                          ? "bg-gradient-to-br from-purple-500 to-indigo-500 text-white rounded-2xl rounded-tr-sm"
+                          ? "bg-gradient-to-br from-primary to-indigo-600 text-white rounded-2xl rounded-tr-sm"
                           : "glass card-subtle text-foreground rounded-2xl rounded-tl-sm"
                       }`}
                     >
-                      {msg.content}
+                      <div className="prose prose-sm max-w-none">
+                        {msg.content.split('\n\n').map((paragraph, idx) => (
+                          <p key={idx} className="mb-2 last:mb-0">
+                            {paragraph.split('\n').map((line, lineIdx) => (
+                              <React.Fragment key={lineIdx}>
+                                {line.trim().startsWith('```') ? (
+                                  <pre key={lineIdx} className="bg-foreground/5 rounded-lg p-3 overflow-x-auto my-2">
+                                    <code className="text-xs font-mono text-foreground/90">{line.replace(/```/g, '')}</code>
+                                  </pre>
+                                ) : line.trim().startsWith('**') && line.trim().endsWith('**') ? (
+                                  <strong key={lineIdx} className="block mb-1">{line.replace(/\*\*/g, '')}</strong>
+                                ) : (
+                                  <span key={lineIdx}>{line}</span>
+                                )}
+                                {lineIdx < paragraph.split('\n').length - 1 && <br />}
+                              </React.Fragment>
+                            ))}
+                          </p>
+                        ))}
+                      </div>
                     </div>
                     {!isUser && (
-                      <button
-                        onClick={() => copyToClipboard(msg.content, msg.id, setCopiedMsgId)}
-                        className={`mt-1 ml-0.5 p-1.5 rounded-md flex items-center gap-1 text-xs transition-all ${
-                          copiedMsgId === msg.id
-                            ? "opacity-100 text-primary"
-                            : "opacity-0 group-hover:opacity-100 text-foreground/40 hover:text-foreground hover:bg-foreground/5"
-                        }`}
-                        aria-label="Copy response"
-                        title={copiedMsgId === msg.id ? "Copied" : "Copy response"}
-                      >
-                        <DocumentDuplicateIcon className="w-3.5 h-3.5" />
-                        <span className="font-medium">
-                          {copiedMsgId === msg.id ? "Copied" : "Copy"}
-                        </span>
-                      </button>
+                      <div className="flex items-center gap-2 mt-2">
+                        <button
+                          onClick={() => copyToClipboard(msg.content, msg.id, setCopiedMsgId)}
+                          className={`p-2 rounded-lg flex items-center gap-1.5 text-xs transition-all min-h-[44px] min-w-[44px] ${
+                            copiedMsgId === msg.id
+                              ? "bg-primary/10 text-primary"
+                              : "text-primary bg-primary/10 hover:text-white hover:bg-primary/80 transition-colors"
+                          }`}
+                          aria-label="Copy response"
+                          title={copiedMsgId === msg.id ? "Copied" : "Copy response"}
+                        >
+                          <DocumentDuplicateIcon className="w-4 h-4" />
+                          <span className="font-medium hidden sm:inline">
+                            {copiedMsgId === msg.id ? "Copied" : "Copy"}
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => handleSave(msg.id, msg.content)}
+                          disabled={!activeConversationId}
+                          className={`p-2 rounded-lg flex items-center gap-1.5 text-xs transition-all min-h-[44px] min-w-[44px] ${
+                            savedMsgIds.has(msg.id)
+                              ? "bg-primary/10 text-primary"
+                              : "text-primary bg-primary/10 hover:text-white hover:bg-primary/80 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          }`}
+                          aria-label={savedMsgIds.has(msg.id) ? "Unsave" : "Save"}
+                          title={savedMsgIds.has(msg.id) ? "Saved" : "Save"}
+                        >
+                          <BookmarkIcon className="w-4 h-4" />
+                          <span className="font-medium hidden sm:inline">
+                            {savedMsgIds.has(msg.id) ? "Saved" : "Save"}
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => handleSimilarQuestion(msg.id, msg.content)}
+                          disabled={!activeConversationId || isTyping || generatingSimilar.has(msg.id)}
+                          className={`p-2 rounded-lg flex items-center gap-1.5 text-xs transition-all min-h-[44px] min-w-[44px] ${
+                            generatingSimilar.has(msg.id)
+                              ? "bg-primary/10 text-primary cursor-wait"
+                              : "text-primary bg-primary/10 hover:text-white hover:bg-primary/80 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          }`}
+                          aria-label="Similar Question"
+                          title={generatingSimilar.has(msg.id) ? "Generating..." : "Similar Question"}
+                        >
+                          <ArrowPathIcon className="w-4 h-4" />
+                          <span className="font-medium hidden sm:inline">
+                            {generatingSimilar.has(msg.id) ? "Generating..." : "Similar"}
+                          </span>
+                        </button>
+                      </div>
                     )}
                   </div>
                 </motion.div>
@@ -921,28 +1168,31 @@ export default function ChatPage() {
               className="flex gap-2.5 justify-start"
             >
               <div className="flex-shrink-0 mt-1">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center shadow-md">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center shadow-md">
                   <SparklesIcon className="w-4 h-4 text-white" />
                 </div>
               </div>
               <div className="glass card-subtle px-4 py-3 rounded-2xl rounded-tl-sm">
-                <div className="flex items-center gap-1.5">
-                  {[0, 1, 2].map((i) => (
-                    <motion.span
-                      key={i}
-                      className="w-2 h-2 bg-foreground/40 rounded-full"
-                      animate={animationsEnabled ? {
-                        y: [0, -4, 0],
-                        opacity: [0.4, 1, 0.4],
-                      } : {}}
-                      transition={animationsEnabled ? {
-                        duration: 0.6,
-                        repeat: Infinity,
-                        delay: i * 0.15,
-                        ease: "easeInOut",
-                      } : {}}
-                    />
-                  ))}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-foreground/60">Padhai Buddy is thinking</span>
+                  <div className="flex items-center gap-1.5">
+                    {[0, 1, 2].map((i) => (
+                      <motion.span
+                        key={i}
+                        className="w-2 h-2 bg-primary/60 rounded-full"
+                        animate={animationsEnabled ? {
+                          y: [0, -4, 0],
+                          opacity: [0.4, 1, 0.4],
+                        } : {}}
+                        transition={animationsEnabled ? {
+                          duration: 0.6,
+                          repeat: Infinity,
+                          delay: i * 0.15,
+                          ease: "easeInOut",
+                        } : {}}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -956,37 +1206,50 @@ export default function ChatPage() {
           variants={chatItemVariants}
           className="border-t border-border/50 pt-3 pb-2"
         >
-          <div className="flex items-end gap-2 glass-strong rounded-2xl px-3 py-2 focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Type your question here..."
-              className="flex-1 resize-none bg-transparent border-none focus:outline-none focus:ring-0 text-sm min-h-[40px] max-h-[160px] py-2"
-              rows={1}
-              maxLength={1000}
-              disabled={isTyping}
-            />
-            <Link
-              href="/dashboard/photo-doubt"
-              className="p-2.5 rounded-xl text-foreground/50 hover:text-primary hover:bg-primary/10 transition-colors flex-shrink-0 self-end mb-0.5"
-              aria-label="Photo doubt"
-              title="Solve a photo doubt"
-            >
-              <PhotoIcon className="w-5 h-5" />
-            </Link>
-            <motion.button
-              whileHover={animationsEnabled ? { scale: 1.08 } : undefined}
-              whileTap={animationsEnabled ? { scale: 0.92 } : undefined}
-              onClick={sendMessage}
-              disabled={!input.trim() || isTyping}
-              className="p-2.5 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg transition-shadow flex-shrink-0 self-end mb-0.5"
-              aria-label="Send message"
-              title="Send"
-            >
-              <PaperAirplaneIcon className="w-5 h-5" />
-            </motion.button>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-end gap-2 glass-strong rounded-2xl px-3 py-2 focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Type your question here..."
+                className="flex-1 resize-none bg-transparent border-none focus:outline-none focus:ring-0 text-sm min-h-[40px] max-h-[160px] py-2 pr-8"
+                rows={1}
+                maxLength={1000}
+                disabled={isTyping}
+              />
+              <Link
+                href="/dashboard/photo-doubt"
+                className="p-2.5 rounded-xl text-foreground/50 hover:text-primary hover:bg-primary/10 transition-colors flex-shrink-0 self-end mb-0.5"
+                aria-label="Photo doubt"
+                title="Solve a photo doubt"
+              >
+                <PhotoIcon className="w-5 h-5" />
+              </Link>
+              <motion.button
+                whileHover={animationsEnabled ? { scale: 1.08 } : undefined}
+                whileTap={animationsEnabled ? { scale: 0.92 } : undefined}
+                onClick={sendMessage}
+                disabled={!input.trim() || isTyping}
+                className="p-2.5 rounded-xl bg-gradient-to-br from-primary to-indigo-600 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg transition-shadow flex-shrink-0 self-end mb-0.5"
+                aria-label="Send message"
+                title="Send"
+              >
+                <PaperAirplaneIcon className="w-5 h-5" />
+              </motion.button>
+            </div>
+            <div className="flex items-center justify-between px-2 text-[10px] text-foreground/40">
+              <span>{input.length}/1000</span>
+              <span className="flex items-center gap-1">
+                <kbd className="px-1.5 py-0.5 text-[9px] bg-foreground/5 rounded text-foreground/60 border border-border/50">Enter</kbd>
+                <span className="text-foreground/40">to send</span>
+                <kbd className="px-1.5 py-0.5 text-[9px] bg-foreground/5 rounded text-foreground/60 border border-border/50 ml-1">Shift</kbd>
+                <kbd className="px-1.5 py-0.5 text-[9px] bg-foreground/5 rounded text-foreground/60 border border-border/50 ml-0.5">+</kbd>
+                <kbd className="px-1.5 py-0.5 text-[9px] bg-foreground/5 rounded text-foreground/60 border border-border/50 ml-0.5">Enter</kbd>
+                <span className="text-foreground/40">for new line</span>
+              </span>
+            </div>
           </div>
         </motion.div>
       </div>
@@ -1085,3 +1348,415 @@ export default function ChatPage() {
     </motion.div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

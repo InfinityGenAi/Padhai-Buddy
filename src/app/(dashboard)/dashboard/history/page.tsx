@@ -60,7 +60,7 @@ function getConversationTitle(title: string): string {
 
 export default function HistoryPage() {
   const { user, preferences } = useAuth();
-  const [tab, setTab] = useState<"doubts" | "quizzes">("doubts");
+  const [tab, setTab] = useState<"doubts" | "chats">("doubts");
   const [doubts, setDoubts] = useState<Doubt[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -392,15 +392,15 @@ export default function HistoryPage() {
         {tab === "doubts" && doubts.length > 0 && (
           <button
             onClick={() => setDeleteAllOpen(true)}
-            className="text-xs font-medium text-red-500 hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+            className="text-xs font-medium text-red-500 hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-950/20 transition-colors"
           >
             Delete All
           </button>
         )}
-        {tab === "quizzes" && conversations.length > 0 && (
+        {tab === "chats" && conversations.length > 0 && (
           <button
             onClick={() => setDeleteAllChatsOpen(true)}
-            className="text-xs font-medium text-red-500 hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+            className="text-xs font-medium text-red-500 hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-950/20 transition-colors"
           >
             Delete All
           </button>
@@ -415,10 +415,10 @@ export default function HistoryPage() {
           Doubts ({doubts.length})
         </button>
         <button
-          onClick={() => setTab("quizzes")}
-          className={tabButtonClass(tab === "quizzes")}
+          onClick={() => setTab("chats")}
+          className={tabButtonClass(tab === "chats")}
         >
-          Quizzes ({conversations.length})
+          Chats ({conversations.length})
         </button>
       </div>
 
@@ -437,7 +437,7 @@ export default function HistoryPage() {
         <motion.div
           initial={{ opacity: 0, y: -5 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm"
+          className="mb-4 p-3 rounded-xl bg-red-950/30 border border-red-800/50 text-red-400 text-sm"
         >
           {historyError}
         </motion.div>
@@ -500,8 +500,8 @@ export default function HistoryPage() {
                             <span
                               className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                                 doubt.type === "text"
-                                  ? "bg-purple-100 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300"
-                                  : "bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300"
+? "bg-purple-950/30 text-purple-300"
+        : "bg-blue-950/30 text-blue-300"
                               }`}
                             >
                               {doubt.type === "text" ? (
@@ -548,7 +548,7 @@ export default function HistoryPage() {
                             setDeleteConfirmId(doubt.id);
                             setMenuDoubtId(null);
                           }}
-                          className="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-950/20 transition-colors flex items-center gap-2"
                         >
                           <TrashIcon className="w-4 h-4" />
                           Delete
@@ -576,7 +576,7 @@ export default function HistoryPage() {
         </>
       )}
 
-      {tab === "quizzes" && (
+      {tab === "chats" && (
         <>
           {!conversationsLoaded && (
             <div className="space-y-2">
@@ -599,9 +599,9 @@ export default function HistoryPage() {
               className="text-center py-12"
             >
               <ChatBubbleOvalLeftEllipsisIcon className="w-12 h-12 text-foreground/20 mx-auto mb-3" />
-              <p className="text-foreground/60">
-                No quizzes yet. Start a quiz to begin!
-              </p>
+               <p className="text-foreground/60">
+                 No chats yet. Start a chat to begin!
+               </p>
             </motion.div>
           )}
 
@@ -642,7 +642,7 @@ export default function HistoryPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1.5">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-950/30 text-purple-300">
                             <ChatBubbleOvalLeftEllipsisIcon className="w-3 h-3 mr-1" />
                             Chat
                           </span>

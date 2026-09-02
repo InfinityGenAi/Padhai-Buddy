@@ -6,10 +6,13 @@ import AnimatedBackground from "@/components/AnimatedBackground";
 import RequireAuth from "@/components/AuthWrapper";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import SettingsModal from "@/components/SettingsModal";
+import InstallPrompt from "@/components/InstallPrompt";
 import BrandLogo from "@/components/BrandLogo";
 import { SettingsModalProvider, useSettingsModal } from "@/contexts/SettingsModalContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { registerSession, heartbeatSession } from "@/lib/sessions";
+import { getFirestoreDb } from "@/lib/firebase";
+import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
@@ -17,9 +20,13 @@ import {
   Cog6ToothIcon,
   ArrowLeftOnRectangleIcon,
   UserIcon,
+  DevicePhoneMobileIcon,
+  ComputerDesktopIcon,
 } from "@heroicons/react/24/outline";
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
 import { playLogout, playSettings } from "@/lib/sounds";
+import { isAndroid, isWindows, isApp } from "@/lib/platform";
+import type { Notification } from "@/types";
 
 function DashboardInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -31,10 +38,11 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [notifications] = useState<{ id: string; text: string; time: string }[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const sessionRegisteredRef = useRef(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     if (!user?.uid || sessionRegisteredRef.current) return;
@@ -52,6 +60,41 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
       cancelled = true;
       clearInterval(interval);
     };
+  }, [user?.uid]);
+
+  // Notifications listener
+  useEffect(() => {
+    if (!user?.uid) return;
+    const db = getFirestoreDb();
+    if (!db) return;
+
+    const q = query(
+      collection(db, "users", user.uid, "notifications"),
+      orderBy("time", "desc"),
+      // Limit to 50 most recent notifications
+    );
+
+    const unsub = onSnapshot(q, (snapshot) => {
+      const items: Notification[] = [];
+      let unread = 0;
+      snapshot.forEach((doc) => {
+        const data = doc.data() as Notification;
+        items.push({
+          id: doc.id,
+          text: data.text,
+          time: data.time,
+          read: data.read ?? false,
+          type: data.type,
+        });
+        if (!((data.read ?? false) as boolean)) {
+          unread++;
+        }
+      });
+      setNotifications(items);
+      setUnreadCount(unread);
+    });
+
+    return () => unsub();
   }, [user?.uid]);
 
   useEffect(() => {
@@ -163,7 +206,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
                     whileHover={animationsEnabled ? { scale: 1.05 } : undefined}
                     whileTap={animationsEnabled ? { scale: 0.95 } : undefined}
                     onClick={() => setProfileOpen((prev) => !prev)}
-                    className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 cursor-pointer focus-ring"
+                    className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-teal-500 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 cursor-pointer focus-ring"
                     aria-label="Profile menu"
                     aria-expanded={profileOpen}
                   >
@@ -193,9 +236,27 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
                           Settings
                         </button>
                         <div className="border-t border-border/50" />
+                        {isApp() ? (
+                          <p className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-foreground/70 hover:bg-foreground/5 transition-colors cursor-default">
+                            Installed
+                          </p>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              if (isAndroid()) {
+                                window.location.href = '/download/android';
+                              } else if (isWindows()) {
+                                window.location.href = '/download/windows';
+                              }
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium text-foreground/70 hover:bg-foreground/5 transition-colors rounded-lg"
+                          >
+                            Download App
+                          </button>
+                        )}
                         <button
                           onClick={handleLogout}
-                          className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-400 hover:bg-red-950/20 transition-colors"
                         >
                           <ArrowLeftOnRectangleIcon className="w-4 h-4" />
                           Logout
@@ -215,7 +276,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
                   whileHover={animationsEnabled ? { scale: 1.05 } : undefined}
                   whileTap={animationsEnabled ? { scale: 0.95 } : undefined}
                   onClick={() => setProfileOpen((prev) => !prev)}
-                  className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 cursor-pointer"
+                  className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-teal-500 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 cursor-pointer"
                   aria-label="Account"
                   aria-expanded={profileOpen}
                 >
@@ -239,6 +300,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
         <BottomNav />
       </div>
       <SettingsModal isOpen={isOpen} onClose={close} />
+      <InstallPrompt />
     </>
   );
 }

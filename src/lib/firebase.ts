@@ -1,6 +1,6 @@
 import { initializeApp, getApps, FirebaseApp } from "firebase/app";
-import { getAuth, Auth, setPersistence, browserLocalPersistence } from "firebase/auth";
-import { getFirestore, Firestore } from "firebase/firestore";
+import { getAuth, Auth, setPersistence, browserLocalPersistence, connectAuthEmulator } from "firebase/auth";
+import { getFirestore, Firestore, connectFirestoreEmulator } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -15,6 +15,10 @@ let auth: Auth | undefined;
 let db: Firestore | undefined;
 let initPromise: Promise<void> | undefined;
 
+function shouldUseEmulators(): boolean {
+  return process.env.NEXT_PUBLIC_USE_EMULATORS === "true";
+}
+
 async function initializeFirebase(): Promise<void> {
   if (typeof window === "undefined") return;
 
@@ -25,12 +29,18 @@ async function initializeFirebase(): Promise<void> {
   db = getFirestore(app);
   if (!auth) throw new Error("Firebase Auth initialization failed");
 
+  if (shouldUseEmulators()) {
+    const authHost = process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST || "localhost:9099";
+    const firestoreHost = process.env.NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST || "localhost:8080";
+    const [firestoreHostname, firestorePortStr] = firestoreHost.split(":");
+    const firestorePort = firestorePortStr ? Number(firestorePortStr) : 8080;
+    connectAuthEmulator(auth, `http://${authHost}`, { disableWarnings: true });
+    connectFirestoreEmulator(db, firestoreHostname, firestorePort);
+  }
+
   try {
     await setPersistence(auth, browserLocalPersistence);
   } catch (err) {
-    // Persistence is a progressive enhancement. Await it so initialization
-    // reflects reality, but a transient failure must not mark it as applied
-    // forever — the next initialization attempt retries it.
     console.warn("[Firebase] Local persistence could not be enabled:", err);
   }
 }
@@ -41,8 +51,6 @@ function ensureInitialized(): Promise<void> {
 
   initPromise = initializeFirebase().catch((err) => {
     console.error("[Firebase] Initialization error:", err);
-    // Do not cache a rejected promise forever: clear it so future callers
-    // can retry initialization instead of failing silently.
     initPromise = undefined;
     throw err;
   });

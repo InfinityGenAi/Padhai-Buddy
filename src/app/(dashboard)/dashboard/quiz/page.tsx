@@ -24,7 +24,7 @@ export default function QuizPage() {
   const [subject, setSubject] = useState("Maths");
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [numQuestions, setNumQuestions] = useState(5);
-  const [loading, setLoading] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [attempt, setAttempt] = useState<QuizAttempt | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -41,7 +41,7 @@ export default function QuizPage() {
       return;
     }
 
-    setLoading(true);
+    setGenerating(true);
     setError(null);
 
     try {
@@ -72,7 +72,7 @@ export default function QuizPage() {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to generate quiz");
     } finally {
-      setLoading(false);
+      setGenerating(false);
     }
   };
 
@@ -117,7 +117,7 @@ export default function QuizPage() {
 
   const handleSubmit = async () => {
     if (!attempt) return;
-    setLoading(true);
+    setGenerating(true);
     setError(null);
     try {
       const token = await (await import("@/lib/auth-utils")).getFirebaseIdToken();
@@ -160,7 +160,7 @@ export default function QuizPage() {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to submit quiz");
     } finally {
-      setLoading(false);
+      setGenerating(false);
     }
   };
 
@@ -187,7 +187,7 @@ export default function QuizPage() {
         <motion.div
           initial={{ opacity: 0, y: -5 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm"
+          className="p-3 rounded-xl bg-red-950/30 border border-red-800/50 text-red-400 text-sm"
         >
           {error}
         </motion.div>
@@ -252,10 +252,10 @@ export default function QuizPage() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={generateQuiz}
-              disabled={loading || !subject.trim()}
+              disabled={generating || !subject.trim()}
               className="w-full py-3 btn-primary rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {loading ? (
+              {generating ? (
                 <>
                   <SparklesIcon className="w-5 h-5 animate-pulse" />
                   Generating...
@@ -302,9 +302,9 @@ export default function QuizPage() {
                   let colorClass = "bg-foreground/5 hover:bg-foreground/8";
                   if (selectedIndex !== null) {
                     if (idx === currentQuestion.correctIndex) {
-                      colorClass = "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800";
+                      colorClass = "bg-green-950/30 border border-green-800/50";
                     } else if (idx === selectedIndex) {
-                      colorClass = "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800";
+                      colorClass = "bg-red-950/30 border border-red-800/50";
                     }
                   }
                   return (
@@ -345,14 +345,15 @@ export default function QuizPage() {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handleSubmit}
-                    className="px-4 py-2 btn-primary rounded-xl text-sm font-medium"
+                    disabled={generating}
+                    className="px-4 py-2 btn-primary rounded-xl text-sm font-medium disabled:opacity-50"
                   >
-                    Submit Quiz
+                    {generating ? "Submitting..." : "Submit Quiz"}
                   </motion.button>
                 ) : (
                   <button
                     onClick={handleNext}
-                    disabled={selectedIndex === null}
+                    disabled={selectedIndex === null || generating}
                     className="px-4 py-2 rounded-xl text-sm font-medium bg-foreground/5 hover:bg-foreground/8 disabled:opacity-50"
                   >
                     Next

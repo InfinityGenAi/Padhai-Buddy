@@ -27,26 +27,6 @@ export default function RootLayout({
       <body
         className={`${poppins.variable} min-h-screen h-full m-0 bg-background text-foreground antialiased`}
       >
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var raw = localStorage.getItem('padhai-buddy-preferences');
-                  if (raw) {
-                    var prefs = JSON.parse(raw);
-                    var theme = prefs.theme || 'system';
-                    if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                      document.documentElement.classList.add('dark');
-                    }
-                  } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                    document.documentElement.classList.add('dark');
-                  }
-                } catch(e) {}
-              })();
-            `,
-          }}
-        />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

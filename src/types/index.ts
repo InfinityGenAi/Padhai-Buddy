@@ -41,7 +41,6 @@ export interface UserPreferences {
     study: boolean;
   };
   animationsEnabled: boolean;
-  theme: "light" | "dark" | "system";
   notificationsEnabled: boolean;
   enterToSend: boolean;
   autoScroll: boolean;
@@ -189,4 +188,21 @@ export interface ProgressStats {
   plansCompleted: number;
   plansTotal: number;
   dailyActivity: { day: string; value: number }[];
+}
+
+export interface SavedItem {
+  id: string;
+  content: string;
+  type: "explanation" | "question";
+  sourceMessageId: string;
+  conversationId: string;
+  createdAt: number;
+}
+
+export interface Notification {
+  id: string;
+  text: string;
+  time: number;
+  read: boolean;
+  type?: "info" | "warning" | "success" | "error";
 }

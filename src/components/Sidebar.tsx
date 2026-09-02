@@ -4,18 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ChatBubbleLeftEllipsisIcon,
-  PhotoIcon,
   HomeIcon,
+  BookOpenIcon,
+  DocumentTextIcon,
+  ChartBarIcon,
+  UserIcon,
   Cog6ToothIcon,
   ArrowLeftOnRectangleIcon,
-  BookOpenIcon,
-  SparklesIcon,
-  DocumentTextIcon,
-  CalendarIcon,
-  SpeakerWaveIcon,
-  TrophyIcon,
-  BoltIcon,
-  UserIcon,
+  Squares2X2Icon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettingsModal } from "@/contexts/SettingsModalContext";
@@ -24,19 +20,13 @@ import { playLogout, playSettings } from "@/lib/sounds";
 import BrandLogo from "./BrandLogo";
 
 const mainNavItems = [
-  { name: "Dashboard", href: "/dashboard", icon: HomeIcon, available: true },
-  { name: "AI Chat", href: "/dashboard/chat", icon: ChatBubbleLeftEllipsisIcon, available: true },
-  { name: "Photo Doubt", href: "/dashboard/photo-doubt", icon: PhotoIcon, available: true },
-  { name: "Quiz", href: "/dashboard/quiz", icon: BookOpenIcon, available: true },
-  { name: "Flashcards", href: "/dashboard/flashcards", icon: SparklesIcon, available: true },
-  { name: "Notes", href: "/dashboard/notes", icon: DocumentTextIcon, available: true },
-  { name: "Planner", href: "/dashboard/planner", icon: CalendarIcon, available: true },
-  { name: "Timer", href: "/dashboard/timer", icon: BoltIcon, available: true },
-  { name: "Resources", href: "/dashboard/resources", icon: SpeakerWaveIcon, available: true },
-  { name: "Leaderboard", href: "/dashboard/leaderboard", icon: TrophyIcon, available: true },
-  { name: "Profile", href: "/dashboard/profile", icon: UserIcon, available: true },
-  { name: "Settings", href: "#", icon: Cog6ToothIcon, available: true, isAction: true },
-  { name: "Logout", href: "#", icon: ArrowLeftOnRectangleIcon, available: true, isAction: true },
+  { name: "Home", href: "/dashboard", icon: HomeIcon, available: true },
+  { name: "Learn", href: "/dashboard/chat", icon: ChatBubbleLeftEllipsisIcon, available: true },
+  { name: "Practice", href: "/dashboard/quiz", icon: BookOpenIcon, available: true },
+  { name: "Organize", href: "/dashboard/notes", icon: DocumentTextIcon, available: true },
+  { name: "Track", href: "/dashboard/progress", icon: ChartBarIcon, available: true },
+  { name: "More", href: "/dashboard/more", icon: Squares2X2Icon, available: true, group: "more", isAction: true },
+  { name: "Account", href: "/dashboard/profile", icon: UserIcon, available: true, group: "account", isAction: true },
 ];
 
 export default function Sidebar() {
@@ -99,7 +89,7 @@ export default function Sidebar() {
                   {isActive && (
                     <motion.div
                       layoutId="sidebar-indicator"
-                      className="ml-auto w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_6px_rgba(124,58,237,0.45)]"
+                      className="ml-auto w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_6px_rgba(99,102,241,0.45)]"
                     />
                   )}
                 </motion.div>

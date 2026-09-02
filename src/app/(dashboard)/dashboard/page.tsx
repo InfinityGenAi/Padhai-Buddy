@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -14,12 +14,20 @@ import {
   BookOpenIcon,
   Squares2X2Icon,
   ChartBarIcon,
-  DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import { getFirestoreDb } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, doc, onSnapshot, query, orderBy, deleteDoc } from "firebase/firestore";
 import { playTaskComplete } from "@/lib/sounds";
 import type { Doubt, StudyPlan } from "@/types";
+import {
+  AiStudyBar,
+  QuickStudy,
+  ContinueLearning,
+  ReviewToday,
+  WeakTopics,
+  ThisWeekOverview,
+  RecentActivity,
+} from "@/components/dashboard";
 
 async function handleTogglePlan(uid: string | undefined, plan: StudyPlan) {
   const db = getFirestoreDb();
@@ -107,6 +115,16 @@ export default function DashboardPage() {
   const [addingPlan, setAddingPlan] = useState(false);
   const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
+
+  // === Topic Mastery state ===
+  const [topicMastery, setTopicMastery] = useState<
+    { subject: string; topic: string; mastery: number; totalQuestions: number; correctAnswers: number; lastPracticed: number }[]
+  >([]);
+
+  // === Mistake Bank state ===
+  const [mistakeBank, setMistakeBank] = useState<
+    { subject: string; topic: string; question: string; userAnswer: string; correctAnswer: string; explanation: string; createdAt: number }[]
+  >([]);
 
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
@@ -207,13 +225,194 @@ export default function DashboardPage() {
     return () => unsub();
   }, [user?.uid]);
 
+  // === Topic Mastery listener ===
+  useEffect(() => {
+    if (!user?.uid) return;
+    const db = getFirestoreDb();
+    if (!db) return;
+
+    const unsub = onSnapshot(
+      collection(db, "users", user.uid, "topicMastery"),
+      (snapshot) => {
+        const data: {
+          subject: string;
+          topic: string;
+          mastery: number;
+          totalQuestions: number;
+          correctAnswers: number;
+          lastPracticed: number;
+        }[] = [];
+        snapshot.forEach((doc) => {
+          const d = doc.data();
+          data.push({
+            subject: d.subject || "General",
+            topic: d.topic || "General",
+            mastery: d.mastery || 0,
+            totalQuestions: d.totalQuestions || 0,
+            correctAnswers: d.correctAnswers || 0,
+            lastPracticed: d.lastPracticed || 0,
+          });
+        });
+        setTopicMastery(data);
+      },
+      (error) => {
+        console.error("[DASHBOARD] topicMastery listener error:", error);
+        setTopicMastery([]);
+      }
+    );
+
+    return () => unsub();
+  }, [user?.uid]);
+
+  // === Mistake Bank listener ===
+  useEffect(() => {
+    if (!user?.uid) return;
+    const db = getFirestoreDb();
+    if (!db) return;
+
+    const unsub = onSnapshot(
+      collection(db, "users", user.uid, "mistakeBank"),
+      (snapshot) => {
+        const data: {
+          subject: string;
+          topic: string;
+          question: string;
+          userAnswer: string;
+          correctAnswer: string;
+          explanation: string;
+          createdAt: number;
+        }[] = [];
+        snapshot.forEach((doc) => {
+          const d = doc.data();
+          data.push({
+            subject: d.subject || "General",
+            topic: d.topic || "General",
+            question: d.question || "",
+            userAnswer: d.userAnswer || "",
+            correctAnswer: d.correctAnswer || "",
+            explanation: d.explanation || "",
+            createdAt: d.createdAt || 0,
+          });
+        });
+        setMistakeBank(data);
+      },
+      (error) => {
+        console.error("[DASHBOARD] mistakeBank listener error:", error);
+        setMistakeBank([]);
+      }
+    );
+
+    return () => unsub();
+  }, [user?.uid]);
+
   const today = new Date().toISOString().split("T")[0];
   const todayPlans = studyPlans.filter((p) => p.plannedDate === today);
   const completedToday = todayPlans.filter((p) => p.completed).length;
-  const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / todayPlans.length) * 100) : 0;
+const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / todayPlans.length) * 100) : 0;
+
+  const continueStudySet = topicMastery.length > 0
+    ? [...topicMastery].sort((a, b) => (b.lastPracticed || 0) - (a.lastPracticed || 0))[0]
+    : undefined;
+  const reviewTodayItems = mistakeBank
+    .filter((m) => !m.explanation || m.explanation.trim() === "")
+    .slice(0, 5);
+  const weakTopics = topicMastery
+    .filter((t) => t.mastery < 60 && t.totalQuestions >= 3)
+    .sort((a, b) => a.mastery - b.mastery)
+    .slice(0, 5);
+
+  const thisWeekOverviewStats = useMemo(() => {
+    const weekAgo = new Date().getTime() - 7 * 24 * 60 * 60 * 1000;
+    const thisWeekStudySessions = studyPlans.filter((p) => (p.createdAt || 0) >= weekAgo);
+    const thisWeekSubjects = [...new Set(thisWeekStudySessions.map((p) => p.subject).filter(Boolean))];
+    return {
+      totalMinutes: weeklyStudyMinutes,
+      sessions: thisWeekStudySessions.length,
+      subjects: thisWeekSubjects.length > 0 ? thisWeekSubjects : ["General"],
+    };
+  }, [studyPlans, weeklyStudyMinutes]);
+
+  // === Next-Best-Action calculation ===
+  const nextBestAction = useMemo(() => {
+    // Priority 1: Unreviewed mistakes
+    const unreviewedMistakes = mistakeBank.filter(
+      (m) => !m.explanation || m.explanation.trim() === ""
+    );
+    if (unreviewedMistakes.length > 0) {
+      const count = unreviewedMistakes.length;
+      const latest = unreviewedMistakes[0];
+      return {
+        type: "review-mistakes" as const,
+        label: `Review ${count} unreviewed mistake${count > 1 ? "s" : ""}`,
+        description: `Start with "${latest.topic}" — ${latest.question.slice(0, 50)}${latest.question.length > 50 ? "…" : ""}`,
+        href: "/dashboard/photo-doubt",
+        icon: PhotoIcon,
+        colorClass: "text-red-400",
+        bgClass: "bg-red-950/30",
+        borderClass: "border-red-800/50",
+      };
+    }
+
+    // Priority 2: Weak topics (mastery < 60, >= 3 questions)
+    if (weakTopics.length > 0) {
+      const weakest = weakTopics[0];
+      return {
+        type: "weak-topic" as const,
+        label: `Strengthen "${weakest.topic}"`,
+        description: `${weakest.mastery}% mastery in ${weakest.subject} — practice to improve`,
+        href: `/dashboard/quiz?topic=${encodeURIComponent(weakest.topic)}&subject=${encodeURIComponent(weakest.subject)}`,
+        icon: BookOpenIcon,
+        colorClass: "text-amber-400",
+        bgClass: "bg-amber-950/30",
+        borderClass: "border-amber-800/50",
+      };
+    }
+
+    // Priority 3: Incomplete today's plan
+    const pendingToday = todayPlans.filter((p) => !p.completed);
+    if (pendingToday.length > 0) {
+      const nextTask = pendingToday[0];
+      return {
+        type: "pending-plan" as const,
+        label: `Complete "${nextTask.title}"`,
+        description: `${nextTask.subject} — ${nextTask.durationMinutes} min task pending today`,
+        href: "/dashboard/planner",
+        icon: CalendarIcon,
+        colorClass: "text-blue-400",
+        bgClass: "bg-blue-950/30",
+        borderClass: "border-blue-800/50",
+      };
+    }
+
+    // Priority 4: Continue learning from recently practiced topic
+    if (continueStudySet) {
+      return {
+        type: "continue-learning" as const,
+        label: `Continue "${continueStudySet.topic}"`,
+        description: `${continueStudySet.subject} — ${continueStudySet.mastery}% mastery, keep building`,
+        href: "/dashboard/ai-tutor",
+        icon: LightBulbIcon,
+        colorClass: "text-indigo-400",
+        bgClass: "bg-indigo-950/30",
+        borderClass: "border-indigo-800/50",
+      };
+    }
+
+    // Priority 5: Default - start a quiz
+    return {
+      type: "start-quiz" as const,
+      label: "Start a quiz",
+      description: "Test your knowledge and build mastery",
+      href: "/dashboard/quiz",
+      icon: BookOpenIcon,
+      colorClass: "text-teal-400",
+      bgClass: "bg-teal-950/30",
+      borderClass: "border-teal-800/50",
+    };
+  }, [mistakeBank, weakTopics, todayPlans, continueStudySet]);
 
   const formatStudyTime = (minutes: number) => {
-    if (minutes <= 0) return "—";
+    if (minutes <= 0) return "â€”";
     if (minutes < 60) return `${minutes}m`;
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
@@ -242,21 +441,21 @@ export default function DashboardPage() {
   const stats = [
     {
       label: "Doubts Solved",
-      value: loading ? "…" : String(totalDoubts),
+      value: loading ? "â€¦" : String(totalDoubts),
       sublabel: "All Time",
       change: "+12 this week",
       icon: ChatBubbleLeftEllipsisIcon,
-      colorClass: "text-accent-purple",
-      bgClass: "bg-purple-500/10",
+      colorClass: "text-accent-blue",
+      bgClass: "bg-blue-950/30",
     },
     {
       label: "Study Time",
-      value: loading ? "…" : formatStudyTime(weeklyStudyMinutes),
+      value: loading ? "â€¦" : formatStudyTime(weeklyStudyMinutes),
       sublabel: "This Week",
       change: "+2h this week",
       icon: ClockIcon,
       colorClass: "text-accent-teal",
-      bgClass: "bg-teal-500/10",
+      bgClass: "bg-teal-950/30",
     },
     {
       label: "Quizzes Taken",
@@ -265,7 +464,7 @@ export default function DashboardPage() {
       change: "+5 this week",
       icon: BookOpenIcon,
       colorClass: "text-accent-amber",
-      bgClass: "bg-amber-500/10",
+      bgClass: "bg-amber-950/30",
     },
     {
       label: "Flashcards Learned",
@@ -278,29 +477,16 @@ export default function DashboardPage() {
     },
     {
       label: "Score Average",
-      value: localStudyStats.avgScore ? `${localStudyStats.avgScore}%` : "—",
+      value: localStudyStats.avgScore ? `${localStudyStats.avgScore}%` : "â€”",
       sublabel: "Best attempt",
       change: "+3% this week",
       icon: ChartBarIcon,
       colorClass: "text-accent-indigo",
-      bgClass: "bg-indigo-500/10",
+bgClass: "bg-indigo-950/30",
     },
   ];
 
-  const formatDate = (ts: number) => {
-    const date = new Date(ts);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = diffMs / (1000 * 60 * 60);
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
-
-    if (diffHours < 1) return `${Math.floor(diffMs / 1000 / 60)}m ago`;
-    if (diffHours < 24) return `${Math.floor(diffHours)}h ago`;
-    if (diffDays < 7) return `${Math.floor(diffDays)}d ago`;
-    return date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-  };
-
-  const renderInsight = () => {
+const renderInsight = () => {
     if (loading) {
       return (
         <div className="space-y-2.5">
@@ -310,26 +496,27 @@ export default function DashboardPage() {
       );
     }
 
+    const action = nextBestAction;
+
     return (
       <div className="space-y-3">
-        <p className="text-foreground/60 text-sm leading-relaxed">
-          You&apos;re doing great! 🎉
-        </p>
-        <p className="text-foreground/60 text-sm leading-relaxed">
-          You&apos;ve been consistent for 2.5 hours. Keep it up to achieve your weekly goal!
-        </p>
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs font-medium text-foreground/60">Weekly Goal</span>
-            <span className="text-xs font-semibold text-primary">60/100</span>
-          </div>
-          <div className="h-2 bg-foreground/5 rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-primary to-primary-dark transition-all duration-500"
-              style={{ width: "60%" }}
-            />
+        <div className={`p-3 rounded-xl border ${action.borderClass} ${action.bgClass}`}>
+          <div className="flex items-start gap-3">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${action.bgClass} ${action.colorClass}`}>
+              <action.icon className="w-4 h-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-foreground">{action.label}</p>
+              <p className="text-xs text-foreground/60 mt-0.5">{action.description}</p>
+            </div>
           </div>
         </div>
+        <Link
+          href={action.href}
+          className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-primary hover:bg-primary/90 transition-colors"
+        >
+          {action.label} →
+        </Link>
       </div>
     );
   };
@@ -354,7 +541,7 @@ export default function DashboardPage() {
       <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
         <div className="flex items-center gap-3 mb-1">
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight sm:hidden">
-            Hi, Student! 👋
+            Hi, Student! ðŸ‘‹
           </h1>
           <span className="hidden sm:inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary">
             Class 10 - CBSE
@@ -365,34 +552,7 @@ export default function DashboardPage() {
         </p>
       </motion.div>
 
-      {/* Quick Actions */}
-      <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {[
-            { href: "/dashboard/chat", icon: ChatBubbleLeftEllipsisIcon, label: "AI Chat", desc: "Chat with AI tutor", iconBg: "bg-gradient-to-br from-violet-500 to-indigo-600", iconColor: "text-white" },
-            { href: "/dashboard/photo-doubt", icon: PhotoIcon, label: "Photo Doubt", desc: "Snap & solve", iconBg: "bg-gradient-to-br from-teal-500 to-cyan-600", iconColor: "text-white" },
-            { href: "/dashboard/quiz", icon: BookOpenIcon, label: "Quiz", desc: "Test yourself", iconBg: "bg-gradient-to-br from-amber-500 to-orange-600", iconColor: "text-white" },
-            { href: "/dashboard/flashcards", icon: Squares2X2Icon, label: "Flashcards", desc: "Revise smartly", iconBg: "bg-gradient-to-br from-emerald-500 to-green-600", iconColor: "text-white" },
-            { href: "/dashboard/notes", icon: DocumentTextIcon, label: "Notes", desc: "Organize notes", iconBg: "bg-gradient-to-br from-blue-500 to-indigo-600", iconColor: "text-white" },
-            { href: "/dashboard/planner", icon: CalendarIcon, label: "Planner", desc: "Plan your day", iconBg: "bg-gradient-to-br from-pink-500 to-rose-600", iconColor: "text-white" },
-          ].map((action) => (
-            <Link key={action.href} href={action.href}>
-              <motion.div
-                whileHover={animationsEnabled ? { y: -2 } : undefined}
-                className="subtle-card pb-card-lift rounded-xl p-4 flex items-center gap-3"
-              >
-                <div className={`w-10 h-10 rounded-xl ${action.iconBg} ${action.iconColor} flex items-center justify-center flex-shrink-0 shadow-md`}>
-                  <action.icon className="w-5 h-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-foreground truncate">{action.label}</p>
-                  <p className="text-[11px] text-foreground/45 truncate">{action.desc}</p>
-                </div>
-              </motion.div>
-            </Link>
-          ))}
-        </div>
-      </motion.div>
+<ContinueLearning currentStudySet={continueStudySet} />
 
       {/* Stats Cards */}
       <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
@@ -430,11 +590,11 @@ export default function DashboardPage() {
               <span className="text-xs text-foreground/50 font-medium">{todayProgress}% done</span>
             </div>
 
-            {planError && (
+{planError && (
               <motion.div
                 initial={{ opacity: 0, y: -5 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-3 p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-xs"
+                className="mb-3 p-3 rounded-xl bg-red-950/30 border border-red-800/50 text-red-400 text-xs"
               >
                 {planError}
               </motion.div>
@@ -480,14 +640,14 @@ export default function DashboardPage() {
                       </button>
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm truncate ${item.completed ? "text-foreground/35 line-through" : "text-foreground/75"}`}>
-                          {item.subject} — {item.title}
+                          {item.subject} â€” {item.title}
                         </p>
                       </div>
                       <span className="text-xs text-foreground/40 flex-shrink-0">{item.durationMinutes} min</span>
                       <button
                         onClick={() => handleDeletePlan(user?.uid, item.id, setDeletingPlanId, setPlanError)}
                         disabled={deletingPlanId === item.id}
-                        className="p-1 rounded-md text-foreground/30 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors disabled:opacity-50"
+                        className="p-1 rounded-md text-foreground/30 hover:text-red-500 hover:bg-red-950/20 transition-colors disabled:opacity-50"
                         title="Delete task"
                       >
                         <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -505,8 +665,8 @@ export default function DashboardPage() {
                   </div>
                   <div className="h-1.5 bg-foreground/5 rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-500"
-                      style={{ width: `${todayProgress}%` }}
+className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500"
+                        style={{ width: `${todayProgress}%` }}
                     />
                   </div>
                 </div>
@@ -520,13 +680,19 @@ export default function DashboardPage() {
               </>
             )}
           </div>
-        </motion.div>
+</motion.div>
 
-        {/* AI Study Insight */}
+      <ReviewToday recentActivities={reviewTodayItems.map((r) => r.question)} />
+
+      <WeakTopics weakTopics={weakTopics} />
+
+      <ThisWeekOverview studyStats={thisWeekOverviewStats} />
+
+      {/* AI Study Insight */}
         <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined} className="lg:col-span-1">
           <div className="subtle-card rounded-xl p-5 h-full">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-primary">
+              <div className="w-8 h-8 rounded-lg bg-blue-950/30 flex items-center justify-center text-primary">
                 <LightBulbIcon className="w-4 h-4" />
               </div>
               <h3 className="text-sm font-semibold text-foreground/75">AI Study Insight</h3>
@@ -535,87 +701,13 @@ export default function DashboardPage() {
           </div>
         </motion.div>
 
-        {/* Recent Activity */}
-        <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined} className="lg:col-span-1">
-          <div className="subtle-card rounded-xl p-5 h-full">
-            <h2 className="text-base font-semibold text-foreground/75 mb-3">Recent Activity</h2>
-            {loading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-4 bg-foreground/5 rounded w-3/4 animate-pulse" />
-                ))}
-              </div>
-            ) : recentDoubts.length === 0 ? (
-              <div className="text-center py-8 sm:py-10">
-                <div className="mx-auto w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                  <ClockIcon className="w-6 h-6 sm:w-7 sm:h-7 text-primary/60" />
-                </div>
-                <p className="text-foreground/60 text-sm sm:text-base mb-4">
-                  Your study journey starts here.
-                </p>
-                <Link href="/dashboard/chat">
-                  <motion.button
-                    whileHover={animationsEnabled ? { scale: 1.03 } : undefined}
-                    whileTap={animationsEnabled ? { scale: 0.97 } : undefined}
-                    className="px-5 py-2.5 rounded-xl text-sm font-medium shadow-md bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:shadow-lg transition-all"
-                  >
-                    Ask your first doubt
-                  </motion.button>
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {recentDoubts.map((doubt) => (
-                  <div
-                    key={doubt.id}
-                    className="flex items-start gap-3 p-3 rounded-xl bg-foreground/5 hover:bg-foreground/10 transition-colors"
-                  >
-                    <div
-                      className={`p-2 rounded-lg flex-shrink-0 ${
-                        doubt.type === "text"
-                          ? "bg-purple-100 dark:bg-purple-950/30"
-                          : "bg-blue-100 dark:bg-blue-950/30"
-                      }`}
-                    >
-                      {doubt.type === "text" ? (
-                        <ChatBubbleLeftEllipsisIcon className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                      ) : (
-                        <PhotoIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-foreground/80 truncate">
-                        {doubt.type === "photo" ? "Photo Doubt" : doubt.question}
-                      </p>
-                      <p className="text-xs text-foreground/45 mt-0.5">
-                        {doubt.createdAt
-                          ? formatDate(doubt.createdAt)
-                          : "Just now"}
-                      </p>
-                    </div>
-                    <span
-                      className={`text-[10px] sm:text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
-                        doubt.type === "text"
-                          ? "bg-purple-100 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300"
-                          : "bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300"
-                      }`}
-                    >
-                      {doubt.type === "text" ? "Text" : "Photo"}
-                    </span>
-                  </div>
-                ))}
-                <div className="text-center pt-2">
-                  <Link
-                    href="/dashboard/history"
-                    className="text-sm text-primary hover:underline font-medium"
-                  >
-                    View All
-                  </Link>
-                </div>
-              </div>
-            )}
-          </div>
-        </motion.div>
+        <RecentActivity recentActivities={recentDoubts.map((d) => ({
+  id: d.id,
+  type: d.type,
+  subject: d.type === "text" ? "Text" : "Photo",
+  time: Math.floor((new Date().getTime() - d.createdAt) / 60000),
+  completed: false,
+}))} />
       </div>
 
       {/* 2-Column Section: Study Streak | Progress Overview */}
@@ -623,7 +715,7 @@ export default function DashboardPage() {
         {/* Study Streak */}
         <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
           <div className="subtle-card rounded-xl p-5 flex items-center gap-4">
-            <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white flex-shrink-0 shadow-md">
+            <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white flex-shrink-0 shadow-md">
               <span className="text-2xl font-bold">{studyStreak}</span>
             </div>
             <div className="flex-1 min-w-0">

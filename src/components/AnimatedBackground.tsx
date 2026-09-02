@@ -185,25 +185,14 @@ export default function AnimatedBackground({
       suppressHydrationWarning
       aria-hidden="true"
     >
-      {/* BACKGROUND: paper texture (1-2px parallax) */}
+      {/* BACKGROUND: paper texture (1-2px parallax) - dark only */}
       <motion.div
         data-pb="parallax"
         className="absolute inset-0"
         style={layerStyle(layerBgX, layerBgY, enableParallax)}
       >
         <div
-          className="absolute inset-0 dark:hidden"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(45deg, rgba(139, 92, 246, 0.018) 0px, rgba(139, 92, 246, 0.018) 0.6px, transparent 0.6px, transparent 8px), repeating-linear-gradient(-45deg, rgba(139, 92, 246, 0.012) 0px, rgba(139, 92, 246, 0.012) 0.5px, transparent 0.5px, transparent 8px), radial-gradient(circle at 2px 2px, rgba(139, 92, 246, 0.025) 0.4px, transparent 0.4px)",
-            backgroundSize: "16px 16px, 16px 16px, 16px 16px",
-            opacity: 0.4,
-            animation: shouldAnimate ? "pb-texture-drift 50s ease-in-out 0s infinite both" : "none",
-          }}
-          data-pb="texture"
-        />
-        <div
-          className="absolute inset-0 hidden dark:block"
+          className="absolute inset-0"
           style={{
             backgroundImage:
               "repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.02) 0px, rgba(255, 255, 255, 0.02) 0.6px, transparent 0.6px, transparent 8px), repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.015) 0px, rgba(255, 255, 255, 0.015) 0.5px, transparent 0.5px, transparent 8px), radial-gradient(circle at 2px 2px, rgba(255, 255, 255, 0.025) 0.4px, transparent 0.4px)",
@@ -260,7 +249,7 @@ export default function AnimatedBackground({
               left: shape.left,
               width: shape.size,
               height: shape.size,
-              border: "1px solid rgba(216, 196, 169, 0.1)",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
               opacity: shouldAnimate
                 ? 0.02 * intensity + 0.025 + (i % 2 === 0 ? 0.005 : 0)
                 : 0.015,

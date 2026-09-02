@@ -81,28 +81,17 @@ export default function LandingBackground({ enabled }: LandingBackgroundProps) {
       aria-hidden="true"
       suppressHydrationWarning
     >
-      {/* Base gradient background */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,#f5f3ff_0%,#fafaf0_55%,#fafaf0_100%)] dark:bg-[radial-gradient(ellipse_at_top,#1a1a3a_0%,#0f0f1a_55%,#0f0f1a_100%)]" />
+      {/* Base gradient background - dark only */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,#1a1a3a_0%,#0f0f1a_55%,#0f0f1a_100%)]" />
 
-      {/* Paper texture */}
+      {/* Paper texture - dark only */}
       <motion.div
         data-pb="parallax"
         className="absolute inset-0"
         style={{ x: layerBgX, y: layerBgY, willChange: enableParallax ? "transform" : undefined }}
       >
         <div
-          className="absolute inset-0 dark:hidden"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(45deg, rgba(139, 92, 246, 0.015) 0px, rgba(139, 92, 246, 0.015) 0.5px, transparent 0.5px, transparent 8px), repeating-linear-gradient(-45deg, rgba(139, 92, 246, 0.01) 0px, rgba(139, 92, 246, 0.01) 0.5px, transparent 0.5px, transparent 8px), radial-gradient(circle at 2px 2px, rgba(139, 92, 246, 0.02) 0.4px, transparent 0.4px)",
-            backgroundSize: "16px 16px, 16px 16px, 16px 16px",
-            opacity: 0.4,
-            animation: shouldAnimate ? "pb-texture-drift 50s ease-in-out 0s infinite both" : "none",
-          }}
-          data-pb="texture"
-        />
-        <div
-          className="absolute inset-0 hidden dark:block"
+          className="absolute inset-0"
           style={{
             backgroundImage:
               "repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.015) 0px, rgba(255, 255, 255, 0.015) 0.5px, transparent 0.5px, transparent 8px), repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.01) 0px, rgba(255, 255, 255, 0.01) 0.5px, transparent 0.5px, transparent 8px), radial-gradient(circle at 2px 2px, rgba(255, 255, 255, 0.02) 0.4px, transparent 0.4px)",

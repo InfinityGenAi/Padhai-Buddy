@@ -148,7 +148,7 @@ export default function PhotoDoubtPage() {
         <motion.div
           initial={{ opacity: 0, y: -5 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-xl p-4 mb-4 text-sm"
+          className="bg-red-950/30 border border-red-800/50 rounded-xl p-4 mb-4 text-sm text-red-400"
         >
           {error}
         </motion.div>
@@ -158,7 +158,7 @@ export default function PhotoDoubtPage() {
         <motion.div
           initial={{ opacity: 0, y: -5 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-xl p-4 mb-4 text-sm"
+          className="bg-red-950/30 border border-red-800/50 text-red-400 rounded-xl p-4 mb-4 text-sm"
         >
           <p>{fileRejections[0].errors[0].message || "Invalid file"}</p>
         </motion.div>
@@ -196,14 +196,14 @@ export default function PhotoDoubtPage() {
               <button
                 type="button"
                 onClick={() => handleButtonClick()}
-                className="px-5 py-2 bg-card border border-border rounded-lg text-sm font-medium hover:bg-foreground/5 transition-colors"
+                className="px-5 py-2 bg-primary/10 border border-primary rounded-lg text-sm font-medium text-primary hover:bg-primary/20 transition-colors"
               >
                 Choose File
               </button>
               <button
                 type="button"
                 onClick={() => handleButtonClick("environment")}
-                className="px-5 py-2 bg-card border border-border rounded-lg text-sm font-medium hover:bg-foreground/5 transition-colors"
+                className="px-5 py-2 bg-primary/10 border border-primary rounded-lg text-sm font-medium text-primary hover:bg-primary/20 transition-colors"
               >
                 Camera
               </button>
@@ -268,7 +268,7 @@ export default function PhotoDoubtPage() {
               {answer}
             </div>
             {answerNotSaved && (
-              <p className="mt-3 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+              <p className="mt-3 text-xs text-amber-400 bg-amber-950/30 border border-amber-800/50 rounded-lg px-3 py-2">
                 Your answer couldn&apos;t be saved to history. It won&apos;t appear in Doubt History.
               </p>
             )}

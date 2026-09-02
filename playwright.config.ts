@@ -1,12 +1,16 @@
 import { defineConfig, devices } from "@playwright/test";
 import * as path from "path";
 
+// Set emulator environment variables for test execution
+process.env.FIREBASE_AUTH_EMULATOR_HOST = "localhost:9099";
+process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
+
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,
   forbidOnly: true,
   retries: 0,
-  workers: 2,
+  workers: 1,
   reporter: [
     ["list"],
     ["html", { outputFolder: "playwright-report" }],
@@ -37,9 +41,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run dev",
+    command: "node scripts/start-test-server.js",
     url: "http://localhost:3000",
-    timeout: 120000,
+    timeout: 300000,
     reuseExistingServer: true,
   },
   globalSetup: path.resolve(__dirname, "tests/global-setup"),

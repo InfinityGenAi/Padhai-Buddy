@@ -56,14 +56,14 @@ export default function ProfilePage() {
   };
 
   return (
-    <motion.div initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined} animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined} className="space-y-6 w-full">
+    <motion.div initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined} animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined} className="space-y-6 w-full pb-24 lg:pb-0">
       <div className="flex items-center gap-2">
         <UserIcon className="w-6 h-6 text-primary" />
         <h1 className="text-xl font-semibold">Profile</h1>
       </div>
 
       {notification && (
-        <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className={`p-3 rounded-xl text-sm font-medium ${notification.type === "success" ? "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400" : "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400"}`}>
+        <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className={`p-3 rounded-xl text-sm font-medium ${notification.type === "success" ? "bg-green-950/30 border border-green-800/50 text-green-400" : "bg-red-950/30 border border-red-800/50 text-red-400"}`}>
           {notification.text}
         </motion.div>
       )}
@@ -91,15 +91,15 @@ export default function ProfilePage() {
 
         <div className="grid grid-cols-3 gap-3 pt-2">
           <div className="text-center p-3 rounded-xl bg-foreground/5">
-            <p className="text-lg font-bold text-foreground">128</p>
+            <p className="text-lg font-bold text-foreground">—</p>
             <p className="text-[10px] text-foreground/50 font-medium">Doubts Solved</p>
           </div>
           <div className="text-center p-3 rounded-xl bg-foreground/5">
-            <p className="text-lg font-bold text-foreground">24h</p>
+            <p className="text-lg font-bold text-foreground">—</p>
             <p className="text-[10px] text-foreground/50 font-medium">Study Time</p>
           </div>
           <div className="text-center p-3 rounded-xl bg-foreground/5">
-            <p className="text-lg font-bold text-foreground">32</p>
+            <p className="text-lg font-bold text-foreground">—</p>
             <p className="text-[10px] text-foreground/50 font-medium">Quizzes</p>
           </div>
         </div>

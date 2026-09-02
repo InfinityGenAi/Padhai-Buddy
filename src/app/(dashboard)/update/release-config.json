@@ -1,0 +1,34 @@
+{
+  "currentVersion": "1.0.0",
+  "minimumSupportedVersion": "0.9.0",
+  "releaseDate": "2026-08-31",
+  "updates": [
+    {
+      "version": "1.1.0",
+      "releaseDate": "2026-09-15",
+      "updateSize": "45 MB",
+      "what'sNew": "• Improved AI tutor responses with better formatting\n• Redesigned More page with organized categories\n• Enhanced Photo Doubt with clearer preview\n• Fixed landing page background and typography\n• Performance improvements and bug fixes",
+      "platform": "android",
+      "downloadUrl": "/download/android",
+      "mandatory": false
+    },
+    {
+      "version": "1.1.0",
+      "releaseDate": "2026-09-15",
+      "updateSize": "65 MB",
+      "what'sNew": "• Improved AI tutor responses with better formatting\n• Redesigned More page with organized categories\n• Enhanced Photo Doubt with clearer preview\n• Fixed landing page background and typography\n• Performance improvements and bug fixes",
+      "platform": "windows",
+      "downloadUrl": "/download/windows",
+      "mandatory": false
+    },
+    {
+      "version": "1.1.0",
+      "releaseDate": "2026-09-15",
+      "updateSize": "N/A",
+      "what'sNew": "• Improved AI tutor responses with better formatting\n• Redesigned More page with organized categories\n• Enhanced Photo Doubt with clearer preview\n• Fixed landing page background and typography\n• Performance improvements and bug fixes",
+      "platform": "web",
+      "downloadUrl": "/",
+      "mandatory": false
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { getGroqClient, GROQ_VISION_MODEL, buildSystemPrompt } from "@/lib/groq";
+import { checkRateLimit } from "@/lib/rate-limiter";
 
 const MAX_FILE_SIZE = 4 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
   try {
     if (!adminAuth || initializationError) {
       return NextResponse.json(
-        { error: initializationError || "Firebase Admin not initialized" },
+        { error: "Server configuration error" },
         { status: 500 },
       );
     }
@@ -36,6 +37,21 @@ export async function POST(req: NextRequest) {
       decoded = await adminAuth.verifyIdToken(token);
     } catch {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+    }
+
+    const rateLimitResult = checkRateLimit(`photo:${decoded.uid}`);
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimitResult.retryAfter || 60),
+            "X-RateLimit-Limit": String(rateLimitResult.remaining + 1),
+            "X-RateLimit-Remaining": String(rateLimitResult.remaining),
+          },
+        },
+      );
     }
 
     const contentType = req.headers.get("content-type") || "";
@@ -132,7 +148,7 @@ export async function POST(req: NextRequest) {
         max_tokens: 2048,
       });
     } catch (error) {
-      console.error("Groq API error:", error);
+      console.error("[PHOTO-DOUBT] Groq API error:", error);
       return NextResponse.json(
         { error: "Failed to analyze image. Please try again." },
         { status: 502 },
@@ -157,7 +173,7 @@ export async function POST(req: NextRequest) {
           createdAt: Date.now(),
         });
     } catch (dbError) {
-      console.error("Failed to save photo doubt:", dbError);
+      console.error("[PHOTO-DOUBT] Failed to save photo doubt:", dbError);
       saveError = dbError instanceof Error ? dbError.message : "Failed to save photo doubt";
     }
 
@@ -175,10 +191,7 @@ export async function POST(req: NextRequest) {
       saved: true,
     });
   } catch (error: unknown) {
-    console.error("Photo doubt API error:", error);
-    if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    console.error("[PHOTO-DOUBT] unexpected error:", error);
     return NextResponse.json(
       { error: "An unexpected error occurred" },
       { status: 500 },

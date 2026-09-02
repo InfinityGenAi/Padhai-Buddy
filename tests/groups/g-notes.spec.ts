@@ -95,8 +95,9 @@ test.describe("G. Notes Tests", () => {
     const card = page.locator(".subtle-card").filter({ hasText: "Note to Delete" });
     const deleteBtn = card.locator("button").last();
 
-    page.once("dialog", (dialog) => dialog.accept());
     await deleteBtn.click();
+    await expect(page.locator("text=Delete Note").first()).toBeAttached();
+    await page.click("button:has-text('Delete')");
 
     await expect(page.locator("text=Note to Delete")).not.toBeVisible();
   });

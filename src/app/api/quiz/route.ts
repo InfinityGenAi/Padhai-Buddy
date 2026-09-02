@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { getGroqClient, GROQ_TEXT_MODEL } from "@/lib/groq";
 import type { QuizAttempt, QuizQuestion } from "@/types";
+import { inferTopic } from "@/lib/curriculum";
 
 function validateQuestions(questions: unknown[]): QuizQuestion[] | null {
   if (!Array.isArray(questions) || questions.length < 1 || questions.length > 20) {
@@ -69,7 +70,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.action === "submit") {
-      const { attemptId, questions } = body;
+      const { attemptId, questions, subject } = body;
+      const sub = String(subject);
       if (!attemptId || typeof attemptId !== "string" || !Array.isArray(questions)) {
         return NextResponse.json({ error: "attemptId and questions are required" }, { status: 400 });
       }
@@ -160,6 +162,99 @@ export async function POST(req: NextRequest) {
       const totalQuestions = serverQuestions.length;
       const score = Math.round((correctAnswers / totalQuestions) * 100);
       const completedAt = Date.now();
+
+      // === Additive mastery + mistake bank tracking (never breaks quiz) ===
+      // wrapped in its own try/catch so quiz submission always succeeds
+      try {
+        // Map each question to tracking data
+        const trackingPromises = serverQuestions.map(async (serverQ, i) => {
+          const sel = selections[i];
+          const isCorrect = sel !== undefined && sel === serverQ.correctIndex;
+          const clientQ = questions[i] as Record<string, unknown> | null | undefined;
+          const clientSelected = clientQ?.selectedIndex as number | undefined;
+          const userAnswer = clientSelected !== undefined ? String(clientSelected) : "";
+          const correctAnswer = String(serverQ.correctIndex);
+          const explanation = String(serverQ.explanation || "");
+          // Infer topic from subject + question text using conservative keyword matching
+          const topic = inferTopic(sub, serverQ.question);
+          return {
+            isCorrect,
+            topic,
+            userAnswer,
+            correctAnswer,
+            explanation,
+            serverQ,
+          };
+        });
+
+        const results = await Promise.all(trackingPromises);
+
+        // Upsert topicMastery for each question
+        for (const r of results) {
+          // Deterministic doc ID: normalized subject + topic
+          const docId =
+            `${r.topic.replace(/\s+/g, "_").toLowerCase()}_${sub
+              .replace(/\s+/g, "_")
+              .toLowerCase()}`;
+          const masteryRef = adminDb
+            .collection("users")
+            .doc(decoded.uid)
+            .collection("topicMastery")
+            .doc(docId);
+
+          // Read existing then merge increment
+          const existingSnap = await masteryRef.get();
+          const existingData = existingSnap?.data();
+          const newTotal = (existingData?.totalQuestions || 0) + 1;
+          const newCorrect = (existingData?.correctAnswers || 0) + (r.isCorrect ? 1 : 0);
+          const newMastery = Math.round((newCorrect / newTotal) * 100);
+
+          await masteryRef.set(
+            {
+              subject,
+              topic: r.topic,
+              mastery: newMastery,
+              totalQuestions: newTotal,
+              correctAnswers: newCorrect,
+              lastPracticed: Date.now(),
+              updatedAt: Date.now(),
+            },
+            { merge: true }
+          );
+        }
+
+        // Create mistake bank entries for incorrect answers only
+        // Use deterministic ID to prevent duplicates if same submission is processed twice
+        for (let mi = 0; mi < results.length; mi++) {
+          const r = results[mi];
+          if (r.isCorrect === false) {
+            const mistakeDocId = `${attemptId}_${mi}_${r.topic.replace(/\s+/g, "_").toLowerCase()}_${r.serverQ.id}`;
+            await adminDb.collection("users")
+              .doc(decoded.uid)
+              .collection("mistakeBank")
+              .doc(mistakeDocId)
+              .set({
+                source: "quiz" as const,
+                sourceId: attemptId,
+                subject,
+                topic: r.topic,
+                question: r.serverQ.question,
+                userAnswer: r.userAnswer,
+                correctAnswer: r.correctAnswer,
+                explanation: r.explanation,
+                createdAt: Date.now(),
+                reviewCount: 0,
+              }, { merge: true });
+          }
+        }
+      } catch (trackingError) {
+        // Log but never break quiz submission
+        console.error(
+          "[QUIZ_TRACKING] Failed to update mastery/mistake bank:",
+          trackingError
+        );
+      }
+      // === End additive tracking ===
 
       await attemptRef.update({
         questions: scoredQuestions,

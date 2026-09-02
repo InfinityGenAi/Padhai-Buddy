@@ -299,13 +299,13 @@ export default function FlashcardsPage() {
         </div>
 
         {error && (
-          <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">
+          <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="p-3 rounded-xl bg-red-950/30 border border-red-800/50 text-red-400 text-sm">
             {error}
           </motion.div>
         )}
 
         {success && (
-          <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="p-3 rounded-xl bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 text-sm">
+          <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="p-3 rounded-xl bg-green-950/30 border border-green-800/50 text-green-400 text-sm">
             {success}
           </motion.div>
         )}
@@ -328,10 +328,10 @@ export default function FlashcardsPage() {
         </div>
 
         <div className="flex gap-2 justify-center">
-          <button onClick={() => { if (preferences.soundEnabled) playTaskComplete(); markCard("difficult"); }} className="px-4 py-2 rounded-xl text-sm font-medium bg-red-50 dark:bg-red-950/30 text-red-600 hover:bg-red-100">
+          <button onClick={() => { if (preferences.soundEnabled) playTaskComplete(); markCard("difficult"); }} className="px-4 py-2 rounded-xl text-sm font-medium bg-red-950/30 text-red-400 hover:bg-red-950/20">
             Difficult
           </button>
-          <button onClick={() => { if (preferences.soundEnabled) playTaskComplete(); markCard("known"); }} className="px-4 py-2 rounded-xl text-sm font-medium bg-green-50 dark:bg-green-950/30 text-green-600 hover:bg-green-100">
+          <button onClick={() => { if (preferences.soundEnabled) playTaskComplete(); markCard("known"); }} className="px-4 py-2 rounded-xl text-sm font-medium bg-green-950/30 text-green-400 hover:bg-green-950/20">
             Known
           </button>
         </div>
@@ -371,13 +371,13 @@ export default function FlashcardsPage() {
         </div>
 
         {error && (
-          <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">
+          <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="p-3 rounded-xl bg-red-950/30 border border-red-800/50 text-red-400 text-sm">
             {error}
           </motion.div>
         )}
 
         {success && (
-          <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="p-3 rounded-xl bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 text-sm">
+          <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="p-3 rounded-xl bg-green-950/30 border border-green-800/50 text-green-400 text-sm">
             {success}
           </motion.div>
         )}
@@ -403,18 +403,18 @@ export default function FlashcardsPage() {
                       value={editFront}
                       onChange={(e) => setEditFront(e.target.value)}
                       placeholder="Front"
-                      className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm"
+                      className="w-full bg-input-bg border border-input-border rounded-xl px-3 py-2 text-sm"
                     />
                     <textarea
                       value={editBack}
                       onChange={(e) => setEditBack(e.target.value)}
                       placeholder="Back"
-                      className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm"
+                      className="w-full bg-input-bg border border-input-border rounded-xl px-3 py-2 text-sm"
                     />
                     <select
                       value={editStatus}
                       onChange={(e) => setEditStatus(e.target.value as CardStatus)}
-                      className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm"
+                      className="w-full bg-input-bg border border-input-border rounded-xl px-3 py-2 text-sm"
                     >
                       <option value="new">New</option>
                       <option value="learning">Learning</option>
@@ -431,7 +431,7 @@ export default function FlashcardsPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{card.front}</p>
                       <p className="text-xs text-foreground/50 truncate">{card.back}</p>
-                      <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-foreground/5 text-foreground/60 capitalize">{card.status}</span>
+                      <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-foreground/5 capitalize">{card.status}</span>
                     </div>
                     <div className="flex gap-1 ml-2">
                       <button onClick={() => startStudy(activeDeckId)} className="p-1.5 rounded-lg text-foreground/40 hover:text-primary" title="Study">
@@ -457,8 +457,8 @@ export default function FlashcardsPage() {
               <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="glass-strong rounded-2xl p-6 max-w-sm w-full">
                 <h3 className="text-lg font-semibold mb-4">Add Card</h3>
                 <div className="space-y-3">
-                  <textarea value={cardFront} onChange={(e) => setCardFront(e.target.value)} placeholder="Front (question)" className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm" rows={3} />
-                  <textarea value={cardBack} onChange={(e) => setCardBack(e.target.value)} placeholder="Back (answer)" className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm" rows={3} />
+                  <textarea value={cardFront} onChange={(e) => setCardFront(e.target.value)} placeholder="Front (question)" className="w-full bg-input-bg border border-input-border rounded-xl px-3 py-2 text-sm" rows={3} />
+                  <textarea value={cardBack} onChange={(e) => setCardBack(e.target.value)} placeholder="Back (answer)" className="w-full bg-input-bg border border-input-border rounded-xl px-3 py-2 text-sm" rows={3} />
                 </div>
                 <div className="flex gap-2 justify-end mt-4">
                   <button onClick={() => setShowAddCard(false)} className="px-4 py-2 rounded-xl text-sm hover:bg-foreground/5">Cancel</button>
@@ -495,13 +495,13 @@ export default function FlashcardsPage() {
       </div>
 
       {error && (
-        <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">
+        <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="p-3 rounded-xl bg-red-950/30 border border-red-800/50 text-red-400 text-sm">
           {error}
         </motion.div>
       )}
 
       {success && (
-        <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="p-3 rounded-xl bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 text-sm">
+        <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="p-3 rounded-xl bg-green-950/30 border border-green-800/50 text-green-400 text-sm">
           {success}
         </motion.div>
       )}
@@ -529,7 +529,7 @@ export default function FlashcardsPage() {
                 <button onClick={() => startStudy(deck.id)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20">
                   Study
                 </button>
-                <button onClick={() => openDeck(deck)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-foreground/5 text-foreground/60 hover:text-foreground">
+                <button onClick={() => openDeck(deck)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-foreground/5 hover:text-foreground">
                   Manage
                 </button>
                 <button onClick={() => handleDeleteDeck(deck.id)} className="p-1.5 rounded-lg text-foreground/40 hover:text-red-500">
@@ -547,9 +547,9 @@ export default function FlashcardsPage() {
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="glass-strong rounded-2xl p-6 max-w-sm w-full">
               <h3 className="text-lg font-semibold mb-4">Create Deck</h3>
               <div className="space-y-3">
-                <input value={deckTitle} onChange={(e) => setDeckTitle(e.target.value)} placeholder="Deck title" className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm" />
-                <input value={deckSubject} onChange={(e) => setDeckSubject(e.target.value)} placeholder="Subject" className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm" />
-                <input value={deckDescription} onChange={(e) => setDeckDescription(e.target.value)} placeholder="Description (optional)" className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm" />
+                <input value={deckTitle} onChange={(e) => setDeckTitle(e.target.value)} placeholder="Deck title" className="w-full bg-input-bg border border-input-border rounded-xl px-3 py-2 text-sm" />
+                <input value={deckSubject} onChange={(e) => setDeckSubject(e.target.value)} placeholder="Subject" className="w-full bg-input-bg border border-input-border rounded-xl px-3 py-2 text-sm" />
+                <input value={deckDescription} onChange={(e) => setDeckDescription(e.target.value)} placeholder="Description (optional)" className="w-full bg-input-bg border border-input-border rounded-xl px-3 py-2 text-sm" />
               </div>
               <div className="flex gap-2 justify-end mt-4">
                 <button onClick={() => setShowCreateDeck(false)} className="px-4 py-2 rounded-xl text-sm hover:bg-foreground/5">Cancel</button>

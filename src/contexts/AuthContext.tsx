@@ -30,7 +30,6 @@ const DEFAULT_PREFERENCES: UserPreferences = {
     study: true,
   },
   animationsEnabled: true,
-  theme: "system",
   notificationsEnabled: true,
   enterToSend: true,
   autoScroll: true,
@@ -65,6 +64,7 @@ interface AuthContextType {
   loading: boolean;
   authError: string | null;
   needsOnboarding: boolean;
+  isAdmin: boolean;
   reloadProfile: () => void;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (
@@ -91,44 +91,17 @@ export function useAuth() {
   return ctx;
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+function AuthProvider({ children }: { children: ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [preferences, setPreferences] = useState<UserPreferences>(() =>
     loadLocalPreferences(),
   );
   const signingUpRef = useRef(false);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    const isDark =
-      preferences.theme === "dark" ||
-      (preferences.theme === "system" &&
-        window.matchMedia("(prefers-color-scheme: dark)").matches);
-    if (isDark) {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
-  }, [preferences.theme]);
-
-  useEffect(() => {
-    if (preferences.theme !== "system") return;
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = () => {
-      const root = document.documentElement;
-      if (media.matches) {
-        root.classList.add("dark");
-      } else {
-        root.classList.remove("dark");
-      }
-    };
-    media.addEventListener("change", handler);
-    return () => media.removeEventListener("change", handler);
-  }, [preferences.theme]);
 
   const loadUserProfile = (fbUser: FirebaseUser | null) => {
     if (!fbUser) {
@@ -136,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthError(null);
       setNeedsOnboarding(false);
       setLoading(false);
+      setIsAdmin(false);
       return;
     }
     const db = getFirestoreDb();
@@ -144,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setNeedsOnboarding(false);
       setLoading(false);
+      setIsAdmin(false);
       return;
     }
     getDoc(doc(db, "users", fbUser.uid))
@@ -184,15 +159,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         }
       });
-  };
 
-  const reloadProfile = useCallback(() => {
-    if (firebaseUser) {
-      setLoading(true);
-      setAuthError(null);
-      loadUserProfile(firebaseUser);
+    // Update admin status from Firebase custom claims
+    // Note: setState in effect is allowed here as this synchronizes auth state
+    const claims = (fbUser as FirebaseUser & { customClaims?: Record<string, unknown> })
+      .customClaims;
+    if (claims && Object.keys(claims).includes('admin')) {
+      setIsAdmin(true);
+    } else {
+      setIsAdmin(false);
     }
-  }, [firebaseUser]);
+  };
 
   useEffect(() => {
     let unsub: (() => void) | undefined;
@@ -219,6 +196,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (unsub) unsub();
     };
   }, []);
+
+  const reloadProfile = useCallback(() => {
+    if (firebaseUser) {
+      setLoading(true);
+      setAuthError(null);
+      loadUserProfile(firebaseUser);
+    }
+  }, [firebaseUser]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     await waitForFirebaseInit();
@@ -249,9 +234,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await sendEmailVerification(cred.user);
           emailVerificationSent = true;
         } catch (verifyErr) {
-          // Do not claim the email was sent. The account was created and the
-          // user is authenticated, so the caller must show a recoverable
-          // message and offer to resend instead of failing the signup.
           console.error("[AuthContext] Failed to send verification email:", verifyErr);
         }
 
@@ -369,6 +351,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setFirebaseUser(null);
     setNeedsOnboarding(false);
+    setIsAdmin(false);
   }, []);
 
   const sendPasswordReset = useCallback(async (email: string) => {
@@ -397,6 +380,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         authError,
         needsOnboarding,
+        isAdmin,
         reloadProfile,
         signIn,
         signUp,
@@ -413,3 +397,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     </AuthContext.Provider>
   );
 }
+
+export { AuthProvider };

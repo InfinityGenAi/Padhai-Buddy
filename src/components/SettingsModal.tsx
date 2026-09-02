@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Cog6ToothIcon,
   XMarkIcon,
-  SunIcon,
   SpeakerWaveIcon,
   SpeakerXMarkIcon,
   SparklesIcon,
@@ -49,7 +48,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import type { UserPreferences, UserSession, Conversation } from "@/types";
-import { playPasswordChange, playSessionLogout, playSuccess } from "@/lib/sounds";
+import { playPasswordChange, playSessionLogout, playSaveSuccess } from "@/lib/sounds";
 import BrandLogo from "./BrandLogo";
 
 export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
@@ -210,7 +209,7 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
       setDeleteAccountOpen(false);
       setDeleteAccountPassword("");
       reloadProfile();
-      playSuccess();
+      playSaveSuccess();
       setNotification({ type: "success", text: "Account deleted" });
       setTimeout(() => setNotification(null), 3000);
     } catch (err) {
@@ -277,7 +276,7 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
       setTimeout(() => setNotification(null), 3000);
     }
     setClearHistoryConfirmOpen(false);
-    playSuccess();
+    playSaveSuccess();
   };
 
   const openEditProfile = () => {
@@ -329,8 +328,8 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                   animate={{ opacity: 1, y: 0 }}
                   className={`p-3 rounded-xl text-sm font-medium ${
                     notification.type === "success"
-                      ? "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400"
-                      : "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400"
+                      ? "bg-green-950/30 border border-green-800/50 text-green-400"
+                      : "bg-red-950/30 border border-red-800/50 text-red-400"
                   }`}
                 >
                   {notification.text}
@@ -342,33 +341,6 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                   Appearance
                 </h4>
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <SunIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">Theme</p>
-                        <p className="text-xs text-foreground/50 truncate">
-                          Choose how Padhai Buddy looks
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-1 bg-foreground/5 rounded-lg p-1 flex-shrink-0">
-                      {(["light", "dark", "system"] as const).map((opt) => (
-                        <button
-                          key={opt}
-                          onClick={() => handleUpdate({ theme: opt })}
-                          className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors capitalize ${
-                            preferences.theme === opt
-                              ? "bg-primary text-white"
-                              : "text-foreground/60 hover:text-foreground"
-                          }`}
-                        >
-                          {opt}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
                       <SparklesIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
@@ -392,7 +364,7 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                       <motion.div
                         animate={{ x: preferences.animationsEnabled ? 20 : 2 }}
                         transition={{ type: "spring", damping: 15, stiffness: 200 }}
-                        className="w-5 h-5 bg-white rounded-full shadow-md absolute top-0.5"
+                        className="w-5 h-5 bg-foreground/20 rounded-full shadow-md absolute top-0.5"
                       />
                     </motion.button>
                   </div>
@@ -424,7 +396,7 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                       <motion.div
                         animate={{ x: preferences.soundEnabled ? 20 : 2 }}
                         transition={{ type: "spring", damping: 15, stiffness: 200 }}
-                        className="w-5 h-5 bg-white rounded-full shadow-md absolute top-0.5"
+                        className="w-5 h-5 bg-foreground/20 rounded-full shadow-md absolute top-0.5"
                       />
                     </motion.button>
                   </div>
@@ -551,7 +523,7 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                       <motion.div
                         animate={{ x: preferences.stepByStep ? 20 : 2 }}
                         transition={{ type: "spring", damping: 15, stiffness: 200 }}
-                        className="w-5 h-5 bg-white rounded-full shadow-md absolute top-0.5"
+                        className="w-5 h-5 bg-foreground/20 rounded-full shadow-md absolute top-0.5"
                       />
                     </motion.button>
                   </div>
@@ -606,7 +578,7 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                       <motion.div
                         animate={{ x: preferences.enterToSend ? 20 : 2 }}
                         transition={{ type: "spring", damping: 15, stiffness: 200 }}
-                        className="w-5 h-5 bg-white rounded-full shadow-md absolute top-0.5"
+                        className="w-5 h-5 bg-foreground/20 rounded-full shadow-md absolute top-0.5"
                       />
                     </motion.button>
                   </div>
@@ -634,7 +606,7 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                       <motion.div
                         animate={{ x: preferences.autoScroll ? 20 : 2 }}
                         transition={{ type: "spring", damping: 15, stiffness: 200 }}
-                        className="w-5 h-5 bg-white rounded-full shadow-md absolute top-0.5"
+                        className="w-5 h-5 bg-foreground/20 rounded-full shadow-md absolute top-0.5"
                       />
                     </motion.button>
                   </div>
@@ -809,7 +781,7 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                         {session.id !== currentSessionId && (
                           <button
                             onClick={() => handleRevokeSession(session.id)}
-                            className="text-xs text-red-500 hover:text-red-600 font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors flex-shrink-0"
+                            className="text-xs text-red-500 hover:text-red-400 font-medium px-3 py-1.5 rounded-lg hover:bg-red-950/20 transition-colors flex-shrink-0"
                           >
                             Log out
                           </button>
@@ -820,7 +792,7 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                   {sessions.some((s) => s.id !== currentSessionId) && (
                     <button
                       onClick={handleRevokeAllOtherSessions}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-950/20 transition-colors"
                     >
                       <TrashIcon className="w-4 h-4" />
                       Log out of all other devices
@@ -830,14 +802,14 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
               </div>
 
               {/* DANGER ZONE */}
-              <div className="subtle-card rounded-xl p-4 border-red-200 dark:border-red-900/30">
+              <div className="subtle-card rounded-xl p-4 border-red-800/50">
                 <h4 className="text-[11px] font-semibold uppercase tracking-wider text-red-500 mb-3">
                   Danger Zone
                 </h4>
                 <div className="space-y-2">
                   <button
                     onClick={() => setClearHistoryConfirmOpen(true)}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                    className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-950/20 transition-colors"
                   >
                     <TrashIcon className="w-4 h-4" />
                     Clear All Chat History
@@ -847,7 +819,7 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                       setDeleteAccountPassword("");
                       setDeleteAccountOpen(true);
                     }}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                    className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-950/20 transition-colors"
                   >
                     <TrashIcon className="w-4 h-4" />
                     Delete Account
@@ -1028,7 +1000,7 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                   exit={{ scale: 0.95, opacity: 0 }}
                   className="glass-strong rounded-2xl p-6 max-w-sm w-full shadow-2xl"
                 >
-                  <h3 className="text-lg font-semibold mb-2 text-red-600">Delete Account</h3>
+                  <h3 className="text-lg font-semibold mb-2 text-red-400">Delete Account</h3>
                   <p className="text-sm text-foreground/70 mb-4">
                     This will permanently delete your account and all associated data. This action cannot be undone.
                   </p>

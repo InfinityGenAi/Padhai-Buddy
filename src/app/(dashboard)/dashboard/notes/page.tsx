@@ -27,6 +27,7 @@ export default function NotesPage() {
   const [editingNote, setEditingNote] = useState<{ id?: string; title: string; subject: string; body: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [sortBy, setSortBy] = useState<"updatedAt" | "title">("updatedAt");
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const fetchNotes = async () => {
     if (!user?.uid) return;
@@ -79,7 +80,7 @@ export default function NotesPage() {
   };
 
   const handleDelete = async (noteId: string) => {
-    if (!confirm("Delete this note?")) return;
+    setDeleteConfirmId(null);
     try {
       const token = await (await import("@/lib/auth-utils")).getFirebaseIdToken();
       const res = await fetch("/api/notes", {
@@ -153,7 +154,7 @@ export default function NotesPage() {
       </div>
 
       {error && (
-        <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">{error}</motion.div>
+        <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="p-3 rounded-xl bg-red-950/30 border border-red-800/50 text-red-400 text-sm">{error}</motion.div>
       )}
 
       <div className="flex gap-2">
@@ -185,10 +186,22 @@ export default function NotesPage() {
               </div>
               <div className="flex gap-1 ml-2">
                 <button onClick={() => { setEditingNote(note); setView("editor"); }} className="p-1.5 rounded-lg text-foreground/40 hover:text-foreground"><PencilSquareIcon className="w-4 h-4" /></button>
-                <button onClick={() => handleDelete(note.id)} className="p-1.5 rounded-lg text-foreground/40 hover:text-red-500"><TrashIcon className="w-4 h-4" /></button>
+                <button onClick={() => setDeleteConfirmId(note.id)} className="p-1.5 rounded-lg text-foreground/40 hover:text-red-500"><TrashIcon className="w-4 h-4" /></button>
               </div>
             </motion.div>
           ))}
+        </div>
+      )}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteConfirmId(null)}>
+          <div className="bg-card border border-foreground/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-foreground mb-2">Delete Note</h3>
+            <p className="text-sm text-foreground/60 mb-4">Are you sure you want to delete this note? This action cannot be undone.</p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setDeleteConfirmId(null)} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-foreground/5 transition-colors">Cancel</button>
+              <button onClick={() => handleDelete(deleteConfirmId)} className="px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 transition-colors">Delete</button>
+            </div>
+          </div>
         </div>
       )}
     </motion.div>

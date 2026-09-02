@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, initializationError } from "@/lib/firebase-admin";
-import { getGroqClient, GROQ_TEXT_MODEL, buildSystemPrompt } from "@/lib/groq";
+import { getGroqClient, GROQ_TEXT_MODEL, buildSystemPrompt, StudyMode } from "@/lib/groq";
+import { checkRateLimit } from "@/lib/rate-limiter";
+
+const MAX_MESSAGE_LENGTH = 5000;
 
 export async function POST(req: NextRequest) {
   try {
     if (!adminAuth || initializationError) {
-      console.error("[CHAT] Firebase Admin not initialized:", initializationError);
       return NextResponse.json(
         { error: "Server configuration error. Please contact support." },
         { status: 500 },
@@ -26,6 +28,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
 
+    const rateLimitResult = checkRateLimit(`chat:${decoded.uid}`);
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimitResult.retryAfter || 60),
+            "X-RateLimit-Limit": String(rateLimitResult.remaining + 1),
+            "X-RateLimit-Remaining": String(rateLimitResult.remaining),
+          },
+        },
+      );
+    }
+
+    const contentLength = req.headers.get("content-length");
+    if (contentLength && parseInt(contentLength, 10) > 1024 * 1024) {
+      return NextResponse.json({ error: "Request body too large" }, { status: 413 });
+    }
+
     let body: {
       message?: unknown;
       class?: unknown;
@@ -33,6 +55,7 @@ export async function POST(req: NextRequest) {
       responseStyle?: unknown;
       stepByStep?: unknown;
       language?: unknown;
+      studyMode?: unknown;
     };
     try {
       body = await req.json();
@@ -40,7 +63,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const { message, class: studentClass, board, responseStyle, stepByStep, language } = body;
+    const { message, class: studentClass, board, responseStyle, stepByStep, language, studyMode } = body;
 
     if (!message || !studentClass || !board) {
       return NextResponse.json(
@@ -50,7 +73,7 @@ export async function POST(req: NextRequest) {
     }
 
     const messageStr = String(message);
-    if (messageStr.length > 5000) {
+    if (messageStr.length > MAX_MESSAGE_LENGTH) {
       return NextResponse.json(
         { error: "Message exceeds maximum length" },
         { status: 400 },
@@ -76,6 +99,7 @@ export async function POST(req: NextRequest) {
       responseStyle: responseStyle !== undefined ? String(responseStyle) : undefined,
       stepByStep: stepByStep !== undefined ? Boolean(stepByStep) : undefined,
       language: language !== undefined ? String(language) : undefined,
+      studyMode: studyMode !== undefined ? (studyMode as StudyMode) : undefined,
     });
 
     let completion;
@@ -89,11 +113,10 @@ export async function POST(req: NextRequest) {
         temperature: 0.3,
         max_tokens: 2048,
       });
-    } catch (groqError) {
+    } catch {
       return NextResponse.json(
         {
           error: "AI service temporarily unavailable. Please try again in a moment.",
-          _dev: process.env.NODE_ENV === "development" ? (groqError instanceof Error ? groqError.message : String(groqError)) : undefined,
         },
         { status: 502 },
       );
@@ -109,12 +132,8 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: unknown) {
     console.error("[CHAT] unexpected error:", error);
-    const message = error instanceof Error ? error.message : "An unexpected error occurred";
     return NextResponse.json(
-      {
-        error: "An unexpected error occurred. Please try again.",
-        _dev: process.env.NODE_ENV === "development" ? message : undefined,
-      },
+      { error: "An unexpected error occurred. Please try again." },
       { status: 500 },
     );
   }

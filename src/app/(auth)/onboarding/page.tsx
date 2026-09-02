@@ -82,7 +82,7 @@ export default function OnboardingPage() {
           initial={animationsEnabled ? { opacity: 0, y: 20 } : false}
           animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
           transition={animationsEnabled ? { duration: 0.6, ease: "easeOut" } : undefined}
-          className="bg-white dark:bg-dark border border-border rounded-xl p-6"
+          className="bg-card border border-border rounded-xl p-6"
         >
           <div className="text-center mb-6">
             <BrandLogo size={48} className="mx-auto mb-2" />
@@ -98,7 +98,7 @@ export default function OnboardingPage() {
             <motion.div
               initial={{ opacity: 0, y: -5 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-xl p-3 mb-4 text-sm"
+              className="bg-red-950/30 border border-red-800/50 text-red-400 rounded-xl p-3 mb-4 text-sm"
             >
               {error}
             </motion.div>
@@ -109,14 +109,14 @@ export default function OnboardingPage() {
               <label className="block text-sm font-medium mb-1.5">
                 Full Name
               </label>
-              <div className="auth-input-wrapper">
-                <UserIcon className="auth-input-icon" />
+              <div className="relative">
+                <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Enter your full name"
-                  className="auth-input"
+                  className="w-full bg-input-bg border border-input-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                   required
                 />
               </div>
@@ -129,7 +129,7 @@ export default function OnboardingPage() {
               <select
                 value={selectedClass ?? ""}
                 onChange={(e) => setSelectedClass(e.target.value ? Number(e.target.value) as UserClass : undefined)}
-                className="auth-select"
+                className="w-full bg-input-bg border border-input-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors appearance-none pr-10"
                 required
               >
                 <option value="">Select class</option>
@@ -148,7 +148,7 @@ export default function OnboardingPage() {
               <select
                 value={selectedBoard ?? ""}
                 onChange={(e) => setSelectedBoard(e.target.value ? e.target.value as UserBoard : undefined)}
-                className="auth-select"
+                className="w-full bg-input-bg border border-input-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors appearance-none pr-10"
                 required
               >
                 <option value="">Select board</option>

@@ -188,6 +188,7 @@ export default function TimerPage() {
               fill="none" strokeWidth="10" strokeLinecap="round"
               stroke="url(#timerGradient)"
               strokeDasharray="326.7"
+              initial={{ strokeDashoffset: 326.7 }}
               animate={{ strokeDashoffset: 326.7 * (1 - timerProgress) }}
               transition={animationsEnabled ? { type: "spring", stiffness: 60, damping: 20 } : undefined}
             />
@@ -216,7 +217,7 @@ export default function TimerPage() {
           <ArrowPathIcon className="w-5 h-5" /> Reset
         </button>
         {!isRunning && currentTime > 0 && (
-          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={async () => { if (soundEnabled) playTimerComplete(); await handleComplete(); }} disabled={saving} className="px-6 py-3 rounded-xl font-medium bg-green-50 dark:bg-green-950/30 text-green-600 hover:bg-green-100 flex items-center gap-2 disabled:opacity-50">
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={async () => { if (soundEnabled) playTimerComplete(); await handleComplete(); }} disabled={saving} className="px-6 py-3 rounded-xl font-medium bg-green-950/30 text-green-400 hover:bg-green-950/20 flex items-center gap-2 disabled:opacity-50">
             <CheckCircleIcon className="w-5 h-5" /> Complete
           </motion.button>
         )}

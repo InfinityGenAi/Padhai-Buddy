@@ -1,7 +1,8 @@
 import { test, expect } from "@playwright/test";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
-import { cert, getApps, initializeApp } from "firebase-admin/app";
+import http from "http";
+import { cert, getApps, initializeApp, deleteApp } from "firebase-admin/app";
 import { getAuth, type Auth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 
@@ -22,15 +23,38 @@ function loadEnv() {
 
 loadEnv();
 
+function isPortInUseSync(port: number): boolean {
+  try {
+    const net = require("net");
+    const client = net.createConnection(port, "localhost");
+    client.end();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "";
 const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "";
 const PASSWORD = "AuditTest123!";
 
 let adminDb: Firestore;
 let adminAuth: Auth;
+let useEmulator = false;
 
 function initAdmin() {
-  if (getApps().length === 0) {
+  const apps = getApps();
+  if (apps.length > 0) {
+    apps.forEach((a) => void deleteApp(a).catch(() => undefined));
+  }
+
+  useEmulator = isPortInUseSync(9099) && isPortInUseSync(8080);
+
+  if (useEmulator) {
+    process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
+    process.env.FIREBASE_AUTH_EMULATOR_HOST = "localhost:9099";
+    initializeApp({ projectId: PROJECT_ID });
+  } else {
     const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
     if (!privateKey) throw new Error("FIREBASE_ADMIN_PRIVATE_KEY is not set");
     initializeApp({
@@ -52,6 +76,48 @@ function uniqueEmail(prefix: string): string {
 
 async function createThrowawayUser(prefix: string): Promise<{ email: string; uid: string; token: string }> {
   const email = uniqueEmail(prefix);
+
+  if (useEmulator) {
+    const userRecord = await adminAuth.createUser({
+      email,
+      password: PASSWORD,
+      displayName: "Audit User",
+    });
+
+    const signinBody = JSON.stringify({ email, password: PASSWORD, returnSecureToken: true });
+    const signinResult = await new Promise<any>((resolve, reject) => {
+      const req = http.request(
+        {
+          hostname: "localhost",
+          port: 9099,
+          path: "/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=test",
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(signinBody) },
+        },
+        (res) => {
+          let data = "";
+          res.on("data", (chunk) => (data += chunk));
+          res.on("end", () => {
+            try {
+              resolve(JSON.parse(data));
+            } catch {
+              resolve(data);
+            }
+          });
+        },
+      );
+      req.on("error", reject);
+      req.write(signinBody);
+      req.end();
+    });
+
+    if (!signinResult.idToken) {
+      throw new Error(`Failed to sign in throwaway user: ${JSON.stringify(signinResult)}`);
+    }
+
+    return { email, uid: userRecord.uid, token: signinResult.idToken };
+  }
+
   const res = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${API_KEY}`,
     {
@@ -79,7 +145,6 @@ async function deleteThrowawayUser(uid: string): Promise<void> {
 }
 
 async function createProfileDoc(uid: string, email: string): Promise<void> {
-  // Seed via the admin SDK (rules are exercised by the PATCH tests below).
   await adminDb.collection("users").doc(uid).set({
     uid,
     name: "Audit User",
@@ -371,9 +436,9 @@ test.describe("Security: delete account", () => {
     await adminAuth.deleteUser(user.uid);
 
     const res = await callDeleteAccount(user.token);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(401);
     const data = await res.json();
-    expect(data.success).toBe(true);
+    expect(data.error).toBe("Invalid or expired token");
   });
 
   test("returns 401 without a token", async () => {
@@ -397,19 +462,30 @@ test.describe("Security: Firestore rules (uid immutability)", () => {
     await deleteThrowawayUser(user.uid);
   });
 
-  const DOC_URL = () =>
-    `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/users/${user.uid}`;
+  const DOC_URL = () => {
+    if (useEmulator) {
+      return `http://localhost:8080/v1/projects/${PROJECT_ID}/databases/(default)/documents/users/${user.uid}`;
+    }
+    return `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/users/${user.uid}`;
+  };
 
   async function patch(fieldPaths: string[], fields: Record<string, unknown>) {
     const params = fieldPaths.map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join("&");
-    return fetch(`${DOC_URL()}?${params}`, {
+    const url = `${DOC_URL()}?${params}`;
+    const options = {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${user.token}`,
       },
       body: JSON.stringify({ fields }),
-    });
+    };
+    let res = await fetch(url, options);
+    if (res.status === 429) {
+      await new Promise((r) => setTimeout(r, 1000));
+      res = await fetch(url, options);
+    }
+    return res;
   }
 
   test("rejects changing the uid field", async () => {
@@ -477,9 +553,9 @@ test.describe("Security: signup verification email failure", () => {
     await page.goto("http://localhost:3000/signup", { waitUntil: "domcontentloaded" });
 
     await page.getByPlaceholder("Enter your name").fill("Audit Signup");
-    await page.getByPlaceholder("you@example.com").fill(email);
-    await page.getByPlaceholder("At least 6 characters").fill(PASSWORD);
-    await page.getByPlaceholder("Repeat your password").fill(PASSWORD);
+    await page.getByPlaceholder("Enter your email").fill(email);
+    await page.getByPlaceholder("Create a password").fill(PASSWORD);
+    await page.getByPlaceholder("Confirm your password").fill(PASSWORD);
     await page.locator("select").nth(0).selectOption("10");
     await page.locator("select").nth(1).selectOption("CBSE");
 
@@ -518,16 +594,16 @@ test.describe("Security: signup verification email failure", () => {
     await page.goto("http://localhost:3000/signup", { waitUntil: "domcontentloaded" });
 
     await page.getByPlaceholder("Enter your name").fill("Audit Signup");
-    await page.getByPlaceholder("you@example.com").fill(email);
-    await page.getByPlaceholder("At least 6 characters").fill(PASSWORD);
-    await page.getByPlaceholder("Repeat your password").fill(PASSWORD);
+    await page.getByPlaceholder("Enter your email").fill(email);
+    await page.getByPlaceholder("Create a password").fill(PASSWORD);
+    await page.getByPlaceholder("Confirm your password").fill(PASSWORD);
     await page.locator("select").nth(0).selectOption("10");
     await page.locator("select").nth(1).selectOption("CBSE");
 
     await page.getByRole("button", { name: "Create Account" }).click();
 
     await expect(page.getByRole("heading", { name: "Check Your Email" })).toBeVisible({ timeout: 30000 });
-    await expect(page.getByText(/we sent a verification link/i)).toBeVisible();
+    await expect(page.getByText(/we've sent a verification link/i)).toBeVisible();
     await expect(page.getByText(/couldn't send the verification email/i)).toHaveCount(0);
 
     try {

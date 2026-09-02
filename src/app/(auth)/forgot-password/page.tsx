@@ -153,7 +153,7 @@ export default function ForgotPasswordPage() {
             <motion.div
               initial={animationsEnabled ? { opacity: 0, y: -5 } : false}
               animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
-              className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-xl p-3 mb-4 text-sm"
+              className="bg-red-950/30 border border-red-800/50 text-red-400 rounded-xl p-3 mb-4 text-sm"
             >
               {error}
             </motion.div>
@@ -165,8 +165,8 @@ export default function ForgotPasswordPage() {
               className="text-center space-y-4"
             >
               <div className="flex flex-col items-center gap-3 py-4">
-                <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-950/30 flex items-center justify-center">
-                  <CheckCircleIcon className="w-6 h-6 text-green-600 dark:text-green-400" />
+                <div className="w-12 h-12 rounded-full bg-green-950/30 flex items-center justify-center">
+                  <CheckCircleIcon className="w-6 h-6 text-green-400" />
                 </div>
                 <p className="text-sm text-foreground/70">
                   If an account exists for <span className="font-medium">{email}</span>, we sent recovery instructions.
@@ -208,7 +208,7 @@ export default function ForgotPasswordPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter your email"
-                    className="w-full bg-background border border-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                    className="w-full bg-input-bg border border-input-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                     required
                     autoFocus
                     autoComplete="email"
