@@ -24,6 +24,12 @@ test.describe("Critical UI/UX Tests", () => {
       page.on("pageerror", (err) => consoleErrors.push(err.message));
 
       await mockSessionsRoute(page);
+      // Auth pages are gated against direct URL entry; pre-set the
+      // internal-nav flag so the PublicAuthGuard allows them to render
+      // and we can still verify they load without errors.
+      await page.addInitScript(() => {
+        try { sessionStorage.setItem("pb-internal-nav", "1"); } catch {}
+      });
       await page.goto(`http://localhost:3000${route}`);
       await page.waitForLoadState("domcontentloaded");
       await expect(page.locator("body")).toBeVisible();

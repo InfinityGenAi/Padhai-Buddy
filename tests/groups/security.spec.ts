@@ -517,7 +517,8 @@ test.describe("Security: signup verification email failure", () => {
 
   test("shows a recoverable error when the verification email cannot be sent", async ({ page }) => {
     let sendOobCodeCalls = 0;
-    await page.route("**/identitytoolkit.googleapis.com/**", async (route) => {
+    // Intercept Firebase Auth emulator endpoints (used when NEXT_PUBLIC_USE_EMULATORS=true)
+    await page.route("**/localhost:9099/identitytoolkit.googleapis.com/**", async (route) => {
       const url = route.request().url();
       if (url.includes("accounts:sendOobCode")) {
         sendOobCodeCalls++;
@@ -550,7 +551,21 @@ test.describe("Security: signup verification email failure", () => {
 
     const email = uniqueEmail("signup-audit");
 
-    await page.goto("http://localhost:3000/signup", { waitUntil: "domcontentloaded" });
+    await page.addInitScript(() => {
+      // Clear IndexedDB to avoid persisted auth state from Firebase emulator
+      try {
+        const databases = indexedDB.databases ? indexedDB.databases() : Promise.resolve([]);
+        databases.then((dbs) => {
+          dbs.forEach((db) => {
+            if (db.name) indexedDB.deleteDatabase(db.name);
+          });
+        });
+      } catch {}
+      try { localStorage.clear(); } catch {}
+    });
+
+    // Use from=landing query param to bypass direct URL entry guard (persists across redirects)
+    await page.goto("http://localhost:3000/signup?from=landing", { waitUntil: "domcontentloaded" });
 
     await page.getByPlaceholder("Enter your name").fill("Audit Signup");
     await page.getByPlaceholder("Enter your email").fill(email);
@@ -576,7 +591,8 @@ test.describe("Security: signup verification email failure", () => {
   });
 
   test("confirms email was sent on success", async ({ page }) => {
-    await page.route("**/identitytoolkit.googleapis.com/**", async (route) => {
+    // Intercept Firebase Auth emulator endpoints (used when NEXT_PUBLIC_USE_EMULATORS=true)
+    await page.route("**/localhost:9099/identitytoolkit.googleapis.com/**", async (route) => {
       const url = route.request().url();
       if (url.includes("accounts:sendOobCode")) {
         await route.fulfill({
@@ -591,7 +607,21 @@ test.describe("Security: signup verification email failure", () => {
 
     const email = uniqueEmail("signup-ok");
 
-    await page.goto("http://localhost:3000/signup", { waitUntil: "domcontentloaded" });
+    await page.addInitScript(() => {
+      // Clear IndexedDB to avoid persisted auth state from Firebase emulator
+      try {
+        const databases = indexedDB.databases ? indexedDB.databases() : Promise.resolve([]);
+        databases.then((dbs) => {
+          dbs.forEach((db) => {
+            if (db.name) indexedDB.deleteDatabase(db.name);
+          });
+        });
+      } catch {}
+      try { localStorage.clear(); } catch {}
+    });
+
+    // Use from=landing query param to bypass direct URL entry guard (persists across redirects)
+    await page.goto("http://localhost:3000/signup?from=landing", { waitUntil: "domcontentloaded" });
 
     await page.getByPlaceholder("Enter your name").fill("Audit Signup");
     await page.getByPlaceholder("Enter your email").fill(email);

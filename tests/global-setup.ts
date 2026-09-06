@@ -244,7 +244,13 @@ export default async function globalSetup() {
 
   try {
     console.log("Global setup - navigating to login page...");
-    await page.goto("http://localhost:3000/login", { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.addInitScript(() => {
+      // Per spec, /login is gated against direct URL entry. The global setup
+      // needs to be able to perform a real sign-in, so set the internal-nav
+      // flag the landing page would set after a click.
+      try { sessionStorage.setItem("pb-internal-nav", "1"); } catch {}
+    });
+    await page.goto("http://localhost:3000/login?from=landing", { waitUntil: "domcontentloaded", timeout: 60000 });
 
     const currentUrl = page.url();
     console.log("Global setup - current URL:", currentUrl);

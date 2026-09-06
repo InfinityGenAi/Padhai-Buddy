@@ -11,10 +11,10 @@ test.describe("More + Notifications Tests", () => {
 
   test("more page loads with navigation sections", async ({ page }) => {
     await expect(page.locator("h1:has-text('More')").first()).toBeAttached();
-    await expect(page.locator("text=Learn & Practice").first()).toBeAttached();
-    await expect(page.locator("text=Organize & Track").first()).toBeAttached();
-    await expect(page.locator("text=Account").first()).toBeAttached();
-    await expect(page.locator("text=AI Chat").first()).toBeAttached();
+    await expect(page.locator("text=LEARN").first()).toBeAttached();
+    await expect(page.locator("text=ORGANIZE").first()).toBeAttached();
+    await expect(page.locator("text=ACCOUNT").first()).toBeAttached();
+    await expect(page.locator("text=AI Tutor").first()).toBeAttached();
     await expect(page.locator("text=Resources").first()).toBeAttached();
     await expect(page.locator("text=Profile").first()).toBeAttached();
   });

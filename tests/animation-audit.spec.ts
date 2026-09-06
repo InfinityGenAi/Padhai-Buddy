@@ -104,6 +104,11 @@ async function setupAuthPage(page: Page) {
     sessionStorage.clear();
     if (prefs) localStorage.setItem("padhai-buddy-preferences", prefs);
   });
+  await page.addInitScript(() => {
+    // Auth pages are gated against direct URL entry; tests set this flag so
+    // the PublicAuthGuard allows the auth page to render.
+    try { sessionStorage.setItem("pb-internal-nav", "1"); } catch {}
+  });
 }
 
 async function setupDashboardPage(page: Page) {

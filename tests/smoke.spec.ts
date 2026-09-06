@@ -28,9 +28,10 @@ test.describe("Quick Smoke Tests", () => {
       page.on("pageerror", (err) => errors.push(err.message));
 
       await mockSessionsRoute(page);
-      await page.goto("http://localhost:3000/login/");
+      // Use from=landing to bypass direct URL entry guard, or go through landing page
+      await page.goto("http://localhost:3000/login?from=landing");
       await page.waitForLoadState("domcontentloaded");
-      await expect(page.locator("text=Welcome Back")).toBeAttached();
+      await expect(page.locator("text=Welcome back")).toBeAttached();
 
       expect(filterCriticalErrors(errors)).toEqual([]);
     });
