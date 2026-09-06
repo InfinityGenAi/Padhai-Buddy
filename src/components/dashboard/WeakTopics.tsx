@@ -17,7 +17,7 @@ export function WeakTopics({ weakTopics }: WeakTopicsProps) {
       <div className="p-3">
         {weakTopics.length === 0 ? (
           <p className="text-foreground/40 text-sm text-center">
-            All topics strong! Keep up the great work.
+            No topic data yet. Complete some study sessions to see your weak topics.
           </p>
         ) : (
           <div className="space-y-3 max-h-[250px] overflow-y-auto">

@@ -10,6 +10,7 @@ import {
 } from "@heroicons/react/24/outline";
 import AnimatedBackground from "@/components/AnimatedBackground";
 import BrandLogo from "@/components/BrandLogo";
+import PublicAuthGuard from "@/components/PublicAuthGuard";
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
@@ -114,8 +115,9 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
-      <AnimatedBackground animate={animationsEnabled} variant="auth" />
+    <PublicAuthGuard blockDirectUrlEntry>
+      <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
+        <AnimatedBackground animate={animationsEnabled} variant="auth" />
       <motion.div
         variants={animationsEnabled ? staggerContainer : undefined}
         initial={animationsEnabled ? "hidden" : false}
@@ -179,7 +181,7 @@ export default function ForgotPasswordPage() {
                 <button
                   onClick={handleResend}
                   disabled={resendCooldown > 0 || isSubmitting}
-                  className="w-full btn-primary py-3 rounded-xl font-medium disabled:opacity-50 focus-ring"
+                  className="w-full bg-primary text-white rounded-full py-3 font-medium disabled:opacity-50 focus-ring shadow-sm shadow-primary/20 hover:shadow-md hover:shadow-primary/30 transition-all"
                 >
                   {isSubmitting
                     ? "Sending..."
@@ -189,7 +191,7 @@ export default function ForgotPasswordPage() {
                 </button>
                 <Link
                   href="/login"
-                  className="block w-full text-center py-2.5 rounded-xl text-sm font-medium text-foreground/70 hover:text-foreground hover:bg-foreground/5 transition-colors"
+                  className="block w-full text-center py-2.5 rounded-full text-sm font-medium text-foreground/70 hover:text-foreground hover:bg-foreground/5 transition-colors"
                 >
                   Back to Login
                 </Link>
@@ -202,13 +204,13 @@ export default function ForgotPasswordPage() {
                   Email
                 </label>
                 <div className="relative">
-                  <EnvelopeIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
+                  <EnvelopeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter your email"
-                    className="w-full bg-input-bg border border-input-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                    className="w-full bg-white border border-border rounded-full px-11 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                     required
                     autoFocus
                     autoComplete="email"
@@ -219,7 +221,7 @@ export default function ForgotPasswordPage() {
               <motion.button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full btn-primary py-3 rounded-xl font-medium focus-ring"
+                className="w-full bg-primary text-white rounded-full py-3 font-medium focus-ring shadow-sm shadow-primary/20 hover:shadow-md hover:shadow-primary/30 transition-all"
                 whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
                 whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
                 variants={animationsEnabled ? staggerItem : undefined}
@@ -243,5 +245,6 @@ export default function ForgotPasswordPage() {
         </motion.div>
       </motion.div>
     </div>
+    </PublicAuthGuard>
   );
 }

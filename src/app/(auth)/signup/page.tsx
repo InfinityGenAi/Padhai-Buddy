@@ -20,6 +20,7 @@ import type { UserBoard, UserClass } from "@/types";
 import AnimatedBackground from "@/components/AnimatedBackground";
 import BrandLogo from "@/components/BrandLogo";
 import GoogleIcon from "@/components/GoogleIcon";
+import PublicAuthGuard from "@/components/PublicAuthGuard";
 
 const CLASSES: UserClass[] = [5, 6, 7, 8, 9, 10, 11, 12];
 
@@ -48,6 +49,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [selectedClass, setSelectedClass] = useState<UserClass | undefined>(undefined);
   const [selectedBoard, setSelectedBoard] = useState<UserBoard | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
@@ -222,7 +224,7 @@ export default function SignupPage() {
               variants={animationsEnabled ? staggerItem : undefined}
               className="text-3xl font-bold text-primary mb-1"
             >
-              Check your email
+              Check Your Email
             </motion.h1>
             <motion.p
               variants={animationsEnabled ? staggerItem : undefined}
@@ -244,20 +246,20 @@ export default function SignupPage() {
               <motion.div variants={animationsEnabled ? staggerItem : undefined} className="space-y-3">
                 <button
                   onClick={handleVerified}
-                  className="w-full btn-primary py-3 rounded-xl font-medium focus-ring"
+                  className="w-full bg-primary text-white rounded-full py-3 font-medium focus-ring shadow-sm shadow-primary/20 hover:shadow-md hover:shadow-primary/30 transition-all"
                 >
                   I&apos;ve Verified
                 </button>
                 <button
                   onClick={handleResend}
                   disabled={resendCooldown > 0}
-                  className="w-full py-2.5 rounded-xl font-medium text-sm text-foreground/70 hover:text-foreground hover:bg-foreground/5 transition-colors disabled:opacity-50"
+                  className="w-full py-2.5 rounded-full font-medium text-sm text-foreground/70 hover:text-foreground hover:bg-foreground/5 transition-colors disabled:opacity-50"
                 >
                   {resendCooldown > 0 ? `Resend Email (${resendCooldown.toString().padStart(2, '0')}s)` : "Resend Email"}
                 </button>
                 <button
                   onClick={() => window.open("https://mail.google.com/", "_blank")}
-                  className="w-full py-2.5 rounded-xl font-medium text-sm text-foreground/70 hover:text-foreground hover:bg-foreground/5 transition-colors"
+                  className="w-full py-2.5 rounded-full font-medium text-sm text-foreground/70 hover:text-foreground hover:bg-foreground/5 transition-colors"
                 >
                   Open Email
                 </button>
@@ -281,8 +283,9 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
-      <AnimatedBackground animate={animationsEnabled} variant="auth" />
+    <PublicAuthGuard>
+      <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
+        <AnimatedBackground animate={animationsEnabled} variant="auth" />
       <motion.div
         variants={animationsEnabled ? staggerContainer : undefined}
         initial={animationsEnabled ? "hidden" : false}
@@ -327,7 +330,7 @@ export default function SignupPage() {
           <motion.button
             onClick={handleGoogle}
             disabled={isSubmitting}
-            className="w-full glass card-subtle border border-border rounded-xl py-3 font-medium flex items-center justify-center gap-2 hover:bg-foreground/5 transition-colors disabled:opacity-50 focus-ring"
+            className="w-full bg-white border border-border rounded-full py-3 font-medium flex items-center justify-center gap-2 hover:bg-foreground/5 transition-colors disabled:opacity-50 focus-ring shadow-sm"
             whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
             whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
             variants={animationsEnabled ? staggerItem : undefined}
@@ -339,7 +342,7 @@ export default function SignupPage() {
           <motion.button
             onClick={scrollToEmailForm}
             disabled={isSubmitting}
-            className="w-full glass card-subtle border border-border rounded-xl py-3 font-medium flex items-center justify-center gap-2 hover:bg-foreground/5 transition-colors disabled:opacity-50 focus-ring"
+            className="w-full bg-white border border-border rounded-full py-3 font-medium flex items-center justify-center gap-2 hover:bg-foreground/5 transition-colors disabled:opacity-50 focus-ring shadow-sm"
             whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
             whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
             variants={animationsEnabled ? staggerItem : undefined}
@@ -366,13 +369,13 @@ export default function SignupPage() {
                   Full Name
                 </label>
                 <div className="relative">
-                  <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
+                  <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Enter your name"
-                    className="w-full bg-input-bg border border-input-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                    className="w-full bg-white border border-border rounded-full px-11 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                     required
                     autoComplete="name"
                   />
@@ -386,14 +389,14 @@ export default function SignupPage() {
                   Email
                 </label>
                 <div className="relative">
-                  <EnvelopeIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
+                  <EnvelopeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
                   <input
                     ref={emailInputRef}
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter your email"
-                    className="w-full bg-input-bg border border-input-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                    className="w-full bg-white border border-border rounded-full px-11 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                     required
                     autoComplete="email"
                   />
@@ -407,13 +410,13 @@ export default function SignupPage() {
                   Password
                 </label>
                 <div className="relative">
-                  <LockClosedIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
+                  <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
                   <input
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Create a password"
-                    className="w-full bg-input-bg border border-input-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors pr-12"
+                    className="w-full bg-white border border-border rounded-full px-11 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors pr-12"
                     required
                     minLength={6}
                     autoComplete="new-password"
@@ -421,7 +424,7 @@ export default function SignupPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground transition-colors"
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? (
@@ -440,17 +443,29 @@ export default function SignupPage() {
                   Confirm Password
                 </label>
                 <div className="relative">
-                  <LockClosedIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
+                  <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
                   <input
-                    type="password"
+                    type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirm your password"
-                    className="w-full bg-input-bg border border-input-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                    className="w-full bg-white border border-border rounded-full px-11 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors pr-12"
                     required
                     minLength={6}
                     autoComplete="new-password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground transition-colors"
+                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeSlashIcon className="w-5 h-5" />
+                    ) : (
+                      <EyeIcon className="w-5 h-5" />
+                    )}
+                  </button>
                 </div>
               </motion.div>
 
@@ -463,11 +478,11 @@ export default function SignupPage() {
                     Class
                   </label>
                   <div className="relative">
-                    <AcademicCapIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
+                    <AcademicCapIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
                     <select
                       value={selectedClass ?? ""}
                       onChange={(e) => setSelectedClass(e.target.value ? Number(e.target.value) as UserClass : undefined)}
-                      className="w-full bg-input-bg border border-input-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors appearance-none pr-10"
+                      className="w-full bg-white border border-border rounded-full px-11 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors appearance-none pr-10"
                       required
                     >
                       <option value="">Select Class</option>
@@ -477,7 +492,7 @@ export default function SignupPage() {
                         </option>
                       ))}
                     </select>
-                    <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/40 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
@@ -488,11 +503,11 @@ export default function SignupPage() {
                     Board
                   </label>
                   <div className="relative">
-                    <DocumentTextIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
+                    <DocumentTextIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
                     <select
                       value={selectedBoard ?? ""}
                       onChange={(e) => setSelectedBoard(e.target.value ? e.target.value as UserBoard : undefined)}
-                      className="w-full bg-input-bg border border-input-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors appearance-none pr-10"
+                      className="w-full bg-white border border-border rounded-full px-11 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors appearance-none pr-10"
                       required
                     >
                       <option value="">Select Board</option>
@@ -502,7 +517,7 @@ export default function SignupPage() {
                         </option>
                       ))}
                     </select>
-                    <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/40 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
@@ -512,7 +527,7 @@ export default function SignupPage() {
               <motion.button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full btn-primary py-3 rounded-xl font-medium focus-ring"
+                className="w-full bg-primary text-white rounded-full py-3 font-medium focus-ring shadow-sm shadow-primary/20 hover:shadow-md hover:shadow-primary/30 transition-all"
                 whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
                 whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
                 variants={animationsEnabled ? staggerItem : undefined}
@@ -537,5 +552,6 @@ export default function SignupPage() {
         </motion.div>
       </motion.div>
     </div>
+    </PublicAuthGuard>
   );
 }

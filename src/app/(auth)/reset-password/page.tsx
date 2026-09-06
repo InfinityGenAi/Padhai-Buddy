@@ -143,7 +143,7 @@ export default function ResetPasswordPage() {
             <motion.div variants={animationsEnabled ? staggerItem : undefined}>
               <Link
                 href="/login"
-                className="block w-full btn-primary py-2.5 rounded-xl font-medium text-center"
+                className="block w-full bg-primary text-white py-3 rounded-full font-medium text-center shadow-sm shadow-primary/20 hover:shadow-md hover:shadow-primary/30 transition-all"
               >
                 Back to Login
               </Link>
@@ -204,13 +204,13 @@ export default function ResetPasswordPage() {
                 New Password
               </label>
               <div className="relative">
-                <LockClosedIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
+                <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
                 <input
                   type={showNewPassword ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Enter new password"
-                  className="w-full bg-input-bg border border-input-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors pr-12"
+                  className="w-full bg-white border border-border rounded-full px-11 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors pr-12"
                   required
                   minLength={6}
                   autoFocus
@@ -218,7 +218,7 @@ export default function ResetPasswordPage() {
                 <button
                   type="button"
                   onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground transition-colors"
                   aria-label={showNewPassword ? "Hide password" : "Show password"}
                 >
                   {showNewPassword ? (
@@ -235,20 +235,20 @@ export default function ResetPasswordPage() {
                 Confirm New Password
               </label>
               <div className="relative">
-                <LockClosedIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
+                <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" />
                   <input
                     type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirm new password"
-                    className="w-full bg-input-bg border border-input-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors pr-12"
+                    className="w-full bg-white border border-border rounded-full px-11 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors pr-12"
                     required
                     minLength={6}
                   />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground transition-colors"
                   aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                 >
                   {showConfirmPassword ? (
@@ -263,7 +263,7 @@ export default function ResetPasswordPage() {
             <motion.button
               type="submit"
               disabled={isSubmitting || !oobCode}
-              className="w-full btn-primary py-2.5 rounded-xl font-medium disabled:opacity-50"
+              className="w-full bg-primary text-white rounded-full py-3 font-medium disabled:opacity-50 shadow-sm shadow-primary/20 hover:shadow-md hover:shadow-primary/30 transition-all"
               whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
               whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
               variants={animationsEnabled ? staggerItem : undefined}

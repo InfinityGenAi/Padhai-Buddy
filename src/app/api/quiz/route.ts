@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     if (body.action === "submit") {
       const { attemptId, questions, subject } = body;
       const sub = String(subject);
-      if (!attemptId || typeof attemptId !== "string" || !Array.isArray(questions)) {
+      if (!sub || !attemptId || typeof attemptId !== "string" || !Array.isArray(questions)) {
         return NextResponse.json({ error: "attemptId and questions are required" }, { status: 400 });
       }
 
@@ -211,7 +211,7 @@ export async function POST(req: NextRequest) {
 
           await masteryRef.set(
             {
-              subject,
+              subject: sub,
               topic: r.topic,
               mastery: newMastery,
               totalQuestions: newTotal,
@@ -236,7 +236,7 @@ export async function POST(req: NextRequest) {
               .set({
                 source: "quiz" as const,
                 sourceId: attemptId,
-                subject,
+                subject: sub,
                 topic: r.topic,
                 question: r.serverQ.question,
                 userAnswer: r.userAnswer,

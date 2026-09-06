@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, useReducedMotion } from "framer-motion";
 import { useSettingsModal } from "@/contexts/SettingsModalContext";
+import { useState } from "react";
 import {
   Squares2X2Icon,
   DocumentTextIcon,
@@ -15,152 +16,212 @@ import {
   BookOpenIcon,
   PhotoIcon,
   ChatBubbleLeftEllipsisIcon,
+  BellAlertIcon,
+  ChartBarIcon,
+  TrophyIcon,
+  ArrowTopRightOnSquareIcon,
+  CommandLineIcon,
+  ChevronRightIcon,
 } from "@heroicons/react/24/outline";
+import KeyboardShortcutsDialog from "@/components/KeyboardShortcutsDialog";
+
+interface NavLink {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  desc?: string;
+  href?: string;
+  onClick?: () => void;
+}
 
 export default function MorePage() {
   const { preferences } = useAuth();
   const { open } = useSettingsModal();
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
-  const studyOptions = [
+  const learn: NavLink[] = [
     {
       icon: ChatBubbleLeftEllipsisIcon,
-      title: "AI Chat",
+      title: "AI Tutor",
+      desc: "Ask any study question and get step-by-step help",
       href: "/dashboard/chat",
     },
     {
       icon: PhotoIcon,
       title: "Photo Doubt",
+      desc: "Snap a problem and get instant solutions",
       href: "/dashboard/photo-doubt",
     },
     {
       icon: BookOpenIcon,
-      title: "Quiz",
+      title: "Practice Quiz",
+      desc: "Board-aligned quizzes for every subject",
       href: "/dashboard/quiz",
     },
     {
       icon: Squares2X2Icon,
       title: "Flashcards",
+      desc: "Spaced repetition for any topic",
       href: "/dashboard/flashcards",
     },
+  ];
+
+  const organize: NavLink[] = [
     {
       icon: DocumentTextIcon,
       title: "Notes",
+      desc: "Organize study notes with subjects and tags",
       href: "/dashboard/notes",
     },
     {
+      icon: FolderIcon,
+      title: "Resources",
+      desc: "Save videos, articles, PDFs and links",
+      href: "/dashboard/resources",
+    },
+    {
       icon: CalendarIcon,
-      title: "Planner",
+      title: "Study Planner",
+      desc: "Plan your day and build a focused schedule",
       href: "/dashboard/planner",
     },
     {
       icon: ClockIcon,
-      title: "Timer",
+      title: "Focus Timer",
+      desc: "Pomodoro and stopwatch for deep focus",
       href: "/dashboard/timer",
     },
   ];
 
-  const resourcesOptions = [
+  const track: NavLink[] = [
     {
-      icon: FolderIcon,
-      title: "Resources",
-      href: "/dashboard/resources",
+      icon: ChartBarIcon,
+      title: "Progress",
+      desc: "Charts and insights on your study time",
+      href: "/dashboard/progress",
     },
     {
-      icon: DocumentTextIcon,
+      icon: TrophyIcon,
+      title: "Leaderboard",
+      desc: "See how you compare with other learners",
+      href: "/dashboard/leaderboard",
+    },
+    {
+      icon: FolderIcon,
       title: "History",
+      desc: "Past doubts, chats, and study sessions",
       href: "/dashboard/history",
     },
   ];
 
-  const accountOptions = [
+  const account: NavLink[] = [
     {
       icon: UserIcon,
       title: "Profile",
+      desc: "Manage your personal information",
       href: "/dashboard/profile",
+    },
+    {
+      icon: BellAlertIcon,
+      title: "Notifications",
+      desc: "Recent updates and alerts",
+      href: "/dashboard/notes",
     },
     {
       icon: Cog6ToothIcon,
       title: "Settings",
+      desc: "Animations, sound, privacy and more",
       onClick: () => open(),
     },
   ];
 
+  const help: NavLink[] = [
+    {
+      icon: CommandLineIcon,
+      title: "Keyboard Shortcuts",
+      desc: "Work faster with these shortcuts",
+      onClick: () => setShortcutsOpen(true),
+    },
+  ];
+
+  const sections: { label: string; items: NavLink[] }[] = [
+    { label: "LEARN", items: learn },
+    { label: "ORGANIZE", items: organize },
+    { label: "TRACK", items: track },
+    { label: "ACCOUNT", items: account },
+    { label: "HELP", items: help },
+  ];
+
   return (
-    <motion.div
-      initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined}
-      animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined}
-      className="space-y-6 w-full"
-    >
-      <div className="flex items-center gap-2">
-        <Squares2X2Icon className="w-6 h-6 text-primary" />
-        <h1 className="text-xl font-semibold">More</h1>
-      </div>
-
-      <div className="grid gap-6">
-        <div>
-          <h2 className="text-sm font-medium text-foreground/60 uppercase tracking-wider mb-4">Learn & Practice</h2>
-          <div className="space-y-3">
-            {studyOptions.map((option) => (
-              <Link
-                key={option.title}
-                href={option.href}
-                className="flex items-center gap-3 rounded-lg border-border/50 p-3 hover:bg-foreground/[0.02] transition-colors cursor-pointer"
-              >
-                <option.icon className="w-5 h-5 text-primary flex-shrink-0" />
-                <span className="font-medium text-foreground">{option.title}</span>
-              </Link>
-            ))}
-          </div>
+    <>
+      <motion.div
+        initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined}
+        animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined}
+        className="space-y-6 w-full"
+      >
+        <div className="flex items-center gap-2">
+          <Squares2X2Icon className="w-6 h-6 text-primary" />
+          <h1 className="text-xl font-semibold">More</h1>
         </div>
 
-        <div>
-          <h2 className="text-sm font-medium text-foreground/60 uppercase tracking-wider mb-4">Organize & Track</h2>
-          <div className="space-y-3">
-            {resourcesOptions.map((option) => (
-              <Link
-                key={option.title}
-                href={option.href}
-                className="flex items-center gap-3 rounded-lg border-border/50 p-3 hover:bg-foreground/[0.02] transition-colors cursor-pointer"
-              >
-                <option.icon className="w-5 h-5 text-primary flex-shrink-0" />
-                <span className="font-medium text-foreground">{option.title}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <h2 className="text-sm font-medium text-foreground/60 uppercase tracking-wider mb-4">Account</h2>
-          <div className="space-y-3">
-            {accountOptions.map((option) => {
-              if (option.onClick) {
-                return (
-                  <button
-                    key={option.title}
-                    onClick={option.onClick}
-                    className="flex items-center gap-3 rounded-lg border-border/50 p-3 hover:bg-foreground/[0.02] transition-colors cursor-pointer w-full text-left"
-                  >
-                    <option.icon className="w-5 h-5 text-primary flex-shrink-0" />
-                    <span className="font-medium text-foreground">{option.title}</span>
-                  </button>
+        {sections.map((section) => (
+          <section key={section.label}>
+            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/45 mb-3">
+              {section.label}
+            </h2>
+            <div className="space-y-2">
+              {section.items.map((item) => {
+                const body = (
+                  <>
+                    <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                      <item.icon className="w-4.5 h-4.5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground text-sm">{item.title}</p>
+                      {item.desc && (
+                        <p className="text-xs text-foreground/55 mt-0.5">{item.desc}</p>
+                      )}
+                    </div>
+                    {item.href?.startsWith("http") ? (
+                      <ArrowTopRightOnSquareIcon className="w-4 h-4 text-foreground/30 flex-shrink-0" />
+                    ) : (
+                      <ChevronRightIcon className="w-4 h-4 text-foreground/30 flex-shrink-0" />
+                    )}
+                  </>
                 );
-              }
-              return (
-                <Link
-                  key={option.title}
-                  href={option.href}
-                  className="flex items-center gap-3 rounded-lg border-border/50 p-3 hover:bg-foreground/[0.02] transition-colors cursor-pointer w-full text-left"
-                >
-                  <option.icon className="w-5 h-5 text-primary flex-shrink-0" />
-                  <span className="font-medium text-foreground">{option.title}</span>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </motion.div>
+                const className =
+                  "flex items-center gap-3 rounded-xl border border-border/60 bg-card p-3 hover:bg-foreground/[0.02] hover:border-primary/30 transition-colors cursor-pointer w-full text-left focus-ring";
+
+                if (item.onClick) {
+                  return (
+                    <button
+                      key={item.title}
+                      onClick={item.onClick}
+                      className={className}
+                    >
+                      {body}
+                    </button>
+                  );
+                }
+                if (item.href) {
+                  return (
+                    <Link key={item.title} href={item.href} className={className}>
+                      {body}
+                    </Link>
+                  );
+                }
+                return null;
+              })}
+            </div>
+          </section>
+        ))}
+      </motion.div>
+
+      <KeyboardShortcutsDialog
+        isOpen={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+      />
+    </>
   );
 }

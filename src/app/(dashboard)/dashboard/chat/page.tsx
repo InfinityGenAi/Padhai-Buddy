@@ -151,7 +151,7 @@ function ChatEmptyState({ studyModes }: { studyModes: readonly { id: string; lab
       </motion.div>
       <h3 className="text-lg font-semibold text-foreground mb-1">Start a New Conversation</h3>
       <p className="text-sm text-foreground/60 max-w-sm mb-6">
-        Ask Padhai Buddy any study question â€” we&apos;ll explain it step by step, tailored to your class and board.
+        Ask Padhai Buddy any study question — we&apos;ll explain it step by step, tailored to your class and board.
       </p>
       <div className="w-full max-w-sm space-y-2 text-left">
         <p className="text-xs font-medium text-foreground/60">Try asking:</p>
@@ -409,18 +409,7 @@ export default function ChatPage() {
   }, [user?.uid, activeConversationId, scrollToBottom]);
 
   // Escape key handler for closing modals
-  useEffect(() => {
-    function handleEscape(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        if (renameConvId) setRenameConvId(null);
-        if (deleteConfirmId) setDeleteConfirmId(null);
-        if (sidebarOpen) setSidebarOpen(false);
-      }
-    }
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
-  }, [renameConvId, deleteConfirmId, sidebarOpen]);
-
+  // Keyboard shortcuts: N = New Chat, Esc = Close modals
   const startNewChat = useCallback(() => {
     setActiveConversationId(null);
     setMessages([]);
@@ -437,6 +426,28 @@ export default function ChatPage() {
     setStudyMode(null);
     textareaRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        if (renameConvId) setRenameConvId(null);
+        if (deleteConfirmId) setDeleteConfirmId(null);
+        if (sidebarOpen) setSidebarOpen(false);
+        return;
+      }
+      if (e.key === "n" || e.key === "N") {
+        // Ignore if user is typing in an input/textarea
+        const active = document.activeElement as HTMLElement | null;
+        if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable)) {
+          return;
+        }
+        e.preventDefault();
+        startNewChat();
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [renameConvId, deleteConfirmId, sidebarOpen, startNewChat]);
 
   useLayoutEffect(() => {
     if (searchParams.get("new") === "1") {
@@ -695,6 +706,11 @@ body: JSON.stringify({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      sendMessage();
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey && preferences.enterToSend) {
       e.preventDefault();
       sendMessage();

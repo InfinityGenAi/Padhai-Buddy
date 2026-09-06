@@ -50,6 +50,7 @@ import {
 import type { UserPreferences, UserSession, Conversation } from "@/types";
 import { playPasswordChange, playSessionLogout, playSaveSuccess } from "@/lib/sounds";
 import BrandLogo from "./BrandLogo";
+import KeyboardShortcutsDialog from "./KeyboardShortcutsDialog";
 
 export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const router = useRouter();
@@ -71,6 +72,7 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
   const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
   const [showDeleteAccountPassword, setShowDeleteAccountPassword] = useState(false);
   const [currentSessionId] = useState(() => getOrCreateSessionId());
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !user?.uid) return;
@@ -335,17 +337,17 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                   {notification.text}
                 </motion.div>
               )}
-              {/* APPEARANCE */}
+              {/* ANIMATIONS */}
               <div className="subtle-card rounded-xl p-4">
                 <h4 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40 mb-3">
-                  Appearance
+                  Animations
                 </h4>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
                       <SparklesIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
                       <div className="min-w-0">
-                        <p className="text-sm font-medium">Animations</p>
+                        <p className="text-sm font-medium">Enable Animations</p>
                         <p className="text-xs text-foreground/50 truncate">
                           Enable interface animations
                         </p>
@@ -364,11 +366,19 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                       <motion.div
                         animate={{ x: preferences.animationsEnabled ? 20 : 2 }}
                         transition={{ type: "spring", damping: 15, stiffness: 200 }}
-                        className="w-5 h-5 bg-foreground/20 rounded-full shadow-md absolute top-0.5"
+                        className="w-5 h-5 bg-white rounded-full shadow-md absolute top-0.5"
                       />
                     </motion.button>
                   </div>
+                </div>
+              </div>
 
+              {/* SOUND */}
+              <div className="subtle-card rounded-xl p-4">
+                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40 mb-3">
+                  Sound
+                </h4>
+                <div className="space-y-4">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
                       {preferences.soundEnabled ? (
@@ -377,9 +387,9 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                         <SpeakerXMarkIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
                       )}
                       <div className="min-w-0">
-                        <p className="text-sm font-medium">Sounds</p>
+                        <p className="text-sm font-medium">Sound Effects</p>
                         <p className="text-xs text-foreground/50 truncate">
-                          Play sounds for chat actions
+                          Play sounds for chat and study actions
                         </p>
                       </div>
                     </div>
@@ -396,7 +406,7 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                       <motion.div
                         animate={{ x: preferences.soundEnabled ? 20 : 2 }}
                         transition={{ type: "spring", damping: 15, stiffness: 200 }}
-                        className="w-5 h-5 bg-foreground/20 rounded-full shadow-md absolute top-0.5"
+                        className="w-5 h-5 bg-white rounded-full shadow-md absolute top-0.5"
                       />
                     </motion.button>
                   </div>
@@ -491,6 +501,40 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                       </div>
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* NOTIFICATIONS */}
+              <div className="subtle-card rounded-xl p-4">
+                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40 mb-3">
+                  Notifications
+                </h4>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <BellIcon className="w-5 h-5 text-foreground/60 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">In-app notifications</p>
+                      <p className="text-xs text-foreground/50 truncate">
+                        Show updates, reminders and study nudges
+                      </p>
+                    </div>
+                  </div>
+                  <motion.button
+                    role="switch"
+                    aria-checked={preferences.notificationsEnabled}
+                    aria-label="Notifications"
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleUpdate({ notificationsEnabled: !preferences.notificationsEnabled })}
+                    className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+                      preferences.notificationsEnabled ? "bg-primary" : "bg-foreground/20"
+                    }`}
+                  >
+                    <motion.div
+                      animate={{ x: preferences.notificationsEnabled ? 20 : 2 }}
+                      transition={{ type: "spring", damping: 15, stiffness: 200 }}
+                      className="w-5 h-5 bg-white rounded-full shadow-md absolute top-0.5"
+                    />
+                  </motion.button>
                 </div>
               </div>
 
@@ -667,6 +711,46 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                       {user?.board || "—"}
                     </span>
                   </div>
+                </div>
+              </div>
+
+              {/* KEYBOARD SHORTCUTS */}
+              <div className="subtle-card rounded-xl p-4">
+                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40 mb-3">
+                  Keyboard Shortcuts
+                </h4>
+                <p className="text-xs text-foreground/55 mb-3">
+                  Work faster with these shortcuts. We never hijack essential browser shortcuts.
+                </p>
+                <button
+                  onClick={() => setShortcutsOpen(true)}
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-sm font-medium border border-border hover:bg-foreground/5 transition-colors"
+                >
+                  <span>View all keyboard shortcuts</span>
+                  <ArrowRightIcon className="w-4 h-4 text-foreground/50" />
+                </button>
+              </div>
+
+              {/* PRIVACY & SECURITY */}
+              <div className="subtle-card rounded-xl p-4">
+                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40 mb-3">
+                  Privacy & Security
+                </h4>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => setChangePasswordOpen(true)}
+                    className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-foreground/80 hover:bg-foreground/5 transition-colors border border-border"
+                  >
+                    <span>Change Password</span>
+                    <ArrowRightIcon className="w-4 h-4 text-foreground/50" />
+                  </button>
+                  <button
+                    onClick={refreshSessions}
+                    className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-foreground/80 hover:bg-foreground/5 transition-colors border border-border"
+                  >
+                    <span>Manage Active Sessions</span>
+                    <ArrowRightIcon className="w-4 h-4 text-foreground/50" />
+                  </button>
                 </div>
               </div>
 
@@ -1108,6 +1192,10 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
           </AnimatePresence>
         </motion.div>
       )}
+      <KeyboardShortcutsDialog
+        isOpen={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+      />
     </AnimatePresence>
   );
 }

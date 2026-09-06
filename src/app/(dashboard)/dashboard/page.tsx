@@ -412,7 +412,7 @@ const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / today
   }, [mistakeBank, weakTopics, todayPlans, continueStudySet]);
 
   const formatStudyTime = (minutes: number) => {
-    if (minutes <= 0) return "â€”";
+    if (minutes <= 0) return "0m";
     if (minutes < 60) return `${minutes}m`;
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
@@ -441,18 +441,16 @@ const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / today
   const stats = [
     {
       label: "Doubts Solved",
-      value: loading ? "â€¦" : String(totalDoubts),
+      value: loading ? "…" : String(totalDoubts),
       sublabel: "All Time",
-      change: "+12 this week",
       icon: ChatBubbleLeftEllipsisIcon,
       colorClass: "text-accent-blue",
       bgClass: "bg-blue-950/30",
     },
     {
       label: "Study Time",
-      value: loading ? "â€¦" : formatStudyTime(weeklyStudyMinutes),
+      value: loading ? "…" : formatStudyTime(weeklyStudyMinutes),
       sublabel: "This Week",
-      change: "+2h this week",
       icon: ClockIcon,
       colorClass: "text-accent-teal",
       bgClass: "bg-teal-950/30",
@@ -461,7 +459,6 @@ const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / today
       label: "Quizzes Taken",
       value: String(localStudyStats.quizzes),
       sublabel: "Total",
-      change: "+5 this week",
       icon: BookOpenIcon,
       colorClass: "text-accent-amber",
       bgClass: "bg-amber-950/30",
@@ -470,19 +467,17 @@ const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / today
       label: "Flashcards Learned",
       value: String(localStudyStats.flashcards),
       sublabel: "Total",
-      change: "+8 this week",
       icon: Squares2X2Icon,
       colorClass: "text-accent-emerald",
       bgClass: "bg-emerald-500/10",
     },
     {
       label: "Score Average",
-      value: localStudyStats.avgScore ? `${localStudyStats.avgScore}%` : "â€”",
+      value: localStudyStats.avgScore ? `${localStudyStats.avgScore}%` : "—",
       sublabel: "Best attempt",
-      change: "+3% this week",
       icon: ChartBarIcon,
       colorClass: "text-accent-indigo",
-bgClass: "bg-indigo-950/30",
+      bgClass: "bg-indigo-950/30",
     },
   ];
 
@@ -539,14 +534,18 @@ const renderInsight = () => {
     >
       {/* Welcome Header */}
       <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
-        <div className="flex items-center gap-3 mb-1">
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight sm:hidden">
-            Hi, Student! ðŸ‘‹
+        <div className="flex items-center gap-3 mb-1 sm:hidden">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+            Hi, {user?.name?.split(" ")[0] || "there"}! 👋
           </h1>
-          <span className="hidden sm:inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary">
-            Class 10 - CBSE
-          </span>
         </div>
+        {user?.class && user?.board && (
+          <div className="hidden sm:flex items-center gap-3 mb-1">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary">
+              Class {user.class} — {user.board}
+            </span>
+          </div>
+        )}
         <p className="text-sm sm:text-base text-foreground/55 mt-1 sm:hidden">
           Let&apos;s make today an amazing learning day.
         </p>
@@ -571,9 +570,6 @@ const renderInsight = () => {
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] sm:text-xs text-foreground/40">{stat.sublabel}</span>
-                {stat.change && (
-                  <span className="text-[10px] sm:text-xs font-medium text-accent-green">{stat.change}</span>
-                )}
               </div>
             </div>
           ))}
@@ -640,7 +636,7 @@ const renderInsight = () => {
                       </button>
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm truncate ${item.completed ? "text-foreground/35 line-through" : "text-foreground/75"}`}>
-                          {item.subject} â€” {item.title}
+                          {item.subject} — {item.title}
                         </p>
                       </div>
                       <span className="text-xs text-foreground/40 flex-shrink-0">{item.durationMinutes} min</span>
@@ -752,7 +748,7 @@ className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 tran
                   strokeLinecap="round"
                   stroke="url(#progressGradient)"
                   strokeDasharray="326.7"
-                  strokeDashoffset="81.675"
+                  strokeDashoffset={326.7 - (326.7 * (Math.max(0, Math.min(100, studyStreak > 0 ? Math.min(100, studyStreak * 14) : 0)) / 100))}
                   className="transition-all duration-1000"
                 />
                 <defs>
@@ -764,7 +760,9 @@ className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 tran
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
-                  <p className="text-3xl font-bold text-foreground">75%</p>
+                  <p className="text-3xl font-bold text-foreground">
+                    {studyStreak > 0 ? `${Math.min(100, studyStreak * 14)}%` : "0%"}
+                  </p>
                   <p className="text-[10px] text-foreground/40 font-medium">Progress</p>
                 </div>
               </div>
