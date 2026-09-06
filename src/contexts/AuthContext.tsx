@@ -20,7 +20,7 @@ import { deleteCurrentSession } from "@/lib/sessions";
 import type { UserProfile, UserBoard, UserClass, UserPreferences } from "@/types";
 
 const DEFAULT_PREFERENCES: UserPreferences = {
-  soundEnabled: true,
+  soundEnabled: false,
   soundVolume: "medium",
   soundCategories: {
     ui: true,
