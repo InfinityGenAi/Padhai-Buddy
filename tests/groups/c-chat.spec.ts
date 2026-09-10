@@ -19,13 +19,16 @@ function mockChatApi(page: Page, opts: { delayMs?: number; longAnswers?: boolean
       const answer = longAnswers
         ? `Mocked answer #${requestCount}. This is a longer line of mock response text used to make the conversation tall enough to scroll. The explanation continues across several sentences.`
         : `Mocked answer #${requestCount}`;
+
+      // Mock SSE streaming response like the real API
       await route.fulfill({
         status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          answer,
-          userId: "mock-user",
-        }),
+        contentType: "text/event-stream",
+        headers: {
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
+        body: `data: ${JSON.stringify({ content: answer })}\n\ndata: [DONE]\n\n`,
       });
       return;
     }

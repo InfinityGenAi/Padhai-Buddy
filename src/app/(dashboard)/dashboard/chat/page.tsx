@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { flushSync } from "react-dom";
@@ -151,7 +151,7 @@ function ChatEmptyState({ studyModes }: { studyModes: readonly { id: string; lab
       </motion.div>
       <h3 className="text-lg font-semibold text-foreground mb-1">Start a New Conversation</h3>
       <p className="text-sm text-foreground/60 max-w-sm mb-6">
-        Ask Padhai Buddy any study question — we&apos;ll explain it step by step, tailored to your class and board.
+        Ask Padhai Buddy any study question � we&apos;ll explain it step by step, tailored to your class and board.
       </p>
       <div className="w-full max-w-sm space-y-2 text-left">
         <p className="text-xs font-medium text-foreground/60">Try asking:</p>
@@ -575,42 +575,103 @@ export default function ChatPage() {
       playSend();
     }
 
-    let aiMessage: ChatMessage | null = null;
+    // aiMessage will be assigned before first use in the try block
+    let aiMessage!: ChatMessage;
 
     try {
       const token = await getFirebaseIdToken();
+
+      // Build conversation history from current messages (excluding the one we just added)
+      const historyMessages = messagesRef.current
+        .filter((msg) => msg.id !== userMessage.id)
+        .map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        }));
+
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-body: JSON.stringify({
-            message: userMessage.content,
-            class: user.class,
-            board: user.board,
-            responseStyle: preferences.responseStyle,
-            stepByStep: preferences.stepByStep,
-            language: preferences.language,
-            studyMode: studyMode,
-          }),
+        body: JSON.stringify({
+          message: userMessage.content,
+          class: user.class,
+          board: user.board,
+          responseStyle: preferences.responseStyle,
+          stepByStep: preferences.stepByStep,
+          language: preferences.language,
+          studyMode: studyMode,
+          history: historyMessages,
+          stream: true,
+        }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to get response");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to get response");
+      }
 
-      aiMessage = {
-        id: `temp-${generateId()}`,
+      // Handle streaming response
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedContent = "";
+      const aiMessageId = `temp-${generateId()}`;
+
+      // Create a placeholder AI message that will be updated as chunks arrive
+      const initialAiMessage: ChatMessage = {
+        id: aiMessageId,
         role: "assistant",
-        content: data.answer,
+        content: "",
         createdAt: Date.now(),
       };
-      aiMessage.tempId = aiMessage.id;
-      pendingMessages.current.set(aiMessage.id, aiMessage);
-      if (aiMessage) {
-        const msg = aiMessage;
-        messagesRef.current = [...messagesRef.current, msg];
-        setMessages((prev) => [...prev, msg]);
+      initialAiMessage.tempId = aiMessageId;
+      aiMessage = initialAiMessage;
+      pendingMessages.current.set(aiMessageId, aiMessage);
+      messagesRef.current = [...messagesRef.current, aiMessage];
+      setMessages((prev) => [...prev, aiMessage]);
+
+      if (reader) {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split("\n");
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6).trim();
+                if (data === "[DONE]") {
+                  break;
+                }
+                try {
+                  const parsed = JSON.parse(data);
+                  if (parsed.content) {
+                    accumulatedContent += parsed.content;
+                    // Update the AI message with accumulated content
+                    aiMessage = { ...aiMessage!, content: accumulatedContent };
+                    pendingMessages.current.set(aiMessageId, aiMessage!);
+                    messagesRef.current = messagesRef.current.map((msg) =>
+                      msg.id === aiMessageId ? aiMessage! : msg
+                    );
+                    setMessages((prev) => prev.map((msg) =>
+                      msg.id === aiMessageId ? aiMessage! : msg
+                    ));
+                  } else if (parsed.error) {
+                    throw new Error(parsed.error);
+                  }
+                } catch {
+                  // Ignore parse errors for partial chunks
+                }
+              }
+            }
+          }
+        } finally {
+          reader.releaseLock();
+        }
       }
 
       if (preferences.soundEnabled) {
@@ -773,6 +834,13 @@ body: JSON.stringify({
     });
     try {
       const token = await getFirebaseIdToken();
+
+      // Build conversation history from current messages
+      const historyMessages = messagesRef.current.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -787,6 +855,7 @@ body: JSON.stringify({
           stepByStep: preferences.stepByStep,
           language: preferences.language,
           studyMode,
+          history: historyMessages,
         }),
       });
       const data = await res.json();

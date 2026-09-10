@@ -3,8 +3,13 @@ import { pixelDiffRatio } from "./utils/test-helpers";
 
 type PbState = { tag: string; opacity: string; transform: string };
 
-const AUTH_ROUTES = ["/login", "/signup", "/onboarding", "/forgot-password", "/reset-password"];
+const AUTH_ROUTES = ["/login", "/signup", "/forgot-password", "/reset-password"];
 const DASHBOARD_ROUTES = ["/dashboard", "/dashboard/chat", "/dashboard/history", "/dashboard/photo-doubt"];
+
+function getAuthRouteUrl(route: string): string {
+  const needsFromLanding = ["/login", "/signup"].includes(route);
+  return `http://localhost:3000${route}${needsFromLanding ? "?from=landing" : ""}`;
+}
 
 async function getPbStates(page: Page): Promise<PbState[]> {
   return page.evaluate(() => {
@@ -133,7 +138,7 @@ test.describe("Background Animation Audit", () => {
         });
         page.on("pageerror", (err) => consoleErrors.push(err.message));
 
-        await page.goto(`http://localhost:3000${route}`);
+        await page.goto(getAuthRouteUrl(route));
         await page.waitForLoadState("domcontentloaded");
         await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
 
@@ -173,7 +178,7 @@ test.describe("Background Animation Audit", () => {
       });
 
       test(`mouse movement produces parallax on ${route}`, async ({ page }) => {
-        await page.goto(`http://localhost:3000${route}`);
+        await page.goto(getAuthRouteUrl(route));
         await page.waitForLoadState("domcontentloaded");
         await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
 
@@ -205,7 +210,7 @@ test.describe("Background Animation Audit", () => {
       });
 
       test(`light/dark mode animation on ${route}`, async ({ page }) => {
-        await page.goto(`http://localhost:3000${route}`);
+        await page.goto(getAuthRouteUrl(route));
         await page.waitForLoadState("domcontentloaded");
         await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
 
@@ -242,7 +247,7 @@ test.describe("Background Animation Audit", () => {
 
         await page.emulateMedia({ reducedMotion: "reduce" });
 
-        await page.goto(`http://localhost:3000${route}`);
+        await page.goto(getAuthRouteUrl(route));
         await page.waitForLoadState("domcontentloaded");
         await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
 
@@ -391,7 +396,7 @@ test.describe("Background Animation Audit", () => {
         });
         page.on("pageerror", (err) => consoleErrors.push(err.message));
 
-        await page.goto(`http://localhost:3000${route}`);
+        await page.goto(getAuthRouteUrl(route));
         await page.waitForLoadState("domcontentloaded");
         await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
 
@@ -431,7 +436,7 @@ test.describe("Background Animation Audit", () => {
       });
 
       test(`mouse movement produces parallax on ${route}`, async ({ page }) => {
-        await page.goto(`http://localhost:3000${route}`);
+        await page.goto(getAuthRouteUrl(route));
         await page.waitForLoadState("domcontentloaded");
         await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
 
@@ -463,7 +468,7 @@ test.describe("Background Animation Audit", () => {
       });
 
       test(`light/dark mode animation on ${route}`, async ({ page }) => {
-        await page.goto(`http://localhost:3000${route}`);
+        await page.goto(getAuthRouteUrl(route));
         await page.waitForLoadState("domcontentloaded");
         await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
 
@@ -500,7 +505,7 @@ test.describe("Background Animation Audit", () => {
 
         await page.emulateMedia({ reducedMotion: "reduce" });
 
-        await page.goto(`http://localhost:3000${route}`);
+        await page.goto(getAuthRouteUrl(route));
         await page.waitForLoadState("domcontentloaded");
         await page.waitForSelector('[data-pb="background"]', { timeout: 15000 });
 

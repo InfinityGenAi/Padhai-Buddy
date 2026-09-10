@@ -28,29 +28,33 @@ export async function POST(req: NextRequest) {
 
     const VALID_MODES = ["pomodoro", "stopwatch", "custom"];
 
-    if (action === "create" || action === "update") {
+    if (action === "create") {
       if (!mode || !VALID_MODES.includes(String(mode))) {
         return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
       }
-      if (action === "create" || action === "update") {
-        if (action === "create") {
-          if (typeof durationMinutes !== "number" || !Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 600) {
-            return NextResponse.json({ error: "durationMinutes must be an integer between 1 and 600" }, { status: 400 });
-          }
-
-          const sessionRef = adminDb.collection("users").doc(decoded.uid).collection("studySessions").doc();
-          const session = { mode: String(mode), durationMinutes, completed: completed || false, createdAt: Date.now() };
-          await sessionRef.set(session);
-          return NextResponse.json({ session: { id: sessionRef.id, ...session } });
-        }
-
-        if (action === "update" && sessionId) {
-          const updates: Record<string, unknown> = {};
-          if (completed !== undefined) updates.completed = completed;
-          await adminDb.collection("users").doc(decoded.uid).collection("studySessions").doc(sessionId).update(updates);
-          return NextResponse.json({ success: true });
-        }
+      if (typeof durationMinutes !== "number" || !Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 600) {
+        return NextResponse.json({ error: "durationMinutes must be an integer between 1 and 600" }, { status: 400 });
       }
+
+      const sessionRef = adminDb.collection("users").doc(decoded.uid).collection("studySessions").doc();
+      const session = { mode: String(mode), durationMinutes, completed: completed === true, createdAt: Date.now() };
+      await sessionRef.set(session);
+      return NextResponse.json({ session: { id: sessionRef.id, ...session } });
+    }
+
+    if (action === "update" && sessionId) {
+      const updates: Record<string, unknown> = {};
+      if (completed !== undefined) {
+        if (typeof completed !== "boolean") {
+          return NextResponse.json({ error: "completed must be a boolean" }, { status: 400 });
+        }
+        updates.completed = completed;
+      }
+      if (Object.keys(updates).length === 0) {
+        return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+      }
+      await adminDb.collection("users").doc(decoded.uid).collection("studySessions").doc(sessionId).update(updates);
+      return NextResponse.json({ success: true });
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });

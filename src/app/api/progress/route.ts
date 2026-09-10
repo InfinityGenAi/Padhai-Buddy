@@ -21,21 +21,34 @@ export async function GET(req: NextRequest) {
 
     const userRef = adminDb.collection("users").doc(decoded.uid);
 
+    // Fetch all main collections in parallel
     const [
       doubtsSnap,
       quizzesSnap,
-      flashcardsSnap,
       notesSnap,
       sessionsSnap,
       plansSnap,
     ] = await Promise.all([
       userRef.collection("doubts").get(),
       userRef.collection("quizAttempts").get(),
-      userRef.collection("flashcardDecks").get(),
       userRef.collection("notes").get(),
       userRef.collection("studySessions").get(),
       userRef.collection("studyPlans").get(),
     ]);
+
+    // Use collection group query for flashcards to avoid N+1 reads
+    // This gets all cards across all decks in a single query
+    const allCardsSnap = await adminDb.collectionGroup("cards").where("__name__", ">=", `${decoded.uid}/flashcardDecks/`).get();
+
+    // Filter to only cards belonging to this user
+    const userCards = allCardsSnap.docs.filter((d) => d.ref.path.startsWith(`users/${decoded.uid}/flashcardDecks/`));
+
+    let totalFlashcards = 0;
+    let flashcardsReviewed = 0;
+    userCards.forEach((d) => {
+      totalFlashcards++;
+      if (d.data().status !== "new") flashcardsReviewed++;
+    });
 
     const now = Date.now();
     const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
@@ -46,22 +59,6 @@ export async function GET(req: NextRequest) {
     const quizzes = quizzesSnap.docs.map((d) => d.data());
     const totalQuizzes = quizzes.length;
     const avgQuizScore = totalQuizzes > 0 ? Math.round(quizzes.reduce((sum: number, q: Record<string, unknown>) => sum + (Number(q.score) || 0), 0) / totalQuizzes) : 0;
-
-    let totalFlashcards = 0;
-    let flashcardsReviewed = 0;
-    const cardPromises = flashcardsSnap.docs.map(async (deckSnap) => {
-      const cardsSnap = await userRef.collection("flashcardDecks").doc(deckSnap.id).collection("cards").get();
-      let reviewed = 0;
-      cardsSnap.forEach((d) => {
-        if (d.data().status !== "new") reviewed++;
-      });
-      return { total: cardsSnap.size, reviewed };
-    });
-    const cardResults = await Promise.all(cardPromises);
-    for (const result of cardResults) {
-      totalFlashcards += result.total;
-      flashcardsReviewed += result.reviewed;
-    }
 
     const sessions = sessionsSnap.docs.map((d) => d.data());
     const plans = plansSnap.docs.map((d) => d.data());

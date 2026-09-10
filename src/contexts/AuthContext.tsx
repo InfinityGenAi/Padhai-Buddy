@@ -130,44 +130,50 @@ function AuthProvider({ children }: { children: ReactNode }) {
       setIsAdmin(false);
     }
 
-    getDoc(doc(db, "users", fbUser.uid))
-      .then((snap) => {
-        if (snap.exists()) {
-          const data = snap.data() as UserProfile;
-          setUser(data);
-          setNeedsOnboarding(false);
-          const remotePrefs = data.preferences;
-          const localPrefs = loadLocalPreferences();
-          const merged: UserPreferences = {
-            ...DEFAULT_PREFERENCES,
-            ...localPrefs,
-            ...(remotePrefs || {}),
-            soundCategories: {
-              ...DEFAULT_PREFERENCES.soundCategories,
-              ...(localPrefs.soundCategories || {}),
-              ...((remotePrefs as UserPreferences | undefined)?.soundCategories || {}),
-            },
-          };
-          setPreferences(merged);
-          saveLocalPreferences(merged);
-        } else {
-          setUser(null);
-          if (!signingUpRef.current) {
-            setNeedsOnboarding(true);
+getDoc(doc(db, "users", fbUser.uid))
+        .then((snap) => {
+          if (snap.exists()) {
+            const data = snap.data() as UserProfile;
+            setUser(data);
+            setNeedsOnboarding(false);
+            const remotePrefs = data.preferences;
+            const localPrefs = loadLocalPreferences();
+            const merged: UserPreferences = {
+              ...DEFAULT_PREFERENCES,
+              ...localPrefs,
+              ...(remotePrefs || {}),
+              soundCategories: {
+                ...DEFAULT_PREFERENCES.soundCategories,
+                ...(localPrefs.soundCategories || {}),
+                ...((remotePrefs as UserPreferences | undefined)?.soundCategories || {}),
+              },
+            };
+            setPreferences(merged);
+            saveLocalPreferences(merged);
+            setAuthError(null);
+          } else {
+            setUser(null);
+            if (!signingUpRef.current) {
+              setNeedsOnboarding(true);
+            }
+            setAuthError(null);
           }
-        }
-        setAuthError(null);
-      })
-      .catch((err) => {
-        console.error("[AuthContext] Failed to load profile:", err);
-        setAuthError("We couldn't load your profile right now. Please refresh the page and try again.");
-        setNeedsOnboarding(false);
-      })
-      .finally(() => {
-        if (!signingUpRef.current) {
-          setLoading(false);
-        }
-      });
+        })
+        .catch((err) => {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          console.error("[AuthContext] Failed to load profile:", err);
+          if (errorMessage.includes("permission") || errorMessage.includes("PERMISSION_DENIED")) {
+            setAuthError("Permission denied loading your profile. Please sign out and sign back in.");
+          } else {
+            setAuthError("We couldn't load your profile right now. Please refresh the page and try again.");
+          }
+          setNeedsOnboarding(false);
+        })
+        .finally(() => {
+          if (!signingUpRef.current) {
+            setLoading(false);
+          }
+        });
   }, []);
 
   useEffect(() => {
@@ -323,8 +329,14 @@ function AuthProvider({ children }: { children: ReactNode }) {
       await updateDoc(doc(db, "users", auth.currentUser.uid), {
         preferences: merged,
       });
-    } catch {
-      // ignore sync errors
+    } catch (err) {
+      // Don't silently ignore - report the sync failure
+      const errorMessage = err instanceof Error ? err.message : "Failed to sync preferences to cloud";
+      console.error("[AuthContext] Preferences sync failed:", err);
+      // The UI will need to display this error - we'll use a custom event
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("prefs-sync-error", { detail: errorMessage }));
+      }
     }
   }, [preferences]);
 

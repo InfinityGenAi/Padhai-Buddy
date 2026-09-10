@@ -94,14 +94,29 @@ export async function POST(req: NextRequest) {
       if (typeof front !== "string" || front.trim().length > 500) return NextResponse.json({ error: "Front must be a string of at most 500 characters" }, { status: 400 });
       if (typeof back !== "string" || back.trim().length > 1000) return NextResponse.json({ error: "Back must be a string of at most 1000 characters" }, { status: 400 });
       if (status !== undefined && !VALID_CARD_STATUSES.includes(String(status))) return NextResponse.json({ error: "Invalid card status" }, { status: 400 });
-      const cardRef = adminDb.collection("users").doc(decoded.uid).collection("flashcardDecks").doc(deckId).collection("cards").doc();
+
+      // Verify parent deck exists and belongs to user
+      const deckRef = adminDb.collection("users").doc(decoded.uid).collection("flashcardDecks").doc(deckId);
+      const deckSnap = await deckRef.get();
+      if (!deckSnap.exists) {
+        return NextResponse.json({ error: "Deck not found" }, { status: 404 });
+      }
+
+      const cardRef = deckRef.collection("cards").doc();
       const card = { deckId, front: front.trim(), back: back.trim(), status: String(status || "new"), createdAt: Date.now(), updatedAt: Date.now() };
       await cardRef.set(card);
-      await adminDb.collection("users").doc(decoded.uid).collection("flashcardDecks").doc(deckId).update({ updatedAt: Date.now() });
+      await deckRef.update({ updatedAt: Date.now() });
       return NextResponse.json({ card: { id: cardRef.id, ...card } });
     }
 
     if (action === "updateCard" && deckId && cardId) {
+      // Verify parent deck exists and belongs to user
+      const deckRef = adminDb.collection("users").doc(decoded.uid).collection("flashcardDecks").doc(deckId);
+      const deckSnap = await deckRef.get();
+      if (!deckSnap.exists) {
+        return NextResponse.json({ error: "Deck not found" }, { status: 404 });
+      }
+
       const updates: Record<string, unknown> = { updatedAt: Date.now() };
       if (front !== undefined) {
         if (typeof front !== "string" || front.trim().length > 500) return NextResponse.json({ error: "Front must be a string of at most 500 characters" }, { status: 400 });
@@ -115,20 +130,34 @@ export async function POST(req: NextRequest) {
         if (!VALID_CARD_STATUSES.includes(String(status))) return NextResponse.json({ error: "Invalid card status" }, { status: 400 });
         updates.status = String(status);
       }
-      await adminDb.collection("users").doc(decoded.uid).collection("flashcardDecks").doc(deckId).collection("cards").doc(cardId).update(updates);
-      await adminDb.collection("users").doc(decoded.uid).collection("flashcardDecks").doc(deckId).update({ updatedAt: Date.now() });
+      await deckRef.collection("cards").doc(cardId).update(updates);
+      await deckRef.update({ updatedAt: Date.now() });
       return NextResponse.json({ success: true });
     }
 
     if (action === "deleteDeck" && deckId) {
+      // Verify parent deck exists and belongs to user
+      const deckRef = adminDb.collection("users").doc(decoded.uid).collection("flashcardDecks").doc(deckId);
+      const deckSnap = await deckRef.get();
+      if (!deckSnap.exists) {
+        return NextResponse.json({ error: "Deck not found" }, { status: 404 });
+      }
+
       await deleteCollection(adminDb, `users/${decoded.uid}/flashcardDecks/${deckId}/cards`);
-      await adminDb.collection("users").doc(decoded.uid).collection("flashcardDecks").doc(deckId).delete();
+      await deckRef.delete();
       return NextResponse.json({ success: true });
     }
 
     if (action === "deleteCard" && deckId && cardId) {
-      await adminDb.collection("users").doc(decoded.uid).collection("flashcardDecks").doc(deckId).collection("cards").doc(cardId).delete();
-      await adminDb.collection("users").doc(decoded.uid).collection("flashcardDecks").doc(deckId).update({ updatedAt: Date.now() });
+      // Verify parent deck exists and belongs to user
+      const deckRef = adminDb.collection("users").doc(decoded.uid).collection("flashcardDecks").doc(deckId);
+      const deckSnap = await deckRef.get();
+      if (!deckSnap.exists) {
+        return NextResponse.json({ error: "Deck not found" }, { status: 404 });
+      }
+
+      await deckRef.collection("cards").doc(cardId).delete();
+      await deckRef.update({ updatedAt: Date.now() });
       return NextResponse.json({ success: true });
     }
 

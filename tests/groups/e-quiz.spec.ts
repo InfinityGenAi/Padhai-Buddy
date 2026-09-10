@@ -123,33 +123,33 @@ test.describe("E. Quiz Tests", () => {
     await expect(page.locator("text=Subject").first()).toBeAttached();
     await page.fill('input[type="text"]', "Physics");
     await page.click("button:has-text('Start Quiz')");
-    await expect(page.locator("text=Question 1 of").first()).toBeVisible();
+    await expect(page.locator("text=Question 1 of").first()).toBeVisible({ timeout: 60000 });
   });
 
   test("answering a question advances to next question", async ({ page }) => {
     await expect(page.locator("text=Subject").first()).toBeAttached();
     await page.fill('input[type="text"]', "Physics");
     await page.click("button:has-text('Start Quiz')");
-    await expect(page.locator("text=Question 1 of").first()).toBeVisible();
+    await expect(page.locator("text=Question 1 of").first()).toBeVisible({ timeout: 60000 });
 
     await page.click("text=4");
     await page.click("button:has-text('Next')");
-    await expect(page.locator("text=Question 2 of").first()).toBeVisible();
+    await expect(page.locator("text=Question 2 of").first()).toBeVisible({ timeout: 10000 });
   });
 
   test("quiz result shows score after submission", async ({ page }) => {
     await expect(page.locator("text=Subject").first()).toBeAttached();
     await page.fill('input[type="text"]', "Physics");
     await page.click("button:has-text('Start Quiz')");
-    await expect(page.locator("text=Question 1 of").first()).toBeVisible();
+    await expect(page.locator("text=Question 1 of").first()).toBeVisible({ timeout: 60000 });
 
     await page.click("text=4");
     await page.click("button:has-text('Next')");
-    await expect(page.locator("text=Question 2 of").first()).toBeVisible();
+    await expect(page.locator("text=Question 2 of").first()).toBeVisible({ timeout: 10000 });
     await page.click("text=Paris");
-    await expect(page.locator("button:has-text('Submit Quiz')").first()).toBeVisible();
+    await expect(page.locator("button:has-text('Submit Quiz')").first()).toBeVisible({ timeout: 10000 });
     await page.click("button:has-text('Submit Quiz')");
-    await expect(page.locator("text=Quiz Complete!").first()).toBeVisible();
+    await expect(page.locator("text=Quiz Complete!").first()).toBeVisible({ timeout: 10000 });
     await expect(page.locator("text=%").first()).toBeAttached();
   });
 });

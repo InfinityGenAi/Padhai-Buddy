@@ -122,7 +122,7 @@ export default function AdminAnalytics() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-        <div className="p-8 bg-card border border-rounded-2xl shadow-xl">
+        <div className="p-8 bg-card border border-gray-200/50 dark:border-gray-700/50 shadow-xl">
           <h1 className="text-3xl font-bold text-foreground">Loading Analytics</h1>
         </div>
       </div>
@@ -132,7 +132,7 @@ export default function AdminAnalytics() {
   if (!isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-        <div className="p-8 bg-card border border-rounded-2xl shadow-xl text-center">
+        <div className="p-8 bg-card border border-gray-200/50 dark:border-gray-700/50 shadow-xl text-center">
           <h1 className="text-xl text-foreground/60">Access Denied</h1>
           <p className="text-foreground/60 mt-4">You do not have permission to view analytics.</p>
           <a href="/dashboard" className="mt-6 inline-block text-primary hover:underline">Go to Dashboard</a>
@@ -151,7 +151,7 @@ export default function AdminAnalytics() {
   );
 
   const renderTrend = (data: number[], label: string, color: string) => (
-    <div className="bg-card border border-rounded-2xl p-6 shadow-xl">
+    <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-xl">
       <h2 className="text-2xl font-bold text-foreground mb-6">{label}</h2>
       <div className="space-y-4">
         {data.map((val, index) => (
@@ -183,42 +183,42 @@ export default function AdminAnalytics() {
         <h1 className="text-4xl font-bold text-foreground mb-8">Admin Analytics</h1>
 
         {dataLoading ? (
-          <div className="bg-card border border-rounded-2xl p-8 shadow-xl text-center">
+          <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-8 shadow-xl text-center">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto mb-4" />
             <p className="text-foreground/60">Loading analytics data from Firestore...</p>
           </div>
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <div className="bg-card border border-rounded-2xl p-6 shadow-xl">
+              <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-xl">
                 <h3 className="text-sm text-foreground/60 uppercase tracking-wider mb-4">Today&apos;s Visitors</h3>
                 <p className="text-5xl font-bold text-primary">{stats.todayVisitors}</p>
               </div>
-              <div className="bg-card border border-rounded-2xl p-6 shadow-xl">
+              <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-xl">
                 <h3 className="text-sm text-foreground/60 uppercase tracking-wider mb-4">Total Visitors</h3>
                 <p className="text-5xl font-bold text-primary">{stats.totalVisitors}</p>
               </div>
-              <div className="bg-card border border-rounded-2xl p-6 shadow-xl">
+              <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-xl">
                 <h3 className="text-sm text-foreground/60 uppercase tracking-wider mb-4">Today&apos;s Downloads</h3>
                 <p className="text-5xl font-bold text-primary">{stats.todayDownloads}</p>
               </div>
-              <div className="bg-card border border-rounded-2xl p-6 shadow-xl">
+              <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-xl">
                 <h3 className="text-sm text-foreground/60 uppercase tracking-wider mb-4">Total Downloads</h3>
                 <p className="text-5xl font-bold text-primary">{stats.totalDownloads}</p>
               </div>
-              <div className="bg-card border border-rounded-2xl p-6 shadow-xl">
+              <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-xl">
                 <h3 className="text-sm text-foreground/60 uppercase tracking-wider mb-4">Today&apos;s Signups</h3>
                 <p className="text-5xl font-bold text-primary">{stats.todaySignups}</p>
               </div>
-              <div className="bg-card border border-rounded-2xl p-6 shadow-xl">
+              <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-xl">
                 <h3 className="text-sm text-foreground/60 uppercase tracking-wider mb-4">Total Signups</h3>
                 <p className="text-5xl font-bold text-primary">{stats.totalSignups}</p>
               </div>
-              <div className="bg-card border border-rounded-2xl p-6 shadow-xl">
+              <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-xl">
                 <h3 className="text-sm text-foreground/60 uppercase tracking-wider mb-4">Today&apos;s Returning</h3>
                 <p className="text-5xl font-bold text-primary">{stats.todayReturning}</p>
               </div>
-              <div className="bg-card border border-rounded-2xl p-6 shadow-xl">
+              <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-xl">
                 <h3 className="text-sm text-foreground/60 uppercase tracking-wider mb-4">Total Returning</h3>
                 <p className="text-5xl font-bold text-primary">{stats.totalReturning}</p>
               </div>
@@ -232,7 +232,7 @@ export default function AdminAnalytics() {
             </div>
 
             {sortedFeatures.length > 0 && (
-              <div className="bg-card border border-rounded-2xl p-6 shadow-xl">
+              <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-xl">
                 <h2 className="text-2xl font-bold text-foreground mb-6">Feature Usage</h2>
                 <div className="space-y-3">
                   {sortedFeatures.map(([key, count], idx) => (
@@ -253,7 +253,7 @@ export default function AdminAnalytics() {
             )}
 
             {sortedFeatures.length === 0 && !dataLoading && (
-              <div className="bg-card border border-rounded-2xl p-8 shadow-xl text-center">
+              <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-8 shadow-xl text-center">
                 <p className="text-foreground/60">No feature usage data collected yet. Data will appear as users interact with features.</p>
               </div>
             )}

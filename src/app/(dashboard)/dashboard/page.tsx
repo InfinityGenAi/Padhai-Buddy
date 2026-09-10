@@ -107,7 +107,12 @@ export default function DashboardPage() {
   const [recentDoubts, setRecentDoubts] = useState<Doubt[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [studyPlans, setStudyPlans] = useState<StudyPlan[]>([]);
+const [studyPlans, setStudyPlans] = useState<StudyPlan[]>([]);
+  const [studySessions, setStudySessions] = useState<
+    { mode: string; durationMinutes: number; completed: boolean; createdAt: number; subject?: string }[]
+  >([]);
+  const [quizStats, setQuizStats] = useState<{ total: number; avgScore: number }>({ total: 0, avgScore: 0 });
+  const [flashcardStats, setFlashcardStats] = useState<{ total: number; learned: number }>({ total: 0, learned: 0 });
   const [showAddPlan, setShowAddPlan] = useState(false);
   const [newPlanTitle, setNewPlanTitle] = useState("");
   const [newPlanSubject, setNewPlanSubject] = useState("");
@@ -121,25 +126,13 @@ export default function DashboardPage() {
     { subject: string; topic: string; mastery: number; totalQuestions: number; correctAnswers: number; lastPracticed: number }[]
   >([]);
 
-  // === Mistake Bank state ===
+// === Mistake Bank state ===
   const [mistakeBank, setMistakeBank] = useState<
-    { subject: string; topic: string; question: string; userAnswer: string; correctAnswer: string; explanation: string; createdAt: number }[]
+    { subject: string; topic: string; question: string; userAnswer: string; correctAnswer: string; explanation: string; createdAt: number; reviewCount: number }[]
   >([]);
 
-  const reducedMotion = useReducedMotion();
+const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
-
-  const [localStudyStats] = useState(() => {
-    try {
-      return {
-        quizzes: Number(localStorage.getItem("pb-quizzes-taken")) || 0,
-        flashcards: Number(localStorage.getItem("pb-flashcards-learned")) || 0,
-        avgScore: localStorage.getItem("pb-avg-score") || null,
-      };
-    } catch {
-      return { quizzes: 0, flashcards: 0, avgScore: null };
-    }
-  });
 
   useEffect(() => {
     const loadStats = async () => {
@@ -222,6 +215,37 @@ export default function DashboardPage() {
       setStudyPlans(plans);
     });
 
+return () => unsub();
+  }, [user?.uid]);
+
+  // === Study Sessions listener (for This Week Overview) ===
+  useEffect(() => {
+    if (!user?.uid) return;
+    const db = getFirestoreDb();
+    if (!db) return;
+
+    const unsub = onSnapshot(
+      collection(db, "users", user.uid, "studySessions"),
+      (snapshot) => {
+        const data: { mode: string; durationMinutes: number; completed: boolean; createdAt: number; subject?: string }[] = [];
+        snapshot.forEach((doc) => {
+          const d = doc.data();
+          data.push({
+            mode: d.mode || "custom",
+            durationMinutes: d.durationMinutes || 0,
+            completed: d.completed || false,
+            createdAt: d.createdAt || Date.now(),
+            subject: d.subject,
+          });
+        });
+        setStudySessions(data);
+      },
+      (error) => {
+        console.error("[DASHBOARD] studySessions listener error:", error);
+        setStudySessions([]);
+      }
+    );
+
     return () => unsub();
   }, [user?.uid]);
 
@@ -270,7 +294,7 @@ export default function DashboardPage() {
     const db = getFirestoreDb();
     if (!db) return;
 
-    const unsub = onSnapshot(
+const unsub = onSnapshot(
       collection(db, "users", user.uid, "mistakeBank"),
       (snapshot) => {
         const data: {
@@ -281,6 +305,7 @@ export default function DashboardPage() {
           correctAnswer: string;
           explanation: string;
           createdAt: number;
+          reviewCount: number;
         }[] = [];
         snapshot.forEach((doc) => {
           const d = doc.data();
@@ -292,6 +317,7 @@ export default function DashboardPage() {
             correctAnswer: d.correctAnswer || "",
             explanation: d.explanation || "",
             createdAt: d.createdAt || 0,
+            reviewCount: d.reviewCount || 0,
           });
         });
         setMistakeBank(data);
@@ -302,10 +328,71 @@ export default function DashboardPage() {
       }
     );
 
+return () => unsub();
+  }, [user?.uid]);
+
+  // === Quiz Stats listener ===
+  useEffect(() => {
+    if (!user?.uid) return;
+    const db = getFirestoreDb();
+    if (!db) return;
+
+    const unsub = onSnapshot(
+      collection(db, "users", user.uid, "quizAttempts"),
+      (snapshot) => {
+        const attempts = snapshot.docs.map((d) => d.data());
+        const total = attempts.length;
+        const avgScore = total > 0
+          ? Math.round(attempts.reduce((sum: number, a: Record<string, unknown>) => sum + (Number(a.score) || 0), 0) / total)
+          : 0;
+        setQuizStats({ total, avgScore });
+      },
+      (error) => {
+        console.error("[DASHBOARD] quizStats listener error:", error);
+        setQuizStats({ total: 0, avgScore: 0 });
+      }
+    );
+
     return () => unsub();
   }, [user?.uid]);
 
-  const today = new Date().toISOString().split("T")[0];
+  // === Flashcard Stats listener ===
+  useEffect(() => {
+    if (!user?.uid) return;
+    const db = getFirestoreDb();
+    if (!db) return;
+
+    const unsub = onSnapshot(
+      collection(db, "users", user.uid, "flashcardDecks"),
+      async (snapshot) => {
+        let total = 0;
+        let learned = 0;
+        for (const deckDoc of snapshot.docs) {
+          const cardsSnap = await getDocs(collection(db, "users", user.uid, "flashcardDecks", deckDoc.id, "cards"));
+          total += cardsSnap.size;
+          cardsSnap.forEach((d) => {
+            if (d.data().status !== "new") learned++;
+          });
+        }
+        setFlashcardStats({ total, learned });
+      },
+      (error) => {
+        console.error("[DASHBOARD] flashcardStats listener error:", error);
+        setFlashcardStats({ total: 0, learned: 0 });
+      }
+    );
+
+    return () => unsub();
+  }, [user?.uid]);
+
+  function getTodayInIST(): string {
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const istTime = new Date(now.getTime() + istOffset);
+    return istTime.toISOString().split("T")[0];
+  }
+
+  const today = getTodayInIST();
   const todayPlans = studyPlans.filter((p) => p.plannedDate === today);
   const completedToday = todayPlans.filter((p) => p.completed).length;
 const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / todayPlans.length) * 100) : 0;
@@ -313,8 +400,9 @@ const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / today
   const continueStudySet = topicMastery.length > 0
     ? [...topicMastery].sort((a, b) => (b.lastPracticed || 0) - (a.lastPracticed || 0))[0]
     : undefined;
+  // Review Today: use reviewCount to determine unreviewed mistakes (reviewCount === 0 means unreviewed)
   const reviewTodayItems = mistakeBank
-    .filter((m) => !m.explanation || m.explanation.trim() === "")
+    .filter((m) => (m.reviewCount ?? 0) === 0)
     .slice(0, 5);
   const weakTopics = topicMastery
     .filter((t) => t.mastery < 60 && t.totalQuestions >= 3)
@@ -323,14 +411,15 @@ const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / today
 
   const thisWeekOverviewStats = useMemo(() => {
     const weekAgo = new Date().getTime() - 7 * 24 * 60 * 60 * 1000;
-    const thisWeekStudySessions = studyPlans.filter((p) => (p.createdAt || 0) >= weekAgo);
-    const thisWeekSubjects = [...new Set(thisWeekStudySessions.map((p) => p.subject).filter(Boolean))];
+    // Use actual studySessions instead of studyPlans for session metrics
+    const thisWeekSessions = studySessions.filter((s) => (s.createdAt || 0) >= weekAgo);
+    const thisWeekSubjects = [...new Set(thisWeekSessions.map((s) => s.subject).filter((s): s is string => Boolean(s)))];
     return {
       totalMinutes: weeklyStudyMinutes,
-      sessions: thisWeekStudySessions.length,
-      subjects: thisWeekSubjects.length > 0 ? thisWeekSubjects : ["General"],
+      sessions: thisWeekSessions.length,
+      subjects: thisWeekSubjects.length > 0 ? thisWeekSubjects : [],
     };
-  }, [studyPlans, weeklyStudyMinutes]);
+  }, [studySessions, weeklyStudyMinutes]);
 
   // === Next-Best-Action calculation ===
   const nextBestAction = useMemo(() => {
@@ -390,7 +479,7 @@ const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / today
         type: "continue-learning" as const,
         label: `Continue "${continueStudySet.topic}"`,
         description: `${continueStudySet.subject} — ${continueStudySet.mastery}% mastery, keep building`,
-        href: "/dashboard/ai-tutor",
+        href: "/dashboard/chat",
         icon: LightBulbIcon,
         colorClass: "text-indigo-400",
         bgClass: "bg-indigo-950/30",
@@ -419,8 +508,10 @@ const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / today
     return m > 0 ? `${h}h ${m}m` : `${h}h`;
   };
 
-  const calculateStreak = (plans: StudyPlan[]): number => {
-    const today = new Date();
+const calculateStreak = (plans: StudyPlan[]): number => {
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const today = new Date(now.getTime() + istOffset);
     let streak = 0;
     for (let i = 0; i < 365; i++) {
       const date = new Date(today);
@@ -436,7 +527,7 @@ const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / today
     return streak;
   };
 
-  const studyStreak = calculateStreak(studyPlans);
+const studyStreak = calculateStreak(studyPlans);
 
   const stats = [
     {
@@ -457,7 +548,7 @@ const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / today
     },
     {
       label: "Quizzes Taken",
-      value: String(localStudyStats.quizzes),
+      value: loading ? "…" : String(quizStats.total),
       sublabel: "Total",
       icon: BookOpenIcon,
       colorClass: "text-accent-amber",
@@ -465,7 +556,7 @@ const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / today
     },
     {
       label: "Flashcards Learned",
-      value: String(localStudyStats.flashcards),
+      value: loading ? "…" : String(flashcardStats.learned),
       sublabel: "Total",
       icon: Squares2X2Icon,
       colorClass: "text-accent-emerald",
@@ -473,8 +564,8 @@ const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / today
     },
     {
       label: "Score Average",
-      value: localStudyStats.avgScore ? `${localStudyStats.avgScore}%` : "—",
-      sublabel: "Best attempt",
+      value: loading ? "…" : (quizStats.avgScore > 0 ? `${quizStats.avgScore}%` : "—"),
+      sublabel: "Average",
       icon: ChartBarIcon,
       colorClass: "text-accent-indigo",
       bgClass: "bg-indigo-950/30",

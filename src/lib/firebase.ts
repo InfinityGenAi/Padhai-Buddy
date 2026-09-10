@@ -2,6 +2,26 @@ import { initializeApp, getApps, FirebaseApp } from "firebase/app";
 import { getAuth, Auth, setPersistence, browserLocalPersistence, connectAuthEmulator } from "firebase/auth";
 import { getFirestore, Firestore, connectFirestoreEmulator } from "firebase/firestore";
 
+/**
+ * Firebase Client Configuration
+ *
+ * FIRESTORE PERMISSION ERROR ROOT CAUSE:
+ *
+ * If you see "FirebaseError: Missing or insufficient permissions", the cause is typically:
+ * 1. PRODUCTION: Firestore rules not deployed to the Firebase project
+ *    FIX: Run `firebase deploy --only firestore:rules` from the project root
+ *
+ * 2. LOCAL DEV: Emulators not running or not configured
+ *    FIX: Set NEXT_PUBLIC_USE_EMULATORS=true in .env.local and run `firebase emulators:start`
+ *    NOTE: Requires Java 21+ for Firebase emulators
+ *
+ * 3. CONFIG MISMATCH: Client connected to wrong Firebase project
+ *    FIX: Verify NEXT_PUBLIC_FIREBASE_PROJECT_ID matches .firebaserc and firebase.json
+ *
+ * Project ID: infinity-gen-ai (must match .firebaserc default project)
+ * Rules file: firestore.rules (deployed via firebase.json)
+ */
+
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,

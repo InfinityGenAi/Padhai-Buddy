@@ -132,6 +132,17 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
+  // Listen for preferences sync errors
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleSyncError = (e: CustomEvent<string>) => {
+      setNotification({ type: "error", text: `Preferences saved locally, but cloud sync failed: ${e.detail}` });
+      setTimeout(() => setNotification(null), 5000);
+    };
+    window.addEventListener("prefs-sync-error", handleSyncError as EventListener);
+    return () => window.removeEventListener("prefs-sync-error", handleSyncError as EventListener);
+  }, [isOpen]);
+
   const handleUpdate = useCallback(
     (updates: Partial<UserPreferences>) => {
       updatePreferences(updates);

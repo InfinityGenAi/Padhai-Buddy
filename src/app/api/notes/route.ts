@@ -72,27 +72,41 @@ export async function POST(req: NextRequest) {
     }
     const { action, noteId, title, subject, body: noteBody } = body;
 
-    if (action === "create" || action === "update") {
+    if (action === "create") {
       if (!title || !subject || !noteBody) return NextResponse.json({ error: "Title, subject, and body are required" }, { status: 400 });
       if (typeof title !== "string" || title.trim().length > 200) return NextResponse.json({ error: "Title must be a string of at most 200 characters" }, { status: 400 });
       if (typeof subject !== "string" || subject.trim().length > 100) return NextResponse.json({ error: "Subject must be a string of at most 100 characters" }, { status: 400 });
       if (typeof noteBody !== "string" || noteBody.trim().length > 20000) return NextResponse.json({ error: "Body must be a string of at most 20000 characters" }, { status: 400 });
 
-      if (action === "create") {
-        const noteRef = adminDb.collection("users").doc(decoded.uid).collection("notes").doc();
-        const note = { title: title.trim(), subject: subject.trim(), body: noteBody.trim(), createdAt: Date.now(), updatedAt: Date.now() };
-        await noteRef.set(note);
-        return NextResponse.json({ note: { id: noteRef.id, ...note } });
-      }
+      const noteRef = adminDb.collection("users").doc(decoded.uid).collection("notes").doc();
+      const note = { title: title.trim(), subject: subject.trim(), body: noteBody.trim(), createdAt: Date.now(), updatedAt: Date.now() };
+      await noteRef.set(note);
+      return NextResponse.json({ note: { id: noteRef.id, ...note } });
+    }
 
-      if (action === "update" && noteId) {
-        const updates: Record<string, unknown> = { updatedAt: Date.now() };
-        if (title !== undefined) updates.title = title.trim();
-        if (subject !== undefined) updates.subject = subject.trim();
-        if (noteBody !== undefined) updates.body = noteBody.trim();
-        await adminDb.collection("users").doc(decoded.uid).collection("notes").doc(noteId).update(updates);
-        return NextResponse.json({ success: true });
+    if (action === "update" && noteId) {
+      const updates: Record<string, unknown> = { updatedAt: Date.now() };
+      let hasUpdates = false;
+      if (title !== undefined) {
+        if (typeof title !== "string" || title.trim().length > 200) return NextResponse.json({ error: "Title must be a string of at most 200 characters" }, { status: 400 });
+        updates.title = title.trim();
+        hasUpdates = true;
       }
+      if (subject !== undefined) {
+        if (typeof subject !== "string" || subject.trim().length > 100) return NextResponse.json({ error: "Subject must be a string of at most 100 characters" }, { status: 400 });
+        updates.subject = subject.trim();
+        hasUpdates = true;
+      }
+      if (noteBody !== undefined) {
+        if (typeof noteBody !== "string" || noteBody.trim().length > 20000) return NextResponse.json({ error: "Body must be a string of at most 20000 characters" }, { status: 400 });
+        updates.body = noteBody.trim();
+        hasUpdates = true;
+      }
+      if (!hasUpdates) {
+        return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+      }
+      await adminDb.collection("users").doc(decoded.uid).collection("notes").doc(noteId).update(updates);
+      return NextResponse.json({ success: true });
     }
 
     if (action === "delete" && noteId) {

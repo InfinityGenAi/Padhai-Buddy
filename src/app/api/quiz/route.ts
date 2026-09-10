@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { getGroqClient, GROQ_TEXT_MODEL } from "@/lib/groq";
+import { checkRateLimit } from "@/lib/rate-limiter";
 import type { QuizAttempt, QuizQuestion } from "@/types";
 import { inferTopic } from "@/lib/curriculum";
 
@@ -172,8 +173,11 @@ export async function POST(req: NextRequest) {
           const isCorrect = sel !== undefined && sel === serverQ.correctIndex;
           const clientQ = questions[i] as Record<string, unknown> | null | undefined;
           const clientSelected = clientQ?.selectedIndex as number | undefined;
-          const userAnswer = clientSelected !== undefined ? String(clientSelected) : "";
-          const correctAnswer = String(serverQ.correctIndex);
+          // Store actual answer text instead of just numeric index
+          const userAnswer = clientSelected !== undefined && serverQ.options[clientSelected]
+            ? serverQ.options[clientSelected]
+            : "";
+          const correctAnswer = serverQ.options[serverQ.correctIndex] || "";
           const explanation = String(serverQ.explanation || "");
           // Infer topic from subject + question text using conservative keyword matching
           const topic = inferTopic(sub, serverQ.question);
@@ -189,7 +193,7 @@ export async function POST(req: NextRequest) {
 
         const results = await Promise.all(trackingPromises);
 
-        // Upsert topicMastery for each question
+        // Upsert topicMastery for each question using transactions to prevent lost updates
         for (const r of results) {
           // Deterministic doc ID: normalized subject + topic
           const docId =
@@ -202,15 +206,15 @@ export async function POST(req: NextRequest) {
             .collection("topicMastery")
             .doc(docId);
 
-          // Read existing then merge increment
-          const existingSnap = await masteryRef.get();
-          const existingData = existingSnap?.data();
-          const newTotal = (existingData?.totalQuestions || 0) + 1;
-          const newCorrect = (existingData?.correctAnswers || 0) + (r.isCorrect ? 1 : 0);
-          const newMastery = Math.round((newCorrect / newTotal) * 100);
+          // Use transaction for atomic increment to prevent lost updates from concurrent submissions
+          await adminDb.runTransaction(async (transaction) => {
+            const existingSnap = await transaction.get(masteryRef);
+            const existingData = existingSnap.data();
+            const newTotal = (existingData?.totalQuestions || 0) + 1;
+            const newCorrect = (existingData?.correctAnswers || 0) + (r.isCorrect ? 1 : 0);
+            const newMastery = Math.round((newCorrect / newTotal) * 100);
 
-          await masteryRef.set(
-            {
+            transaction.set(masteryRef, {
               subject: sub,
               topic: r.topic,
               mastery: newMastery,
@@ -218,9 +222,8 @@ export async function POST(req: NextRequest) {
               correctAnswers: newCorrect,
               lastPracticed: Date.now(),
               updatedAt: Date.now(),
-            },
-            { merge: true }
-          );
+            }, { merge: true });
+          });
         }
 
         // Create mistake bank entries for incorrect answers only
@@ -279,6 +282,27 @@ export async function POST(req: NextRequest) {
 
     if (!subject || !studentClass || !board || !difficulty || !numberOfQuestions) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    const sub = String(subject).trim();
+    if (!sub || sub === "undefined" || sub.length > 100) {
+      return NextResponse.json({ error: "Invalid subject" }, { status: 400 });
+    }
+
+    // Rate limiting for quiz generation - per user
+    const rateLimitResult = await checkRateLimit(`quiz:${decoded.uid}`);
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        { error: "Too many quiz generation requests. Please wait before trying again." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimitResult.retryAfter || 60),
+            "X-RateLimit-Limit": String(rateLimitResult.remaining + 1),
+            "X-RateLimit-Remaining": String(rateLimitResult.remaining),
+          },
+        },
+      );
     }
 
     const numQuestions = Math.min(Math.max(Number(numberOfQuestions) || 5, 1), 20);

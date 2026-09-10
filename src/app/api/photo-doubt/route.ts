@@ -8,6 +8,29 @@ const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const VALID_CLASSES = ["5", "6", "7", "8", "9", "10", "11", "12"];
 const VALID_BOARDS = ["CBSE", "ICSE", "State Board"];
 
+// File signature (magic bytes) validation
+const FILE_SIGNATURES = {
+  "image/jpeg": [0xff, 0xd8, 0xff],
+  "image/png": [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+  "image/webp": [0x52, 0x49, 0x46, 0x46], // RIFF header, need to check "WEBP" at offset 8
+};
+
+function validateFileSignature(buffer: Buffer, mimeType: string): boolean {
+  const signature = FILE_SIGNATURES[mimeType as keyof typeof FILE_SIGNATURES];
+  if (!signature) return false;
+
+  if (mimeType === "image/webp") {
+    // WebP: RIFF header + "WEBP" at offset 8
+    if (buffer.length < 12) return false;
+    const riffMatch = signature.every((byte, i) => buffer[i] === byte);
+    const webpMatch = buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50; // "WEBP"
+    return riffMatch && webpMatch;
+  }
+
+  if (buffer.length < signature.length) return false;
+  return signature.every((byte, i) => buffer[i] === byte);
+}
+
 async function toDataUri(file: File): Promise<string> {
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
@@ -39,7 +62,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
 
-    const rateLimitResult = checkRateLimit(`photo:${decoded.uid}`);
+    const rateLimitResult = await checkRateLimit(`photo:${decoded.uid}`);
     if (!rateLimitResult.allowed) {
       return NextResponse.json(
         { error: "Too many requests. Please wait before trying again." },
@@ -97,6 +120,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (fileField.size === 0) {
+      return NextResponse.json(
+        { error: "Empty file. Please select a valid image." },
+        { status: 400 },
+      );
+    }
+
     if (!VALID_CLASSES.includes(studentClass)) {
       return NextResponse.json(
         { error: "Invalid class value" },
@@ -111,9 +141,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Read file buffer for signature validation
+    const arrayBuffer = await fileField.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Validate actual file signature (magic bytes)
+    const declaredMime = fileField.type;
+    if (!validateFileSignature(buffer, declaredMime)) {
+      return NextResponse.json(
+        { error: "File content does not match declared type. Please upload a valid JPEG, PNG, or WebP image." },
+        { status: 400 },
+      );
+    }
+
+    // Check for reasonable image dimensions (basic check)
+    // JPEG: SOF marker at offset varies, PNG: IHDR at offset 8, WebP: VP8 at offset 12
+    // Skip detailed dimension check to avoid breaking normal phone-camera uploads
+
     let dataUri: string;
     try {
-      dataUri = await toDataUri(fileField);
+      const base64 = buffer.toString("base64");
+      const mime = ALLOWED_MIME_TYPES.has(fileField.type) ? fileField.type : "application/octet-stream";
+      dataUri = `data:${mime};base64,${base64}`;
     } catch {
       return NextResponse.json(
         { error: "Failed to process image" },

@@ -126,7 +126,7 @@ export default function MorePage() {
       icon: BellAlertIcon,
       title: "Notifications",
       desc: "Recent updates and alerts",
-      href: "/dashboard/notes",
+      href: "/dashboard/notifications",
     },
     {
       icon: Cog6ToothIcon,

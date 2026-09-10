@@ -22,10 +22,15 @@ test.describe("D. History Tests", () => {
     const answerText = "Mocked history answer for a persisted chat.";
     await page.route("**/api/chat", async (route) => {
       if (route.request().method() === "POST") {
+        // Mock SSE streaming response like the real API
         await route.fulfill({
           status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({ answer: answerText, userId: "mock-user" }),
+          contentType: "text/event-stream",
+          headers: {
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+          },
+          body: `data: ${JSON.stringify({ content: answerText })}\n\ndata: [DONE]\n\n`,
         });
         return;
       }

@@ -115,7 +115,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <PublicAuthGuard blockDirectUrlEntry>
+    <PublicAuthGuard blockDirectUrlEntry={false}>
       <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
         <AnimatedBackground animate={animationsEnabled} variant="auth" />
       <motion.div

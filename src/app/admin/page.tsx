@@ -7,11 +7,38 @@ import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { HomeIcon, ChartBarIcon, UserIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
 
+/**
+ * ADMIN ARCHITECTURE NOTE:
+ *
+ * This admin panel uses a SINGLE STABLE FIREBASE UID ("admin-stable-uid") for all admin sessions.
+ *
+ * CONSTRAINT: This architecture INTENTIONALLY SUPPORTS ONLY ONE ADMIN ACCOUNT.
+ *
+ * Implications:
+ * - All admin logins share the same Firebase Auth identity (admin-stable-uid)
+ * - Admin sessions cannot be individually tracked or revoked per admin user
+ * - Audit trails will show all admin actions under the same UID
+ * - If multiple people need admin access, they must share the ADMIN_SECRET
+ * - Session revocation (logout) affects all admin sessions simultaneously
+ *
+ * If multiple distinct admin accounts are needed in the future, this must be redesigned to:
+ * 1. Create individual Firebase Auth users for each admin
+ * 2. Set custom claims (admin: true) on each admin user
+ * 3. Use their actual Firebase UIDs for session tracking and audit logs
+ * 4. Remove the ADMIN_UID constant and ADMIN_SECRET-based login
+ *
+ * SECURITY: ADMIN_SECRET must remain server-side only. Never expose to client.
+ */
+
 export default function AdminDashboard() {
-  const { loading, isAdmin, authError } = useAuth();
+  const { loading, isAdmin, authError, user } = useAuth();
   const [selectedSection, setSelectedSection] = useState<string>("overview");
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   const handleLogin = async (password: string) => {
+    setLoginLoading(true);
+    setLoginError(null);
     try {
       const res = await fetch("/api/admin/login", {
         method: "POST",
@@ -37,8 +64,13 @@ export default function AdminDashboard() {
         const cred = await signInWithCustomToken(auth, data.customToken);
         await cred.user.getIdTokenResult(true);
       }
+      setLoginError(null);
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Login failed";
+      setLoginError(errorMessage);
       console.error("Admin login error:", err);
+    } finally {
+      setLoginLoading(false);
     }
   };
 
@@ -57,7 +89,7 @@ export default function AdminDashboard() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-        <div className="p-8 bg-card border border-rounded-2xl shadow-xl text-center">
+        <div className="p-8 bg-card border border-gray-200/50 dark:border-gray-700/50 rounded-2xl shadow-xl text-center">
           <h1 className="text-3xl font-bold text-foreground">
             Loading Admin Dashboard
           </h1>
@@ -75,7 +107,7 @@ export default function AdminDashboard() {
             Admin Login
           </h1>
 
-          <div className="bg-card border border-rounded-2xl p-6 shadow-xl max-w-md mx-auto">
+          <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-xl max-w-md mx-auto">
             <h2 className="text-2xl font-bold text-foreground mb-6">Admin Authentication</h2>
 
             <form onSubmit={(e) => {
@@ -100,12 +132,18 @@ export default function AdminDashboard() {
 
               <button
                 type="submit"
-                className="w-full px-4 py-3 rounded-xl text-white bg-primary font-medium hover:bg-primary/90 transition-all">
-                Sign In as Admin
+                disabled={loginLoading}
+                className="w-full px-4 py-3 rounded-xl text-white bg-primary font-medium hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                {loginLoading ? "Signing in..." : "Sign In as Admin"}
               </button>
             </form>
 
-            {authError && (
+            {loginError && (
+              <div className="mt-4 p-3 rounded-xl bg-red-500/10 text-red-400 text-sm">
+                {loginError}
+              </div>
+            )}
+            {authError && !loginError && (
               <div className="mt-4 p-3 rounded-xl bg-red-500/10 text-red-400 text-sm">
                 {authError}
               </div>
@@ -151,8 +189,8 @@ export default function AdminDashboard() {
         </p>
 
         {/* Section Navigation */}
-        <div className="bg-card border border-rounded-2xl p-6 mb-8 shadow-xl">
-          <div className="grid grid-cols-5 gap-2">
+        <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-6 mb-8 shadow-xl">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
             <button
               onClick={() => setSelectedSection("overview")}
               className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
@@ -300,7 +338,7 @@ function OverviewSection() {
 <h1 className="text-4xl font-bold text-foreground mb-8">
 Today&apos;s Analytics
 </h1>
-          <div className="bg-card border border-rounded-2xl p-8 shadow-xl text-center">
+          <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-8 shadow-xl text-center">
             <p className="text-foreground/60">
               Loading analytics data from Firestore...
             </p>
@@ -374,7 +412,7 @@ function AnalyticsSection() {
       <h1 className="text-4xl font-bold text-foreground mb-8">
         Admin Analytics
       </h1>
-      <div className="bg-card border border-rounded-2xl p-8 shadow-xl text-center">
+      <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-8 shadow-xl text-center">
         <p className="text-foreground/60">
           Analytics section - real Firestore data connection. Range controls coming soon.
         </p>
@@ -390,7 +428,7 @@ function UsersSection() {
       <h1 className="text-4xl font-bold text-foreground mb-8">
         User Management
       </h1>
-      <div className="bg-card border border-rounded-2xl p-8 shadow-xl text-center">
+      <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-8 shadow-xl text-center">
         <p className="text-foreground/60">
           User management section.
         </p>
@@ -406,7 +444,7 @@ function DownloadsSection() {
       <h1 className="text-4xl font-bold text-foreground mb-8">
         App Download Analytics
       </h1>
-      <div className="bg-card border border-rounded-2xl p-8 shadow-xl text-center">
+      <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-8 shadow-xl text-center">
         <p className="text-foreground/60">
           Download analytics section.
         </p>
@@ -422,7 +460,7 @@ function UpdateSection() {
       <h1 className="text-4xl font-bold text-foreground mb-8">
         App Update Management
       </h1>
-      <div className="bg-card border border-rounded-2xl p-8 shadow-xl text-center">
+      <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-8 shadow-xl text-center">
         <p className="text-foreground/60">
           Update management - preserves existing UpdateAvailable.tsx system.
         </p>

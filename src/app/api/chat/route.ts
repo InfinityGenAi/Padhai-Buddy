@@ -4,6 +4,35 @@ import { getGroqClient, GROQ_TEXT_MODEL, buildSystemPrompt, StudyMode } from "@/
 import { checkRateLimit } from "@/lib/rate-limiter";
 
 const MAX_MESSAGE_LENGTH = 5000;
+const MAX_HISTORY_MESSAGES = 10;
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+function createStreamingResponse(stream: AsyncIterable<unknown>): ReadableStream {
+  const encoder = new TextEncoder();
+  return new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const chunk of stream) {
+          const choice = (chunk as { choices?: Array<{ delta?: { content?: string } }> }).choices?.[0];
+          const content = choice?.delta?.content;
+          if (content) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+          }
+        }
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+      } catch (error) {
+        console.error("[CHAT] Streaming error:", error);
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Streaming failed" })}\n\n`));
+        controller.close();
+      }
+    },
+  });
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,7 +57,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
 
-    const rateLimitResult = checkRateLimit(`chat:${decoded.uid}`);
+    const rateLimitResult = await checkRateLimit(`chat:${decoded.uid}`);
     if (!rateLimitResult.allowed) {
       return NextResponse.json(
         { error: "Too many requests. Please wait before trying again." },
@@ -56,6 +85,8 @@ export async function POST(req: NextRequest) {
       stepByStep?: unknown;
       language?: unknown;
       studyMode?: unknown;
+      history?: unknown;
+      stream?: unknown;
     };
     try {
       body = await req.json();
@@ -63,7 +94,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const { message, class: studentClass, board, responseStyle, stepByStep, language, studyMode } = body;
+    const { message, class: studentClass, board, responseStyle, stepByStep, language, studyMode, history, stream } = body;
 
     if (!message || !studentClass || !board) {
       return NextResponse.json(
@@ -109,16 +140,68 @@ export async function POST(req: NextRequest) {
       studyMode: validatedStudyMode,
     });
 
-    let completion;
+    const historyMessages: ChatMessage[] = [];
+    if (Array.isArray(history)) {
+      const recentHistory = history.slice(-MAX_HISTORY_MESSAGES);
+      for (const msg of recentHistory) {
+        if (msg && typeof msg === "object" && msg.role && msg.content) {
+          const role = msg.role === "user" || msg.role === "assistant" ? msg.role : "user";
+          const content = String(msg.content).slice(0, MAX_MESSAGE_LENGTH);
+          if (content.trim()) {
+            historyMessages.push({ role, content });
+          }
+        }
+      }
+    }
+
+    const messages = [
+      { role: "system" as const, content: systemPrompt },
+      ...historyMessages,
+      { role: "user" as const, content: messageStr },
+    ];
+
+    const shouldStream = stream === true;
+
     try {
-      completion = await getGroqClient().chat.completions.create({
+      if (shouldStream) {
+        const groqStream = await getGroqClient().chat.completions.create({
+          model: GROQ_TEXT_MODEL,
+          messages,
+          temperature: 0.3,
+          max_tokens: 2048,
+          stream: true,
+        });
+
+        return new NextResponse(createStreamingResponse(groqStream), {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-RateLimit-Limit": String(rateLimitResult.remaining + 1),
+            "X-RateLimit-Remaining": String(rateLimitResult.remaining),
+          },
+        });
+      }
+
+      const completion = await getGroqClient().chat.completions.create({
         model: GROQ_TEXT_MODEL,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: messageStr },
-        ],
+        messages,
         temperature: 0.3,
         max_tokens: 2048,
+      });
+
+      const answer =
+        completion.choices[0]?.message?.content ||
+        "I couldn't generate an answer at this time. Please try again.";
+
+      return NextResponse.json({
+        answer,
+        userId: decoded.uid,
+      }, {
+        headers: {
+          "X-RateLimit-Limit": String(rateLimitResult.remaining + 1),
+          "X-RateLimit-Remaining": String(rateLimitResult.remaining),
+        },
       });
     } catch {
       return NextResponse.json(
@@ -128,15 +211,6 @@ export async function POST(req: NextRequest) {
         { status: 502 },
       );
     }
-
-    const answer =
-      completion.choices[0]?.message?.content ||
-      "I couldn't generate an answer at this time. Please try again.";
-
-    return NextResponse.json({
-      answer,
-      userId: decoded.uid,
-    });
   } catch (error: unknown) {
     console.error("[CHAT] unexpected error:", error);
     return NextResponse.json(
