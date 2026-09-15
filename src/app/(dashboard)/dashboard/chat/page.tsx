@@ -42,9 +42,12 @@ import {
   TrophyIcon,
   BookmarkIcon,
   ArrowPathIcon,
+  Cog6ToothIcon,
 } from "@heroicons/react/24/outline";
 import { playSend, playReceive, playCopy, playError } from "@/lib/sounds";
 import type { ChatMessage, Conversation } from "@/types";
+import { AIProviderConfigModal } from "@/components/AIProviderConfigModal";
+import { safeFetch } from "@/lib/api-client";
 
 function getTimestampMs(ts: unknown): number {
   if (ts instanceof Timestamp) return ts.toDate().getTime();
@@ -194,6 +197,8 @@ export default function ChatPage() {
   const [studyMode, setStudyMode] = useState<string | null>(null);
   const [savedMsgIds, setSavedMsgIds] = useState<Set<string>>(new Set());
   const [generatingSimilar, setGeneratingSimilar] = useState<Set<string>>(new Set());
+  const [providerConfigOpen, setProviderConfigOpen] = useState(false);
+  const [userAIConfig, setUserAIConfig] = useState<{ provider: string; model: string; hasKey: boolean } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -463,6 +468,35 @@ export default function ChatPage() {
       textareaRef.current?.focus();
     }
   }, [activeConversationId, messages.length]);
+
+  // Load user AI config
+  useEffect(() => {
+    if (!user?.uid) return;
+    const loadConfig = async () => {
+      try {
+        const token = await getFirebaseIdToken();
+        if (!token) return;
+        const res = await fetch("/api/ai-config", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.config) {
+            setUserAIConfig({
+              provider: data.config.provider,
+              model: data.config.model,
+              hasKey: data.config.hasApiKey,
+            });
+          } else {
+            setUserAIConfig(null);
+          }
+        }
+      } catch {
+        // Ignore
+      }
+    };
+    loadConfig();
+  }, [user?.uid]);
 
   const selectConversation = useCallback((id: string) => {
     setActiveConversationId(id);
@@ -841,12 +875,9 @@ export default function ChatPage() {
         content: msg.content,
       }));
 
-      const res = await fetch("/api/chat", {
+const result = await safeFetch<{ answer: string }>("/api/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           message: `Generate a similar practice question based on this explanation. Make it a clear, standalone question that tests the same concept. Do not provide the answer, just the question.\n\nExplanation: ${content}`,
           class: user.class,
@@ -858,11 +889,12 @@ export default function ChatPage() {
           history: historyMessages,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to generate question");
-      const question = data.answer;
+
+      if (!result.success) throw new Error(result.error || "Failed to generate question");
+      const question = result.data?.answer;
+      if (!question) throw new Error("No question generated");
       // Send the generated question as a user message to continue the conversation
-      setInput(question);
+      setInput(question!);
       sendMessage();
     } catch {
       setChatError("Failed to generate similar question. Please try again.");
@@ -1072,16 +1104,31 @@ export default function ChatPage() {
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center shadow-md flex-shrink-0">
             <SparklesIcon className="w-5 h-5 text-white" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold truncate text-foreground">
               Padhai Buddy AI Tutor
             </h1>
-            <div className="flex items-center gap-1.5 -mt-0.5">
+            <div className="flex items-center gap-2 -mt-0.5 flex-wrap">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
               <p className="text-[11px] text-foreground/45">Online</p>
+              {userAIConfig && (
+                <span className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary rounded-full">
+                  {userAIConfig.provider} · {userAIConfig.model}
+                </span>
+              )}
             </div>
           </div>
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-auto flex items-center gap-1.5">
+            <motion.button
+              whileHover={animationsEnabled ? { scale: 1.05 } : undefined}
+              whileTap={animationsEnabled ? { scale: 0.95 } : undefined}
+              onClick={() => setProviderConfigOpen(true)}
+              className="p-2 rounded-lg hover:bg-foreground/5 text-foreground/70 hover:text-foreground transition-colors"
+              aria-label="AI Provider Settings"
+              title="AI Provider Settings"
+            >
+              <Cog6ToothIcon className="w-5 h-5" />
+            </motion.button>
             <motion.button
               whileHover={animationsEnabled ? { scale: 1.1 } : undefined}
               whileTap={animationsEnabled ? { scale: 0.9 } : undefined}
@@ -1430,6 +1477,12 @@ export default function ChatPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* AI Provider Config Modal */}
+      <AIProviderConfigModal
+        isOpen={providerConfigOpen}
+        onClose={() => setProviderConfigOpen(false)}
+      />
     </motion.div>
   );
 }

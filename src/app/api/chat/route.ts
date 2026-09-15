@@ -1,29 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, initializationError } from "@/lib/firebase-admin";
-import { getGroqClient, GROQ_TEXT_MODEL, buildSystemPrompt, StudyMode } from "@/lib/groq";
 import { checkRateLimit } from "@/lib/rate-limiter";
+import { sendMessage, validateProviderConfig, AI_PROVIDERS, UserAIConfig, AIProviderId, AIProviderResponse, AIProviderStreamChunk } from "@/lib/ai-providers";
 
 const MAX_MESSAGE_LENGTH = 5000;
 const MAX_HISTORY_MESSAGES = 10;
 
 interface ChatMessage {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
 }
 
-function createStreamingResponse(stream: AsyncIterable<unknown>): ReadableStream {
+function createStreamingResponse(stream: AsyncIterable<{ content: string; done: boolean }>): ReadableStream {
   const encoder = new TextEncoder();
   return new ReadableStream({
     async start(controller) {
       try {
         for await (const chunk of stream) {
-          const choice = (chunk as { choices?: Array<{ delta?: { content?: string } }> }).choices?.[0];
-          const content = choice?.delta?.content;
-          if (content) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+          if (chunk.content) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: chunk.content })}\n\n`));
+          }
+          if (chunk.done) {
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            break;
           }
         }
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();
       } catch (error) {
         console.error("[CHAT] Streaming error:", error);
@@ -32,6 +33,10 @@ function createStreamingResponse(stream: AsyncIterable<unknown>): ReadableStream
       }
     },
   });
+}
+
+function isAsyncIterable<T>(obj: T | AsyncIterable<T>): obj is AsyncIterable<T> {
+  return obj !== null && typeof obj === "object" && Symbol.asyncIterator in obj;
 }
 
 export async function POST(req: NextRequest) {
@@ -87,6 +92,10 @@ export async function POST(req: NextRequest) {
       studyMode?: unknown;
       history?: unknown;
       stream?: unknown;
+      provider?: unknown;
+      model?: unknown;
+      apiKey?: unknown;
+      baseUrl?: unknown;
     };
     try {
       body = await req.json();
@@ -94,7 +103,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const { message, class: studentClass, board, responseStyle, stepByStep, language, studyMode, history, stream } = body;
+    const {
+      message,
+      class: studentClass,
+      board,
+      responseStyle,
+      stepByStep,
+      language,
+      studyMode,
+      history,
+      stream,
+      provider: providerId,
+      model,
+      apiKey,
+      baseUrl,
+    } = body;
 
     if (!message || !studentClass || !board) {
       return NextResponse.json(
@@ -126,19 +149,94 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const validStudyModes = ["explain", "teach", "quiz", "hint", "simplify", "deep", "exam"];
+    const validStudyModes = ["explain", "teach", "quiz", "hint", "simplify", "deep", "exam"] as const;
+    type StudyMode = typeof validStudyModes[number];
     const validatedStudyMode = studyMode !== undefined && studyMode !== null
-      ? validStudyModes.includes(String(studyMode))
-        ? (String(studyMode) as StudyMode)
+      ? validStudyModes.includes(String(studyMode) as StudyMode)
+        ? String(studyMode) as StudyMode
         : null
       : null;
 
-    const systemPrompt = buildSystemPrompt(String(studentClass), String(board), {
-      responseStyle: responseStyle !== undefined ? String(responseStyle) : undefined,
-      stepByStep: stepByStep !== undefined ? Boolean(stepByStep) : undefined,
-      language: language !== undefined ? String(language) : undefined,
-      studyMode: validatedStudyMode,
-    });
+    // Build system prompt (same as before)
+    const styleMap: Record<string, string> = {
+      balanced: "Give balanced explanations suitable for a Class student.",
+      concise: "Keep answers concise and to the point.",
+      detailed: "Give detailed, thorough explanations with examples and context.",
+    };
+
+    const stepMap: Record<number, string> = {
+      0: "You can skip step-by-step breakdowns and give more direct answers when appropriate.",
+      1: "Break down your explanations into clear, numbered steps to help the student follow along.",
+    };
+
+    const langMap: Record<string, string> = {
+      english: "Respond in English.",
+      hindi: "Respond in Hindi.",
+      hinglish: "Respond in Hinglish (a casual mix of Hindi and English).",
+    };
+
+    const modeMap: Record<string, string> = {
+      explain: `Explain the concept clearly and simply. Structure your response with:
+- A direct, one-sentence answer
+- A clear explanation in simple terms
+- A concrete example if helpful
+- One key takeaway point
+Keep it focused and easy to understand.`,
+      teach: `Teach the concept step-by-step like a teacher in a classroom.
+- Start with what the student likely already knows (prior knowledge hook)
+- Build understanding progressively in small steps
+- Use simple, relatable examples at each step
+- Check understanding with a brief question before moving on
+- End with a summary and a practice question for them to try
+Be encouraging and patient.`,
+      quiz: `Quiz the student on this topic interactively.
+- Ask ONE clear, focused question at a time
+- Do NOT provide the answer immediately — wait for their response
+- After they answer, evaluate it and give constructive feedback
+- Then ask the next question or explain if needed
+- Keep questions appropriate for Class ${studentClass} ${board}
+If this is the first message in a quiz session, start with a welcoming question.`,
+      hint: `Give a gentle hint or clue to help the student figure it out themselves.
+- Do NOT give the full answer
+- Provide a nudge in the right direction (e.g., "Think about what formula relates X and Y" or "Recall the rule for...")
+- Keep it brief — one or two sentences
+- Encourage them to try solving it`,
+      simplify: `Simplify the concept as much as possible.
+- Use everyday analogies and relatable examples
+- Avoid jargon and technical terms unless necessary (explain them simply if used)
+- Break it down to its absolute core idea
+- Make it feel approachable, not academic
+- One clear takeaway`,
+      deep: `Provide a deep, thorough explanation with structure:
+- Direct answer
+- Step-by-step derivation or reasoning
+- Mathematical/scientific formulation where applicable
+- Connections to related topics
+- Advanced context or extensions
+- Summary of key insights
+Use proper notation for formulas and equations.`,
+      exam: `Explain this in an exam-oriented way for Class ${studentClass} ${board}.
+Structure with:
+- Key formulas, definitions, or theorems (highlight what to memorize)
+- Common question patterns and how to approach them
+- Step-by-step solution method for typical problems
+- Common mistakes to avoid
+- Short revision points (bullet form for quick review)
+- What examiners specifically look for in answers
+Keep it focused and practical.`,
+    };
+
+    const systemPrompt = `You are a friendly, patient tutor for a Class ${studentClass} ${board} student in India. ${langMap[language as string] || langMap.english} ${styleMap[responseStyle as string] || styleMap.balanced} ${stepMap[stepByStep ? 1 : 0]} ${validatedStudyMode ? modeMap[validatedStudyMode] : ""}
+
+RESPONSE STRUCTURE GUIDELINES (apply naturally, don't force every section):
+- Start with a direct, clear answer
+- Follow with explanation/reasoning
+- Include steps when solving problems
+- Provide a concrete example when helpful
+- Add a "Key Point" or "Exam Tip" for important concepts
+- Use proper formatting: bold for key terms, code blocks for formulas/equations, bullet points for lists
+- Keep language appropriate for Class ${studentClass} ${board} syllabus
+- Be encouraging and supportive`;
 
     const historyMessages: ChatMessage[] = [];
     if (Array.isArray(history)) {
@@ -154,25 +252,78 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const messages = [
-      { role: "system" as const, content: systemPrompt },
+    const messages: ChatMessage[] = [
+      { role: "system", content: systemPrompt },
       ...historyMessages,
-      { role: "user" as const, content: messageStr },
+      { role: "user", content: messageStr },
     ];
 
     const shouldStream = stream === true;
 
+    // Determine AI config: user-provided or server default (Groq)
+    let aiConfig: UserAIConfig;
+    if (providerId && apiKey) {
+      // User provided their own config
+      const providerIdValidated = providerId as AIProviderId;
+      if (!AI_PROVIDERS[providerIdValidated]) {
+        return NextResponse.json({ error: "Invalid provider" }, { status: 400 });
+      }
+      const providerConfig = AI_PROVIDERS[providerIdValidated];
+      if (providerConfig.requiresApiKey && !apiKey) {
+        return NextResponse.json({ error: "API key required for this provider" }, { status: 400 });
+      }
+      if (providerConfig.supportsCustomBaseUrl && baseUrl) {
+        aiConfig = {
+          provider: providerIdValidated,
+          apiKey: String(apiKey),
+          model: String(model || providerConfig.defaultModel),
+          baseUrl: String(baseUrl),
+          updatedAt: Date.now(),
+        };
+      } else {
+        aiConfig = {
+          provider: providerIdValidated,
+          apiKey: String(apiKey),
+          model: String(model || providerConfig.defaultModel),
+          updatedAt: Date.now(),
+        };
+      }
+    } else {
+      // Use server default (Groq)
+      aiConfig = {
+        provider: "groq" as AIProviderId,
+        apiKey: process.env.GROQ_API_KEY || "",
+        model: "openai/gpt-oss-120b",
+        updatedAt: Date.now(),
+      };
+      if (!aiConfig.apiKey) {
+        return NextResponse.json(
+          { error: "AI service not configured on server" },
+          { status: 500 },
+        );
+      }
+    }
+
+    // Validate provider config
+    const validation = await validateProviderConfig(aiConfig.provider, aiConfig);
+    if (!validation.valid) {
+      return NextResponse.json(
+        { error: validation.error || "Invalid AI provider configuration" },
+        { status: 400 },
+      );
+    }
+
     try {
       if (shouldStream) {
-        const groqStream = await getGroqClient().chat.completions.create({
-          model: GROQ_TEXT_MODEL,
-          messages,
-          temperature: 0.3,
-          max_tokens: 2048,
-          stream: true,
-        });
+        const streamResult = await sendMessage(aiConfig.provider, messages, aiConfig, true) as AsyncIterable<AIProviderStreamChunk>;
+        if (!isAsyncIterable(streamResult)) {
+          return NextResponse.json(
+            { error: "Provider does not support streaming" },
+            { status: 400 },
+          );
+        }
 
-        return new NextResponse(createStreamingResponse(groqStream), {
+        return new NextResponse(createStreamingResponse(streamResult), {
           headers: {
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache",
@@ -183,16 +334,8 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      const completion = await getGroqClient().chat.completions.create({
-        model: GROQ_TEXT_MODEL,
-        messages,
-        temperature: 0.3,
-        max_tokens: 2048,
-      });
-
-      const answer =
-        completion.choices[0]?.message?.content ||
-        "I couldn't generate an answer at this time. Please try again.";
+      const completion = await sendMessage(aiConfig.provider, messages, aiConfig, false);
+      const answer = (completion as AIProviderResponse).content;
 
       return NextResponse.json({
         answer,
@@ -203,10 +346,12 @@ export async function POST(req: NextRequest) {
           "X-RateLimit-Remaining": String(rateLimitResult.remaining),
         },
       });
-    } catch {
+    } catch (error: unknown) {
+      console.error("[CHAT] Provider error:", error);
+      const message = error instanceof Error ? error.message : "AI service temporarily unavailable. Please try again in a moment.";
       return NextResponse.json(
         {
-          error: "AI service temporarily unavailable. Please try again in a moment.",
+          error: message,
         },
         { status: 502 },
       );
