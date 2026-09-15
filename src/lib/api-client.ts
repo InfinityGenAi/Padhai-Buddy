@@ -26,7 +26,7 @@ export async function safeJsonParse<T>(
     let errorMessage = `Request failed with status ${status}`;
     try {
       const errorData = await safeReadJson(response);
-      if (errorData?.error) {
+      if (errorData && typeof errorData.error === "string") {
         errorMessage = errorData.error;
       }
     } catch {
@@ -47,7 +47,7 @@ export async function safeJsonParse<T>(
       };
     }
     // Empty response with success status
-    return { success: true, data: undefined as any, status };
+    return { success: true, data: undefined as T | undefined, status };
   }
 
   // Try to parse JSON
@@ -63,7 +63,7 @@ export async function safeJsonParse<T>(
   }
 }
 
-async function safeReadJson(response: Response): Promise<any> {
+async function safeReadJson(response: Response): Promise<Record<string, unknown> | null> {
   try {
     const cloned = response.clone();
     return await cloned.json();
@@ -103,7 +103,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public data?: any
+    public data?: unknown
   ) {
     super(message);
     this.name = "ApiError";

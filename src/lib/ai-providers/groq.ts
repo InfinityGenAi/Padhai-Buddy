@@ -1,4 +1,5 @@
 import Groq from "groq-sdk";
+import type { ChatCompletionChunk } from "groq-sdk/resources/chat/completions";
 import { AIProvider, AIProviderId, UserAIConfig, AIMessage, AIProviderResponse, AIProviderStreamChunk } from "./types";
 
 export class GroqProvider implements AIProvider {
@@ -20,7 +21,7 @@ export class GroqProvider implements AIProvider {
         stream: true,
       });
 
-      return this.createStreamIterator(groqStream as any);
+      return this.createStreamIterator(groqStream as AsyncIterable<ChatCompletionChunk>);
     }
 
     const completion = await client.chat.completions.create({
@@ -42,7 +43,7 @@ export class GroqProvider implements AIProvider {
     };
   }
 
-  private async *createStreamIterator(stream: any): AsyncIterable<AIProviderStreamChunk> {
+  private async *createStreamIterator(stream: AsyncIterable<ChatCompletionChunk>): AsyncIterable<AIProviderStreamChunk> {
     for await (const chunk of stream) {
       const choice = chunk.choices?.[0];
       const content = choice?.delta?.content;

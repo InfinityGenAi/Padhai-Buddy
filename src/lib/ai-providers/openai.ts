@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import type { ChatCompletionChunk } from "openai/resources/chat/completions";
 import { AIProvider, AIProviderId, UserAIConfig, AIMessage, AIProviderResponse, AIProviderStreamChunk } from "./types";
 
 export class OpenAIProvider implements AIProvider {
@@ -14,18 +15,18 @@ export class OpenAIProvider implements AIProvider {
     if (stream) {
       const openaiStream = await client.chat.completions.create({
         model: config.model,
-        messages: messages as any,
+        messages: messages as AIMessage[],
         temperature: 0.3,
         max_tokens: 2048,
         stream: true,
       });
 
-      return this.createStreamIterator(openaiStream);
+      return this.createStreamIterator(openaiStream as AsyncIterable<ChatCompletionChunk>);
     }
 
     const completion = await client.chat.completions.create({
       model: config.model,
-      messages: messages as any,
+      messages: messages as AIMessage[],
       temperature: 0.3,
       max_tokens: 2048,
     });
@@ -42,7 +43,7 @@ export class OpenAIProvider implements AIProvider {
     };
   }
 
-  private async *createStreamIterator(stream: any): AsyncIterable<AIProviderStreamChunk> {
+  private async *createStreamIterator(stream: AsyncIterable<ChatCompletionChunk>): AsyncIterable<AIProviderStreamChunk> {
     for await (const chunk of stream) {
       const choice = chunk.choices?.[0];
       const content = choice?.delta?.content;
@@ -61,8 +62,9 @@ export class OpenAIProvider implements AIProvider {
       const client = new OpenAI({ apiKey: config.apiKey });
       await client.models.list();
       return { valid: true };
-    } catch (error: any) {
-      return { valid: false, error: error.message || "Invalid API key" };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Invalid API key";
+      return { valid: false, error: message };
     }
   }
 

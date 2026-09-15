@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import type { ChatCompletionChunk } from "openai/resources/chat/completions";
 import { AIProvider, AIProviderId, UserAIConfig, AIMessage, AIProviderResponse, AIProviderStreamChunk } from "./types";
 
 export class OpenAICompatibleProvider implements AIProvider {
@@ -21,18 +22,18 @@ export class OpenAICompatibleProvider implements AIProvider {
     if (stream) {
       const openaiStream = await client.chat.completions.create({
         model: config.model,
-        messages: messages as any,
+        messages: messages as AIMessage[],
         temperature: 0.3,
         max_tokens: 2048,
         stream: true,
       });
 
-      return this.createStreamIterator(openaiStream);
+      return this.createStreamIterator(openaiStream as AsyncIterable<ChatCompletionChunk>);
     }
 
     const completion = await client.chat.completions.create({
       model: config.model,
-      messages: messages as any,
+      messages: messages as AIMessage[],
       temperature: 0.3,
       max_tokens: 2048,
     });
@@ -49,7 +50,7 @@ export class OpenAICompatibleProvider implements AIProvider {
     };
   }
 
-  private async *createStreamIterator(stream: any): AsyncIterable<AIProviderStreamChunk> {
+  private async *createStreamIterator(stream: AsyncIterable<ChatCompletionChunk>): AsyncIterable<AIProviderStreamChunk> {
     for await (const chunk of stream) {
       const choice = chunk.choices?.[0];
       const content = choice?.delta?.content;
@@ -74,8 +75,9 @@ export class OpenAICompatibleProvider implements AIProvider {
       });
       await client.models.list();
       return { valid: true };
-    } catch (error: any) {
-      return { valid: false, error: error.message || "Invalid configuration" };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Invalid configuration";
+      return { valid: false, error: message };
     }
   }
 
@@ -84,7 +86,7 @@ export class OpenAICompatibleProvider implements AIProvider {
     try {
       const client = new OpenAI({ apiKey, baseURL: baseUrl });
       const models = await client.models.list();
-      return models.data.map((m) => m.id);
+      return models.data.map((m: { id: string }) => m.id);
     } catch {
       return [];
     }
