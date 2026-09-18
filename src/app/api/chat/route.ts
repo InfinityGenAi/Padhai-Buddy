@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, initializationError } from "@/lib/firebase-admin";
+import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { getGroqClient, GROQ_TEXT_MODEL, buildSystemPrompt, StudyMode } from "@/lib/groq";
 import { checkRateLimit } from "@/lib/rate-limiter";
 
@@ -9,6 +9,125 @@ const MAX_HISTORY_MESSAGES = 10;
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+}
+
+/**
+ * Fetches and builds a summarized student context for AI personalization.
+ * Only includes essential data - never sends entire datasets.
+ */
+async function buildStudentContext(uid: string): Promise<string> {
+  if (!adminDb) return "";
+
+  try {
+    // Fetch essential data in parallel with limits
+    const [
+      profileSnap,
+      topicMasterySnap,
+      mistakeBankSnap,
+      quizAttemptsSnap,
+      studySessionsSnap,
+    ] = await Promise.all([
+      adminDb.collection("users").doc(uid).get(),
+      adminDb.collection("users").doc(uid).collection("topicMastery").get(),
+      adminDb.collection("users").doc(uid).collection("mistakeBank").orderBy("createdAt", "desc").limit(10).get(),
+      adminDb.collection("users").doc(uid).collection("quizAttempts").orderBy("completedAt", "desc").limit(5).get(),
+      adminDb.collection("users").doc(uid).collection("studySessions").orderBy("createdAt", "desc").limit(10).get(),
+    ]);
+
+    interface ProfileData {
+  class?: number;
+  board?: string;
+}
+
+interface TopicMasteryData {
+  subject: string;
+  topic: string;
+  mastery: number;
+  totalQuestions: number;
+}
+
+interface MistakeData {
+  subject: string;
+  topic: string;
+  question?: string;
+}
+
+interface QuizData {
+  score?: number;
+  completedAt?: number;
+}
+
+interface SessionData {
+  completed?: boolean;
+  subject?: string;
+}
+
+    const profileData = profileSnap.data() as ProfileData | undefined;
+    const parts: string[] = [];
+
+    // Class and board
+    if (profileData?.class && profileData?.board) {
+      parts.push(`Class ${profileData.class} ${profileData.board} student`);
+    } else if (profileData?.class) {
+      parts.push(`Class ${profileData.class} student`);
+    } else if (profileData?.board) {
+      parts.push(`${profileData.board} curriculum student`);
+    }
+
+    // Topic mastery - weak topics
+    const weakTopics = topicMasterySnap.docs
+      .map((d) => d.data() as TopicMasteryData)
+      .filter((t) => t.mastery < 70 && t.totalQuestions >= 3)
+      .sort((a, b) => a.mastery - b.mastery)
+      .slice(0, 3);
+
+    if (weakTopics.length > 0) {
+      const weakTopicText = weakTopics
+        .map((t) => `${t.subject}: ${t.topic} (${t.mastery}% mastery)`)
+        .join(", ");
+      parts.push(`Areas needing improvement: ${weakTopicText}`);
+    }
+
+    // Recent mistakes
+    const recentMistakes = mistakeBankSnap.docs
+      .map((d) => d.data() as MistakeData)
+      .slice(0, 2);
+
+    if (recentMistakes.length > 0) {
+      const mistakeText = recentMistakes
+        .map((m) => `${m.subject}: ${m.topic} - "${m.question?.slice(0, 40) || "question"}${m.question && m.question.length > 40 ? "…" : ""}"`)
+        .join("; ");
+      parts.push(`Recent mistakes: ${mistakeText}`);
+    }
+
+    // Recent quiz performance
+    const recentQuizzes = quizAttemptsSnap.docs
+      .map((d) => d.data() as QuizData)
+      .filter((q) => q.completedAt);
+
+    if (recentQuizzes.length > 0) {
+      const avgScore = recentQuizzes
+        .reduce((sum: number, q) => sum + (q.score || 0), 0) / recentQuizzes.length;
+      parts.push(`Recent quiz average: ${Math.round(avgScore)}%`);
+    }
+
+    // Recent study activity
+    const completedSessions = studySessionsSnap.docs
+      .map((d) => d.data() as SessionData)
+      .filter((s) => s.completed)
+      .slice(0, 3);
+
+    if (completedSessions.length > 0) {
+      const subjects = [...new Set(completedSessions.map((s) => s.subject).filter(Boolean))];
+      if (subjects.length > 0) {
+        parts.push(`Recently studied: ${subjects.slice(0, 3).join(", ")}`);
+      }
+    }
+
+    return parts.join(". ");
+  } catch {
+    return "";
+  }
 }
 
 function createStreamingResponse(stream: AsyncIterable<unknown>): ReadableStream {
@@ -87,6 +206,7 @@ export async function POST(req: NextRequest) {
       studyMode?: unknown;
       history?: unknown;
       stream?: unknown;
+      includeContext?: unknown;
     };
     try {
       body = await req.json();
@@ -94,7 +214,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const { message, class: studentClass, board, responseStyle, stepByStep, language, studyMode, history, stream } = body;
+    const { message, class: studentClass, board, responseStyle, stepByStep, language, studyMode, history, stream, includeContext } = body;
 
     if (!message || !studentClass || !board) {
       return NextResponse.json(
@@ -133,12 +253,21 @@ export async function POST(req: NextRequest) {
         : null
       : null;
 
-    const systemPrompt = buildSystemPrompt(String(studentClass), String(board), {
+    // Build base system prompt
+    let systemPrompt = buildSystemPrompt(String(studentClass), String(board), {
       responseStyle: responseStyle !== undefined ? String(responseStyle) : undefined,
       stepByStep: stepByStep !== undefined ? Boolean(stepByStep) : undefined,
       language: language !== undefined ? String(language) : undefined,
       studyMode: validatedStudyMode,
     });
+
+    // Add student context if requested (and not in a specific study mode that handles it differently)
+    if (includeContext === true && !validatedStudyMode) {
+      const context = await buildStudentContext(decoded.uid);
+      if (context) {
+        systemPrompt += `\n\nSTUDENT CONTEXT (use to personalize responses):\n${context}`;
+      }
+    }
 
     const historyMessages: ChatMessage[] = [];
     if (Array.isArray(history)) {

@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getFirebaseIdToken } from "@/lib/auth-utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 import {
   PhotoIcon,
   SparklesIcon,
@@ -15,18 +16,117 @@ const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export default function PhotoDoubtPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [answer, setAnswer] = useState<string | null>(null);
   const [answerNotSaved, setAnswerNotSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savingNote, setSavingNote] = useState(false);
+  const [generatingQuiz, setGeneratingQuiz] = useState(false);
+  const [showFollowUp, setShowFollowUp] = useState(false);
+  const [followUpQuestion, setFollowUpQuestion] = useState("");
+  const [followUpLoading, setFollowUpLoading] = useState(false);
 
   useEffect(() => {
     return () => {
       if (preview) URL.revokeObjectURL(preview);
     };
   }, [preview]);
+
+  const handleSaveAsNote = async () => {
+    if (!user?.uid || !answer) return;
+    setSavingNote(true);
+    try {
+      const token = await (await import("@/lib/auth-utils")).getFirebaseIdToken();
+      const res = await fetch("/api/notes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: "Photo Doubt Solution",
+          subject: "General",
+          body: answer,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to save note");
+      setError("Note saved!");
+      setTimeout(() => setError(null), 3000);
+    } catch {
+      setError("Failed to save note. Please try again.");
+      setTimeout(() => setError(null), 4000);
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const handleGenerateQuiz = async () => {
+    if (!user || !answer || !user.class || !user.board || generatingQuiz) return;
+    setGeneratingQuiz(true);
+    try {
+      const token = await (await import("@/lib/auth-utils")).getFirebaseIdToken();
+      const res = await fetch("/api/quiz", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          subject: "General",
+          class: user.class,
+          board: user.board,
+          difficulty: "medium",
+          numberOfQuestions: 5,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to generate quiz");
+      }
+      const data = await res.json();
+      router.push(`/dashboard/quiz?attempt=${data.attempt?.id}`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to generate quiz");
+      setTimeout(() => setError(null), 4000);
+    } finally {
+      setGeneratingQuiz(false);
+    }
+  };
+
+  const handleFollowUp = async () => {
+    if (!user || !followUpQuestion.trim() || !user.class || !user.board || followUpLoading) return;
+    setFollowUpLoading(true);
+    try {
+      const token = await (await import("@/lib/auth-utils")).getFirebaseIdToken();
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          message: `Follow-up to previous photo doubt explanation:\n\n${answer}\n\nQuestion: ${followUpQuestion}`,
+          class: user.class,
+          board: user.board,
+          stream: false,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to get response");
+      // Append follow-up answer to the main answer
+      setAnswer((prev) => (prev || "") + "\n\n---\n\n**Follow-up:** " + followUpQuestion + "\n\n" + data.answer);
+      setFollowUpQuestion("");
+      setShowFollowUp(false);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to get follow-up answer");
+      setTimeout(() => setError(null), 4000);
+    } finally {
+      setFollowUpLoading(false);
+    }
+  };
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const f = acceptedFiles[0];
@@ -272,6 +372,31 @@ export default function PhotoDoubtPage() {
                 Your answer couldn&apos;t be saved to history. It won&apos;t appear in Doubt History.
               </p>
             )}
+            <div className="mt-4 space-y-2">
+              <p className="text-xs text-foreground/50 font-medium">Actions</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={handleSaveAsNote}
+                  disabled={savingNote}
+                  className="flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors disabled:opacity-50"
+                >
+                  {savingNote ? "Saving..." : "Save as Note"}
+                </button>
+                <button
+                  onClick={handleGenerateQuiz}
+                  disabled={generatingQuiz}
+                  className="flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium text-primary bg-primary/10 hover:bg-primary/20 transition-colors disabled:opacity-50"
+                >
+                  {generatingQuiz ? "Generating..." : "Generate Quiz"}
+                </button>
+                <button
+                  onClick={() => setShowFollowUp(true)}
+                  className="flex-1 sm:flex-none px-4 py-2 rounded-lg text-sm font-medium text-foreground/60 hover:bg-foreground/5 border border-border transition-colors"
+                >
+                  Ask Follow-up
+                </button>
+              </div>
+            </div>
             <motion.button
               onClick={resetUpload}
               className="mt-6 w-full btn-primary py-2 rounded-xl font-medium"
@@ -279,6 +404,40 @@ export default function PhotoDoubtPage() {
             >
               Ask Another
             </motion.button>
+          </motion.div>
+        )}
+
+        {showFollowUp && (
+          <motion.div
+            key="followup"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="mt-4 glass card-subtle rounded-2xl p-6"
+          >
+            <h3 className="text-sm font-semibold text-foreground mb-3">Ask a Follow-up</h3>
+            <textarea
+              value={followUpQuestion}
+              onChange={(e) => setFollowUpQuestion(e.target.value)}
+              placeholder="Ask a follow-up question about the explanation..."
+              className="w-full min-h-[80px] p-3 rounded-lg bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none mb-3"
+              rows={3}
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowFollowUp(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium hover:bg-foreground/5 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleFollowUp}
+                disabled={followUpLoading || !followUpQuestion.trim()}
+                className="px-4 py-2 btn-primary rounded-lg text-sm font-medium disabled:opacity-50"
+              >
+                {followUpLoading ? "Asking..." : "Ask"}
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -88,7 +88,7 @@ export function shouldShowInstallPrompt(): boolean {
   // Don't show if already in app
   if (isApp()) return false;
 
-  // Don't show on iOS (no direct APK install)
+  // Don't show on iOS (PWA install via Share sheet only)
   if (isIOS()) return false;
 
   // Show on Android and Windows

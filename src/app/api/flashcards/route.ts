@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
+import { getGroqClient, GROQ_TEXT_MODEL } from "@/lib/groq";
 import type { Firestore } from "firebase-admin/firestore";
+
+interface FlashcardItem {
+  front: string;
+  back: string;
+}
 
 const BATCH_SIZE = 450;
 
@@ -69,13 +75,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
 
-    let body: { action?: string; deckId?: string; title?: string; subject?: string; description?: string; front?: string; back?: string; cardId?: string; status?: string };
+    let body: { 
+      action?: string; 
+      deckId?: string; 
+      title?: string; 
+      subject?: string; 
+      description?: string; 
+      front?: string; 
+      back?: string; 
+      cardId?: string; 
+      status?: string;
+      noteBody?: string;
+    };
     try {
       body = await req.json();
     } catch {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
-    const { action, deckId, title, subject, description, front, back, cardId, status } = body;
+    const { action, deckId, title, subject, description, front, back, cardId, status, noteBody } = body;
 
     const VALID_CARD_STATUSES = ["new", "learning", "known", "difficult"];
 
@@ -159,6 +176,76 @@ export async function POST(req: NextRequest) {
       await deckRef.collection("cards").doc(cardId).delete();
       await deckRef.update({ updatedAt: Date.now() });
       return NextResponse.json({ success: true });
+    }
+
+    // New action: create flashcards from a note using AI
+    if (action === "create-from-note") {
+      if (!title || !subject || !noteBody) return NextResponse.json({ error: "Title, subject, and noteBody are required" }, { status: 400 });
+      if (typeof title !== "string" || title.trim().length > 100) return NextResponse.json({ error: "Title must be a string of at most 100 characters" }, { status: 400 });
+      if (typeof subject !== "string" || subject.trim().length > 100) return NextResponse.json({ error: "Subject must be a string of at most 100 characters" }, { status: 400 });
+      if (typeof noteBody !== "string" || noteBody.trim().length < 50) return NextResponse.json({ error: "Note body must be at least 50 characters" }, { status: 400 });
+
+      // Create the deck
+      const deckRef = adminDb.collection("users").doc(decoded.uid).collection("flashcardDecks").doc();
+      const deck = { title: title.trim(), subject: subject.trim(), description: "Generated from note", createdAt: Date.now(), updatedAt: Date.now() };
+      await deckRef.set(deck);
+
+      // Use AI to generate flashcards from the note
+      const systemPrompt = `You are a flashcard generator for students. Create flashcards from the provided note content. Generate 5-10 high-quality flashcards that capture the key concepts, definitions, formulas, and important facts from the note. Each flashcard should have a clear question/concept on the front and a concise answer on the back. Return ONLY a valid JSON array of objects with "front" and "back" properties.`;
+
+      const userPrompt = `Create flashcards from this note:\n\nSubject: ${subject}\nTitle: ${title}\n\nNote:\n${noteBody}\n\nReturn ONLY a JSON array like: [{"front": "Question", "back": "Answer"}, ...]`;
+
+      let flashcards: { front: string; back: string }[] = [];
+      try {
+        const completion = await getGroqClient().chat.completions.create({
+          model: GROQ_TEXT_MODEL,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: 0.3,
+          max_tokens: 2048,
+        });
+
+        const raw = completion.choices[0]?.message?.content || "[]";
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          flashcards = parsed
+            .filter((c: FlashcardItem) => c.front && c.back && typeof c.front === "string" && typeof c.back === "string")
+            .slice(0, 15); // Limit to 15 cards
+        }
+      } catch {
+        // If AI fails, create basic flashcards from the note structure
+        flashcards = [];
+      }
+
+      // If AI didn't generate enough cards, create some from the note structure
+      if (flashcards.length < 3) {
+        // Extract key sentences/concepts as fallback
+        const sentences = noteBody.split(/[.!?]+/).filter(s => s.trim().length > 20).slice(0, 10);
+        flashcards = sentences.map((s, i) => ({
+          front: `Key concept ${i + 1}`,
+          back: s.trim(),
+        }));
+      }
+
+      // Add flashcards to the deck
+      const batch = adminDb.batch();
+      for (const card of flashcards) {
+        const cardRef = deckRef.collection("cards").doc();
+        batch.set(cardRef, {
+          deckId: deckRef.id,
+          front: card.front.trim(),
+          back: card.back.trim(),
+          status: "new",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+      }
+      await batch.commit();
+      await deckRef.update({ updatedAt: Date.now() });
+
+      return NextResponse.json({ deck: { id: deckRef.id, ...deck }, flashcardCount: flashcards.length });
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });

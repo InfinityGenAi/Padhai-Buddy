@@ -1,8 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowDownTrayIcon, DevicePhoneMobileIcon, CheckCircleIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
-import { useAuth } from "@/contexts/AuthContext";
+import { DevicePhoneMobileIcon, CheckCircleIcon, GlobeAltIcon } from "@heroicons/react/24/outline";
 import BrandLogo from "@/components/BrandLogo";
 import Link from "next/link";
 
@@ -29,10 +28,10 @@ export default function DownloadAndroidPage() {
               <DevicePhoneMobileIcon className="w-10 h-10 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-foreground mb-2">
-              Download Android App
+              Install on Android
             </h1>
             <p className="text-foreground/60">
-              Install the native Padhai Buddy app on your Android device
+              Add Padhai Buddy to your home screen for app-like experience
             </p>
           </motion.div>
 
@@ -44,26 +43,41 @@ export default function DownloadAndroidPage() {
                 </div>
                 <div className="text-left">
                   <p className="text-sm font-medium text-foreground">
-                    Native Android App
+                    Progressive Web App (PWA)
                   </p>
                   <p className="text-xs text-foreground/60">
-                    APK file for direct installation
+                    Works offline, no app store needed
                   </p>
                 </div>
               </div>
             </div>
 
+            <div className="bg-foreground/5 border border-border rounded-xl p-4 text-left">
+              <p className="text-sm font-medium text-foreground mb-2">How to install:</p>
+              <ol className="space-y-2 text-xs text-foreground/60">
+                <li className="flex items-center gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">1</span>Open this page in Chrome on Android</li>
+                <li className="flex items-center gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">2</span>Tap the menu (⋮) → "Add to Home screen" or "Install app"</li>
+                <li className="flex items-center gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">3</span>Confirm to add the icon to your home screen</li>
+              </ol>
+            </div>
+
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                // Trigger PWA install prompt if available
+                if ('serviceWorker' in navigator) {
+                  window.dispatchEvent(new CustomEvent('pwa-install-prompt'));
+                }
+              }}
               className="w-full btn-primary py-3 rounded-xl font-medium flex items-center justify-center gap-2"
             >
-              <ArrowDownTrayIcon className="w-5 h-5" />
-              Download APK
+              <GlobeAltIcon className="w-5 h-5" />
+              Open in Browser to Install
             </motion.button>
 
             <p className="text-xs text-foreground/50 text-center">
-              After downloading, open the APK file to install. You may need to enable &#34;Install from unknown sources&#34; in settings.
+              Padhai Buddy is a Progressive Web App. Install it directly from your browser — no APK download needed.
             </p>
           </div>
 

@@ -1,8 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowDownTrayIcon, ComputerDesktopIcon, CheckCircleIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
-import { useAuth } from "@/contexts/AuthContext";
+import { ComputerDesktopIcon, CheckCircleIcon, GlobeAltIcon } from "@heroicons/react/24/outline";
 import BrandLogo from "@/components/BrandLogo";
 import Link from "next/link";
 
@@ -29,10 +28,10 @@ export default function DownloadWindowsPage() {
               <ComputerDesktopIcon className="w-10 h-10 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-foreground mb-2">
-              Download Windows App
+              Install on Windows
             </h1>
             <p className="text-foreground/60">
-              Install the native Padhai Buddy app on your Windows PC
+              Add Padhai Buddy to your desktop for app-like experience
             </p>
           </motion.div>
 
@@ -44,26 +43,40 @@ export default function DownloadWindowsPage() {
                 </div>
                 <div className="text-left">
                   <p className="text-sm font-medium text-foreground">
-                    Native Windows App
+                    Progressive Web App (PWA)
                   </p>
                   <p className="text-xs text-foreground/60">
-                    MSIX installer for Windows 10/11
+                    Works offline, installs from browser
                   </p>
                 </div>
               </div>
             </div>
 
+            <div className="bg-foreground/5 border border-border rounded-xl p-4 text-left">
+              <p className="text-sm font-medium text-foreground mb-2">How to install:</p>
+              <ol className="space-y-2 text-xs text-foreground/60">
+                <li className="flex items-center gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">1</span>Open this page in Chrome or Edge on Windows</li>
+                <li className="flex items-center gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">2</span>Click the install icon in the address bar or menu (⋮) → "Install Padhai Buddy"</li>
+                <li className="flex items-center gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">3</span>Confirm to add to Start menu and desktop</li>
+              </ol>
+            </div>
+
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                if ('serviceWorker' in navigator) {
+                  window.dispatchEvent(new CustomEvent('pwa-install-prompt'));
+                }
+              }}
               className="w-full btn-primary py-3 rounded-xl font-medium flex items-center justify-center gap-2"
             >
-              <ArrowDownTrayIcon className="w-5 h-5" />
-              Download Installer
+              <GlobeAltIcon className="w-5 h-5" />
+              Open in Browser to Install
             </motion.button>
 
             <p className="text-xs text-foreground/50 text-center">
-              Run the installer and follow the setup wizard. The app will be available from Start menu.
+              Padhai Buddy is a Progressive Web App. Install it directly from your browser — no separate installer download needed.
             </p>
           </div>
 

@@ -72,11 +72,11 @@ export default function InstallPrompt({ onDismiss }: InstallPromptProps) {
                 <h3 className="text-base font-semibold text-foreground truncate">
                   Install Padhai Buddy
                 </h3>
-                <p className="text-sm text-foreground/60 truncate">
-                  {isAndroid() 
-                    ? "Get the native Android app with offline support & notifications"
-                    : "Get the native Windows app with desktop integration"}
-                  </p>
+<p className="text-sm text-foreground/60 truncate">
+                {isAndroid() 
+                  ? "Install the PWA for offline support & home screen access"
+                  : "Install the PWA for desktop integration & offline access"}
+              </p>
               </div>
             </div>
             <button

@@ -36,7 +36,8 @@ export async function GET(req: NextRequest) {
       const filtered = notes.filter((n: Record<string, unknown>) =>
         String(n.title || "").toLowerCase().includes(q) ||
         String(n.body || "").toLowerCase().includes(q) ||
-        String(n.subject || "").toLowerCase().includes(q)
+        String(n.subject || "").toLowerCase().includes(q) ||
+        (Array.isArray(n.tags) ? n.tags.some((t: string) => t.toLowerCase().includes(q)) : false)
       );
       return NextResponse.json({ notes: filtered });
     }
@@ -64,22 +65,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
 
-    let body: { action?: string; noteId?: string; title?: string; subject?: string; body?: string };
+    let body: { 
+      action?: string; 
+      noteId?: string; 
+      title?: string; 
+      subject?: string; 
+      body?: string; 
+      tags?: string[];
+    };
     try {
       body = await req.json();
     } catch {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
-    const { action, noteId, title, subject, body: noteBody } = body;
+    const { action, noteId, title, subject, body: noteBody, tags } = body;
 
     if (action === "create") {
       if (!title || !subject || !noteBody) return NextResponse.json({ error: "Title, subject, and body are required" }, { status: 400 });
       if (typeof title !== "string" || title.trim().length > 200) return NextResponse.json({ error: "Title must be a string of at most 200 characters" }, { status: 400 });
       if (typeof subject !== "string" || subject.trim().length > 100) return NextResponse.json({ error: "Subject must be a string of at most 100 characters" }, { status: 400 });
       if (typeof noteBody !== "string" || noteBody.trim().length > 20000) return NextResponse.json({ error: "Body must be a string of at most 20000 characters" }, { status: 400 });
+      if (tags !== undefined) {
+        if (!Array.isArray(tags) || tags.length > 10) return NextResponse.json({ error: "Tags must be an array of at most 10 strings" }, { status: 400 });
+        if (!tags.every(t => typeof t === "string" && t.trim().length > 0 && t.trim().length <= 30)) return NextResponse.json({ error: "Each tag must be a non-empty string of at most 30 characters" }, { status: 400 });
+      }
 
       const noteRef = adminDb.collection("users").doc(decoded.uid).collection("notes").doc();
-      const note = { title: title.trim(), subject: subject.trim(), body: noteBody.trim(), createdAt: Date.now(), updatedAt: Date.now() };
+      const note = { 
+        title: title.trim(), 
+        subject: subject.trim(), 
+        body: noteBody.trim(), 
+        tags: tags?.map(t => t.trim().toLowerCase()) || [], 
+        createdAt: Date.now(), 
+        updatedAt: Date.now() 
+      };
       await noteRef.set(note);
       return NextResponse.json({ note: { id: noteRef.id, ...note } });
     }
@@ -100,6 +119,12 @@ export async function POST(req: NextRequest) {
       if (noteBody !== undefined) {
         if (typeof noteBody !== "string" || noteBody.trim().length > 20000) return NextResponse.json({ error: "Body must be a string of at most 20000 characters" }, { status: 400 });
         updates.body = noteBody.trim();
+        hasUpdates = true;
+      }
+      if (tags !== undefined) {
+        if (!Array.isArray(tags) || tags.length > 10) return NextResponse.json({ error: "Tags must be an array of at most 10 strings" }, { status: 400 });
+        if (!tags.every(t => typeof t === "string" && t.trim().length > 0 && t.trim().length <= 30)) return NextResponse.json({ error: "Each tag must be a non-empty string of at most 30 characters" }, { status: 400 });
+        updates.tags = tags.map(t => t.trim().toLowerCase());
         hasUpdates = true;
       }
       if (!hasUpdates) {

@@ -42,6 +42,7 @@ import {
   TrophyIcon,
   BookmarkIcon,
   ArrowPathIcon,
+  BookOpenIcon,
 } from "@heroicons/react/24/outline";
 import { playSend, playReceive, playCopy, playError } from "@/lib/sounds";
 import type { ChatMessage, Conversation } from "@/types";
@@ -605,6 +606,7 @@ export default function ChatPage() {
           studyMode: studyMode,
           history: historyMessages,
           stream: true,
+          includeContext: true,
         }),
       });
 
@@ -876,6 +878,69 @@ export default function ChatPage() {
     }
   };
 
+  const handleQuickAction = async (action: "quiz" | "simplify" | "hint" | "save-note" | "practice" | "explain-differently") => {
+    if (!user || !activeConversationId || !user.class || !user.board || isTyping) return;
+    
+    // Get the last assistant message content
+    const lastAssistantMsg = [...messagesRef.current].reverse().find((m) => m.role === "assistant");
+    const lastContent = lastAssistantMsg?.content || "";
+    
+    let message = "";
+    let studyModeOverride: string | null = null;
+    
+    switch (action) {
+      case "quiz":
+        message = "Create a practice quiz based on our conversation. Generate 3-5 multiple choice questions with explanations. Don't provide answers yet - let me answer them.";
+        studyModeOverride = "quiz";
+        break;
+      case "simplify":
+        message = `Simplify this explanation using everyday analogies and simple language. Avoid jargon. Make it easy to understand for a Class ${user.class} student.\n\nExplanation: ${lastContent}`;
+        studyModeOverride = "simplify";
+        break;
+      case "hint":
+        message = `Give me a gentle hint or clue to help me figure out the answer myself. Don't give the full answer - just a nudge in the right direction.\n\nContext: ${lastContent}`;
+        studyModeOverride = "hint";
+        break;
+      case "save-note":
+        // This will be handled by the save note functionality
+        // For now, we'll save the last AI response as a note
+        try {
+          await saveItem(user.uid, lastContent, "explanation", lastAssistantMsg?.id || "", activeConversationId);
+          setChatError("Saved as note!");
+          setTimeout(() => setChatError(null), 3000);
+        } catch {
+          setChatError("Failed to save note. Please try again.");
+          setTimeout(() => setChatError(null), 4000);
+        }
+        return;
+      case "practice":
+        message = `Generate practice questions similar to what we've discussed. Create 3-5 questions that test the same concepts. Make them standalone questions.`;
+        studyModeOverride = "quiz";
+        break;
+      case "explain-differently":
+        message = `Explain this concept in a completely different way - use a different analogy, approach, or perspective. Make it feel fresh and new.\n\nConcept: ${lastContent}`;
+        studyModeOverride = "teach";
+        break;
+    }
+    
+    if (!message) return;
+    
+    // Set the study mode temporarily if specified
+    const previousStudyMode = studyMode;
+    if (studyModeOverride) {
+      setStudyMode(studyModeOverride);
+    }
+    
+    // Send the message
+    setInput(message);
+    sendMessage();
+    
+    // Restore previous study mode after a short delay
+    if (studyModeOverride && previousStudyMode !== studyModeOverride) {
+      setTimeout(() => setStudyMode(previousStudyMode), 100);
+    }
+  };
+
   const sidebarContent = (
     <div className="flex flex-col h-full">
       <div className="p-3 border-b border-border/50">
@@ -1117,6 +1182,69 @@ export default function ChatPage() {
                 <span className="hidden sm:inline">{mode.label}</span>
               </button>
             ))}
+          </div>
+        </motion.div>
+
+        {/* AI Study Action Toolbar */}
+        <motion.div
+          variants={animationsEnabled ? { hidden: { opacity: 0, y: -8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3 } } } : undefined}
+          className="mb-3"
+        >
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:px-6">
+            <button
+              onClick={() => handleQuickAction("quiz")}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap bg-card-subtle text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+              title="Generate a quiz on this topic"
+              disabled={isTyping}
+            >
+              <BookOpenIcon className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Quiz Me</span>
+            </button>
+            <button
+              onClick={() => handleQuickAction("simplify")}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap bg-card-subtle text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+              title="Simplify the last explanation"
+              disabled={isTyping}
+            >
+              <SparklesIcon className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Simplify</span>
+            </button>
+            <button
+              onClick={() => handleQuickAction("hint")}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap bg-card-subtle text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+              title="Give a hint for the current problem"
+              disabled={isTyping}
+            >
+              <MagnifyingGlassIcon className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Hint</span>
+            </button>
+            <button
+              onClick={() => handleQuickAction("save-note")}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap bg-card-subtle text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+              title="Save the last explanation as a note"
+              disabled={isTyping || !activeConversationId}
+            >
+              <BookmarkIcon className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Save Note</span>
+            </button>
+            <button
+              onClick={() => handleQuickAction("practice")}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap bg-card-subtle text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+              title="Generate practice questions"
+              disabled={isTyping}
+            >
+              <ArrowPathIcon className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Practice</span>
+            </button>
+            <button
+              onClick={() => handleQuickAction("explain-differently")}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap bg-card-subtle text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+              title="Explain the concept differently"
+              disabled={isTyping}
+            >
+              <AcademicCapIcon className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Explain Differently</span>
+            </button>
           </div>
         </motion.div>
 

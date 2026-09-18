@@ -14,20 +14,49 @@ import {
   BookOpenIcon,
   Squares2X2Icon,
   ChartBarIcon,
+  ExclamationTriangleIcon,
+  AcademicCapIcon,
+  ArrowPathIcon,
+  SparklesIcon,
 } from "@heroicons/react/24/outline";
 import { getFirestoreDb } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, doc, onSnapshot, query, orderBy, deleteDoc } from "firebase/firestore";
 import { playTaskComplete } from "@/lib/sounds";
 import type { Doubt, StudyPlan } from "@/types";
-import {
-  AiStudyBar,
-  QuickStudy,
-  ContinueLearning,
-  ReviewToday,
-  WeakTopics,
-  ThisWeekOverview,
-  RecentActivity,
-} from "@/components/dashboard";
+import { AiStudyBar, QuickStudy, ContinueLearning, ThisWeekOverview, RecentActivity } from "@/components/dashboard";
+
+interface NextAction {
+  id: string;
+  title: string;
+  reason: string;
+  actionType: string;
+  targetRoute: string;
+  subject?: string;
+  topic?: string;
+  priority: number;
+  icon: string;
+  color: string;
+}
+
+interface WeakTopic {
+  subject: string;
+  topic: string;
+  mastery: number;
+  totalQuestions: number;
+  correctAnswers: number;
+  mistakeCount: number;
+  lastMistakeAt: number;
+  lastPracticed: number;
+  weaknessScore: number;
+}
+
+interface StreakData {
+  currentStreak: number;
+  longestStreak: number;
+  lastStudyDate: string | null;
+  isActiveToday: boolean;
+  streakMessage: string;
+}
 
 async function handleTogglePlan(uid: string | undefined, plan: StudyPlan) {
   const db = getFirestoreDb();
@@ -100,6 +129,48 @@ async function handleAddPlan(
   }
 }
 
+function getIconComponent(iconName: string) {
+  switch (iconName) {
+    case "exclamation-triangle": return ExclamationTriangleIcon;
+    case "academic-cap": return AcademicCapIcon;
+    case "calendar-days": return CalendarIcon;
+    case "sparkles": return SparklesIcon;
+    case "question-mark-circle": return BookOpenIcon;
+    case "squares-2x2": return Squares2X2Icon;
+    case "photo": return PhotoIcon;
+    default: return SparklesIcon;
+  }
+}
+
+function getColorClasses(color: string) {
+  switch (color) {
+    case "red": return { colorClass: "text-red-400", bgClass: "bg-red-950/30", borderClass: "border-red-800/50" };
+    case "amber": return { colorClass: "text-amber-400", bgClass: "bg-amber-950/30", borderClass: "border-amber-800/50" };
+    case "blue": return { colorClass: "text-blue-400", bgClass: "bg-blue-950/30", borderClass: "border-blue-800/50" };
+    case "indigo": return { colorClass: "text-indigo-400", bgClass: "bg-indigo-950/30", borderClass: "border-indigo-800/50" };
+    case "teal": return { colorClass: "text-teal-400", bgClass: "bg-teal-950/30", borderClass: "border-teal-800/50" };
+    case "emerald": return { colorClass: "text-emerald-400", bgClass: "bg-emerald-950/30", borderClass: "border-emerald-800/50" };
+    case "purple": return { colorClass: "text-purple-400", bgClass: "bg-purple-950/30", borderClass: "border-purple-800/50" };
+    case "primary": return { colorClass: "text-primary", bgClass: "bg-primary/10", borderClass: "border-primary/30" };
+    default: return { colorClass: "text-primary", bgClass: "bg-primary/10", borderClass: "border-primary/30" };
+  }
+}
+
+function formatStudyTime(minutes: number) {
+  if (minutes <= 0) return "0m";
+  if (minutes < 60) return `${minutes}m`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+function getTodayInIST(): string {
+  const now = new Date();
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  const istTime = new Date(now.getTime() + istOffset);
+  return istTime.toISOString().split("T")[0];
+}
+
 export default function DashboardPage() {
   const { user, preferences } = useAuth();
   const [totalDoubts, setTotalDoubts] = useState(0);
@@ -107,7 +178,7 @@ export default function DashboardPage() {
   const [recentDoubts, setRecentDoubts] = useState<Doubt[]>([]);
   const [loading, setLoading] = useState(true);
 
-const [studyPlans, setStudyPlans] = useState<StudyPlan[]>([]);
+  const [studyPlans, setStudyPlans] = useState<StudyPlan[]>([]);
   const [studySessions, setStudySessions] = useState<
     { mode: string; durationMinutes: number; completed: boolean; createdAt: number; subject?: string }[]
   >([]);
@@ -121,19 +192,78 @@ const [studyPlans, setStudyPlans] = useState<StudyPlan[]>([]);
   const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
 
-  // === Topic Mastery state ===
-  const [topicMastery, setTopicMastery] = useState<
-    { subject: string; topic: string; mastery: number; totalQuestions: number; correctAnswers: number; lastPracticed: number }[]
-  >([]);
+  // === New API-driven state ===
+  const [nextActions, setNextActions] = useState<NextAction[]>([]);
+  const [nextActionsLoading, setNextActionsLoading] = useState(true);
+  const [weakTopics, setWeakTopics] = useState<WeakTopic[]>([]);
+  const [weakTopicsLoading, setWeakTopicsLoading] = useState(true);
+  const [streak, setStreak] = useState<StreakData | null>(null);
+  const [streakLoading, setStreakLoading] = useState(true);
 
-// === Mistake Bank state ===
-  const [mistakeBank, setMistakeBank] = useState<
-    { subject: string; topic: string; question: string; userAnswer: string; correctAnswer: string; explanation: string; createdAt: number; reviewCount: number }[]
-  >([]);
-
-const reducedMotion = useReducedMotion();
+  const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
 
+  // === Fetch Next Actions ===
+  useEffect(() => {
+    if (!user?.uid) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await (await import("@/lib/auth-utils")).getFirebaseIdToken();
+        const res = await fetch("/api/next-action", { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        if (!cancelled) setNextActions(data.actions || []);
+      } catch {
+        // ignore, will use fallback
+      } finally {
+        if (!cancelled) setNextActionsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.uid]);
+
+  // === Fetch Weak Topics ===
+  useEffect(() => {
+    if (!user?.uid) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await (await import("@/lib/auth-utils")).getFirebaseIdToken();
+        const res = await fetch("/api/weak-topics", { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        if (!cancelled) setWeakTopics(data.weakTopics || []);
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setWeakTopicsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.uid]);
+
+  // === Fetch Streak ===
+  useEffect(() => {
+    if (!user?.uid) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await (await import("@/lib/auth-utils")).getFirebaseIdToken();
+        const res = await fetch("/api/streak", { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        if (!cancelled) setStreak(data.streak || null);
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setStreakLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.uid]);
+
+  // === Load basic stats ===
   useEffect(() => {
     const loadStats = async () => {
       const db = getFirestoreDb();
@@ -187,6 +317,7 @@ const reducedMotion = useReducedMotion();
     loadStats();
   }, [user?.uid]);
 
+  // === Study Plans listener ===
   useEffect(() => {
     if (!user?.uid) return;
     const db = getFirestoreDb();
@@ -215,10 +346,10 @@ const reducedMotion = useReducedMotion();
       setStudyPlans(plans);
     });
 
-return () => unsub();
+    return () => unsub();
   }, [user?.uid]);
 
-  // === Study Sessions listener (for This Week Overview) ===
+  // === Study Sessions listener ===
   useEffect(() => {
     if (!user?.uid) return;
     const db = getFirestoreDb();
@@ -247,88 +378,6 @@ return () => unsub();
     );
 
     return () => unsub();
-  }, [user?.uid]);
-
-  // === Topic Mastery listener ===
-  useEffect(() => {
-    if (!user?.uid) return;
-    const db = getFirestoreDb();
-    if (!db) return;
-
-    const unsub = onSnapshot(
-      collection(db, "users", user.uid, "topicMastery"),
-      (snapshot) => {
-        const data: {
-          subject: string;
-          topic: string;
-          mastery: number;
-          totalQuestions: number;
-          correctAnswers: number;
-          lastPracticed: number;
-        }[] = [];
-        snapshot.forEach((doc) => {
-          const d = doc.data();
-          data.push({
-            subject: d.subject || "General",
-            topic: d.topic || "General",
-            mastery: d.mastery || 0,
-            totalQuestions: d.totalQuestions || 0,
-            correctAnswers: d.correctAnswers || 0,
-            lastPracticed: d.lastPracticed || 0,
-          });
-        });
-        setTopicMastery(data);
-      },
-      (error) => {
-        console.error("[DASHBOARD] topicMastery listener error:", error);
-        setTopicMastery([]);
-      }
-    );
-
-    return () => unsub();
-  }, [user?.uid]);
-
-  // === Mistake Bank listener ===
-  useEffect(() => {
-    if (!user?.uid) return;
-    const db = getFirestoreDb();
-    if (!db) return;
-
-const unsub = onSnapshot(
-      collection(db, "users", user.uid, "mistakeBank"),
-      (snapshot) => {
-        const data: {
-          subject: string;
-          topic: string;
-          question: string;
-          userAnswer: string;
-          correctAnswer: string;
-          explanation: string;
-          createdAt: number;
-          reviewCount: number;
-        }[] = [];
-        snapshot.forEach((doc) => {
-          const d = doc.data();
-          data.push({
-            subject: d.subject || "General",
-            topic: d.topic || "General",
-            question: d.question || "",
-            userAnswer: d.userAnswer || "",
-            correctAnswer: d.correctAnswer || "",
-            explanation: d.explanation || "",
-            createdAt: d.createdAt || 0,
-            reviewCount: d.reviewCount || 0,
-          });
-        });
-        setMistakeBank(data);
-      },
-      (error) => {
-        console.error("[DASHBOARD] mistakeBank listener error:", error);
-        setMistakeBank([]);
-      }
-    );
-
-return () => unsub();
   }, [user?.uid]);
 
   // === Quiz Stats listener ===
@@ -385,33 +434,19 @@ return () => unsub();
     return () => unsub();
   }, [user?.uid]);
 
-  function getTodayInIST(): string {
-    const now = new Date();
-    const istOffset = 5.5 * 60 * 60 * 1000;
-    const istTime = new Date(now.getTime() + istOffset);
-    return istTime.toISOString().split("T")[0];
-  }
-
   const today = getTodayInIST();
   const todayPlans = studyPlans.filter((p) => p.plannedDate === today);
   const completedToday = todayPlans.filter((p) => p.completed).length;
-const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / todayPlans.length) * 100) : 0;
+  const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / todayPlans.length) * 100) : 0;
 
-  const continueStudySet = topicMastery.length > 0
-    ? [...topicMastery].sort((a, b) => (b.lastPracticed || 0) - (a.lastPracticed || 0))[0]
-    : undefined;
-  // Review Today: use reviewCount to determine unreviewed mistakes (reviewCount === 0 means unreviewed)
-  const reviewTodayItems = mistakeBank
-    .filter((m) => (m.reviewCount ?? 0) === 0)
-    .slice(0, 5);
-  const weakTopics = topicMastery
-    .filter((t) => t.mastery < 60 && t.totalQuestions >= 3)
-    .sort((a, b) => a.mastery - b.mastery)
-    .slice(0, 5);
+  // Primary action from nextActions API (or fallback)
+  const primaryAction = nextActions[0];
+
+  // Secondary actions
+  const secondaryActions = nextActions.slice(1, 3);
 
   const thisWeekOverviewStats = useMemo(() => {
     const weekAgo = new Date().getTime() - 7 * 24 * 60 * 60 * 1000;
-    // Use actual studySessions instead of studyPlans for session metrics
     const thisWeekSessions = studySessions.filter((s) => (s.createdAt || 0) >= weekAgo);
     const thisWeekSubjects = [...new Set(thisWeekSessions.map((s) => s.subject).filter((s): s is string => Boolean(s)))];
     return {
@@ -421,188 +456,88 @@ const todayProgress = todayPlans.length > 0 ? Math.round((completedToday / today
     };
   }, [studySessions, weeklyStudyMinutes]);
 
-  // === Next-Best-Action calculation ===
-  const nextBestAction = useMemo(() => {
-    // Priority 1: Unreviewed mistakes
-    const unreviewedMistakes = mistakeBank.filter(
-      (m) => !m.explanation || m.explanation.trim() === ""
-    );
-    if (unreviewedMistakes.length > 0) {
-      const count = unreviewedMistakes.length;
-      const latest = unreviewedMistakes[0];
-      return {
-        type: "review-mistakes" as const,
-        label: `Review ${count} unreviewed mistake${count > 1 ? "s" : ""}`,
-        description: `Start with "${latest.topic}" — ${latest.question.slice(0, 50)}${latest.question.length > 50 ? "…" : ""}`,
-        href: "/dashboard/photo-doubt",
-        icon: PhotoIcon,
-        colorClass: "text-red-400",
-        bgClass: "bg-red-950/30",
-        borderClass: "border-red-800/50",
-      };
-    }
+  // Quick study actions
+  const quickStudyActions = useMemo(() => {
+    const actions = [
+      { key: "ai-tutor", href: "/dashboard/chat", label: "Ask AI Tutor", desc: "Get help with any topic" },
+      { key: "quiz", href: "/dashboard/quiz", label: "Practice Quiz", desc: "Test your knowledge" },
+      { key: "flashcards", href: "/dashboard/flashcards", label: "Flashcards", desc: "Spaced repetition" },
+      { key: "photo", href: "/dashboard/photo-doubt", label: "Photo Doubt", desc: "Snap & solve problems" },
+    ];
+    return actions;
+  }, []);
 
-    // Priority 2: Weak topics (mastery < 60, >= 3 questions)
-    if (weakTopics.length > 0) {
-      const weakest = weakTopics[0];
-      return {
-        type: "weak-topic" as const,
-        label: `Strengthen "${weakest.topic}"`,
-        description: `${weakest.mastery}% mastery in ${weakest.subject} — practice to improve`,
-        href: `/dashboard/quiz?topic=${encodeURIComponent(weakest.topic)}&subject=${encodeURIComponent(weakest.subject)}`,
-        icon: BookOpenIcon,
-        colorClass: "text-amber-400",
-        bgClass: "bg-amber-950/30",
-        borderClass: "border-amber-800/50",
-      };
-    }
-
-    // Priority 3: Incomplete today's plan
-    const pendingToday = todayPlans.filter((p) => !p.completed);
-    if (pendingToday.length > 0) {
-      const nextTask = pendingToday[0];
-      return {
-        type: "pending-plan" as const,
-        label: `Complete "${nextTask.title}"`,
-        description: `${nextTask.subject} — ${nextTask.durationMinutes} min task pending today`,
-        href: "/dashboard/planner",
-        icon: CalendarIcon,
-        colorClass: "text-blue-400",
-        bgClass: "bg-blue-950/30",
-        borderClass: "border-blue-800/50",
-      };
-    }
-
-    // Priority 4: Continue learning from recently practiced topic
-    if (continueStudySet) {
-      return {
-        type: "continue-learning" as const,
-        label: `Continue "${continueStudySet.topic}"`,
-        description: `${continueStudySet.subject} — ${continueStudySet.mastery}% mastery, keep building`,
-        href: "/dashboard/chat",
-        icon: LightBulbIcon,
-        colorClass: "text-indigo-400",
-        bgClass: "bg-indigo-950/30",
-        borderClass: "border-indigo-800/50",
-      };
-    }
-
-    // Priority 5: Default - start a quiz
-    return {
-      type: "start-quiz" as const,
-      label: "Start a quiz",
-      description: "Test your knowledge and build mastery",
-      href: "/dashboard/quiz",
-      icon: BookOpenIcon,
-      colorClass: "text-teal-400",
-      bgClass: "bg-teal-950/30",
-      borderClass: "border-teal-800/50",
-    };
-  }, [mistakeBank, weakTopics, todayPlans, continueStudySet]);
-
-  const formatStudyTime = (minutes: number) => {
-    if (minutes <= 0) return "0m";
-    if (minutes < 60) return `${minutes}m`;
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    return m > 0 ? `${h}h ${m}m` : `${h}h`;
-  };
-
-const calculateStreak = (plans: StudyPlan[]): number => {
-    const now = new Date();
-    const istOffset = 5.5 * 60 * 60 * 1000;
-    const today = new Date(now.getTime() + istOffset);
-    let streak = 0;
-    for (let i = 0; i < 365; i++) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split("T")[0];
-      const hasActivity = plans.some((p) => p.plannedDate === dateStr && p.completed);
-      if (hasActivity) {
-        streak++;
-      } else if (i > 0) {
-        break;
-      }
-    }
-    return streak;
-  };
-
-const studyStreak = calculateStreak(studyPlans);
-
-  const stats = [
-    {
-      label: "Doubts Solved",
-      value: loading ? "…" : String(totalDoubts),
-      sublabel: "All Time",
-      icon: ChatBubbleLeftEllipsisIcon,
-      colorClass: "text-accent-blue",
-      bgClass: "bg-blue-950/30",
-    },
-    {
-      label: "Study Time",
-      value: loading ? "…" : formatStudyTime(weeklyStudyMinutes),
-      sublabel: "This Week",
-      icon: ClockIcon,
-      colorClass: "text-accent-teal",
-      bgClass: "bg-teal-950/30",
-    },
-    {
-      label: "Quizzes Taken",
-      value: loading ? "…" : String(quizStats.total),
-      sublabel: "Total",
-      icon: BookOpenIcon,
-      colorClass: "text-accent-amber",
-      bgClass: "bg-amber-950/30",
-    },
-    {
-      label: "Flashcards Learned",
-      value: loading ? "…" : String(flashcardStats.learned),
-      sublabel: "Total",
-      icon: Squares2X2Icon,
-      colorClass: "text-accent-emerald",
-      bgClass: "bg-emerald-500/10",
-    },
-    {
-      label: "Score Average",
-      value: loading ? "…" : (quizStats.avgScore > 0 ? `${quizStats.avgScore}%` : "—"),
-      sublabel: "Average",
-      icon: ChartBarIcon,
-      colorClass: "text-accent-indigo",
-      bgClass: "bg-indigo-950/30",
-    },
-  ];
-
-const renderInsight = () => {
-    if (loading) {
+  const renderPrimaryAction = () => {
+    if (nextActionsLoading) {
       return (
-        <div className="space-y-2.5">
-          <div className="h-3.5 bg-foreground/5 rounded w-4/5 animate-pulse" />
-          <div className="h-3.5 bg-foreground/5 rounded w-3/5 animate-pulse" />
+        <div className="p-4 rounded-xl border border-border/50 bg-foreground/5 animate-pulse space-y-3">
+          <div className="h-5 bg-foreground/10 rounded w-1/3" />
+          <div className="h-4 bg-foreground/10 rounded w-1/2" />
+          <div className="h-10 bg-foreground/10 rounded" />
         </div>
       );
     }
 
-    const action = nextBestAction;
+    if (!primaryAction) {
+      return (
+        <div className="p-4 rounded-xl border border-border/50 bg-foreground/5 text-center">
+          <SparklesIcon className="w-8 h-8 text-foreground/30 mx-auto mb-2" />
+          <p className="text-sm text-foreground/60">No recommendations yet. Start studying to get personalized suggestions!</p>
+        </div>
+      );
+    }
+
+    const IconComponent = getIconComponent(primaryAction.icon);
+    const { colorClass, bgClass, borderClass } = getColorClasses(primaryAction.color);
 
     return (
-      <div className="space-y-3">
-        <div className={`p-3 rounded-xl border ${action.borderClass} ${action.bgClass}`}>
-          <div className="flex items-start gap-3">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${action.bgClass} ${action.colorClass}`}>
-              <action.icon className="w-4 h-4" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground">{action.label}</p>
-              <p className="text-xs text-foreground/60 mt-0.5">{action.description}</p>
-            </div>
+      <Link
+        href={primaryAction.targetRoute}
+        className="block p-4 rounded-xl border hover:border-primary/30 hover:bg-foreground/[0.02] transition-all"
+      >
+        <div className="flex items-start gap-3">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${bgClass} ${colorClass}`}>
+            <IconComponent className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-base font-semibold text-foreground">{primaryAction.title}</p>
+            <p className="text-sm text-foreground/60 mt-1">{primaryAction.reason}</p>
+          </div>
+          <div className="flex-shrink-0 self-center">
+            <span className="px-3 py-1.5 bg-primary text-primary-foreground text-sm font-medium rounded-lg">
+              Start →
+            </span>
           </div>
         </div>
-        <Link
-          href={action.href}
-          className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-primary hover:bg-primary/90 transition-colors"
-        >
-          {action.label} →
-        </Link>
+      </Link>
+    );
+  };
+
+  const renderSecondaryActions = () => {
+    if (nextActionsLoading || secondaryActions.length === 0) return null;
+
+    return (
+      <div className="grid grid-cols-2 gap-3">
+        {secondaryActions.map((action) => {
+          const IconComponent = getIconComponent(action.icon);
+          const { colorClass, bgClass, borderClass } = getColorClasses(action.color);
+
+          return (
+            <Link
+              key={action.id}
+              href={action.targetRoute}
+              className={`p-3 rounded-xl border flex items-start gap-2.5 ${borderClass} ${bgClass} hover:border-primary/30 hover:bg-foreground/[0.02] transition-all`}
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${bgClass} ${colorClass}`}>
+                <IconComponent className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{action.title}</p>
+                <p className="text-xs text-foreground/55 mt-0.5 truncate">{action.reason}</p>
+              </div>
+            </Link>
+          );
+        })}
       </div>
     );
   };
@@ -623,244 +558,264 @@ const renderInsight = () => {
       animate={animationsEnabled ? "visible" : undefined}
       className="space-y-6 w-full"
     >
-      {/* Welcome Header */}
-      <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
-        <div className="flex items-center gap-3 mb-1 sm:hidden">
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-            Hi, {user?.name?.split(" ")[0] || "there"}! 👋
-          </h1>
-        </div>
-        {user?.class && user?.board && (
-          <div className="hidden sm:flex items-center gap-3 mb-1">
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary">
+      {/* 1. GREETING + CLASS/BOARD CONTEXT */}
+      <motion.div
+        variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}
+      >
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-2">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+              Hi, {user?.name?.split(" ")[0] || "there"}!
+            </h1>
+          </div>
+          {user?.class && user?.board && (
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary whitespace-nowrap">
               Class {user.class} — {user.board}
             </span>
-          </div>
-        )}
-        <p className="text-sm sm:text-base text-foreground/55 mt-1 sm:hidden">
-          Let&apos;s make today an amazing learning day.
+          )}
+        </div>
+        <p className="text-sm sm:text-base text-foreground/55">
+          What should we tackle today?
         </p>
       </motion.div>
 
-<ContinueLearning currentStudySet={continueStudySet} />
+      {/* 2. TODAY'S PRIMARY STUDY ACTION (Above the fold) */}
+      <motion.div
+        variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-semibold text-foreground/75">TODAY</h2>
+          <span className="text-xs text-foreground/50 font-medium">Primary Focus</span>
+        </div>
+        {renderPrimaryAction()}
+      </motion.div>
 
-      {/* Stats Cards */}
-      <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-          {stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="subtle-card card-hover rounded-xl p-4 flex flex-col gap-2.5"
+      {/* 3. SECONDARY ACTIONS */}
+      {renderSecondaryActions() && (
+        <motion.div
+          variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}
+        >
+          <h2 className="text-base font-semibold text-foreground/75 mb-3">MORE ACTIONS</h2>
+          {renderSecondaryActions()}
+        </motion.div>
+      )}
+
+      {/* 4. TODAY'S PLAN / PROGRESS */}
+      <motion.div
+        variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}
+        className="subtle-card rounded-xl p-5"
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-foreground/75">TODAY'S PLAN</h2>
+          <span className="text-xs text-foreground/50 font-medium">{todayProgress}% done</span>
+        </div>
+
+        {planError && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-3 p-3 rounded-xl bg-red-950/30 border border-red-800/50 text-red-400 text-xs"
+          >
+            {planError}
+          </motion.div>
+        )}
+
+        {todayPlans.length === 0 ? (
+          <div className="flex flex-col items-center justify-center text-center py-4">
+            <div className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center mb-3">
+              <CalendarIcon className="w-5 h-5 text-foreground/30" />
+            </div>
+            <p className="text-sm text-foreground/50 mb-3">No tasks planned for today.</p>
+            <button
+              onClick={() => setShowAddPlan(true)}
+              className="text-xs font-medium text-primary hover:text-primary/80 flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-primary/5 transition-colors"
             >
-              <div className={`w-8 h-8 rounded-lg ${stat.bgClass} ${stat.colorClass} flex items-center justify-center card-icon`}>
-                <stat.icon className="w-4 h-4" />
+              <PlusIcon className="w-3.5 h-3.5" />
+              Add Task
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-2 flex-1 max-h-[200px] overflow-y-auto">
+              {todayPlans.map((item) => (
+                <div
+                  key={item.id}
+                  className={`flex items-center gap-3 p-2.5 rounded-xl transition-colors ${
+                    item.completed ? "bg-foreground/[0.02]" : "bg-foreground/5 hover:bg-foreground/8"
+                  }`}
+                >
+                  <button
+                    onClick={() => handleTogglePlan(user?.uid, item)}
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                      item.completed
+                        ? "bg-primary border-primary"
+                        : "border-foreground/25 hover:border-primary/50"
+                    }`}
+                  >
+                    {item.completed && (
+                      <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm truncate ${item.completed ? "text-foreground/35 line-through" : "text-foreground/75"}`}>
+                      {item.subject} — {item.title}
+                    </p>
+                  </div>
+                  <span className="text-xs text-foreground/40 flex-shrink-0">{item.durationMinutes} min</span>
+                  <button
+                    onClick={() => handleDeletePlan(user?.uid, item.id, setDeletingPlanId, setPlanError)}
+                    disabled={deletingPlanId === item.id}
+                    className="p-1 rounded-md text-foreground/30 hover:text-red-500 hover:bg-red-950/20 transition-colors disabled:opacity-50"
+                    title="Delete task"
+                  >
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 pt-3 border-t border-border/50">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-foreground/50 font-medium">Progress</span>
+                <span className="text-xs text-foreground/60 font-medium">{completedToday}/{todayPlans.length}</span>
               </div>
-              <div>
-                <p className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">{stat.value}</p>
-                <p className="text-[11px] sm:text-xs text-foreground/45 font-medium">{stat.label}</p>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] sm:text-xs text-foreground/40">{stat.sublabel}</span>
+              <div className="h-1.5 bg-foreground/5 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500"
+                  style={{ width: `${todayProgress}%` }}
+                />
               </div>
             </div>
-          ))}
+            <button
+              onClick={() => setShowAddPlan(true)}
+              className="mt-3 w-full py-2 rounded-lg text-sm font-medium text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-1.5 focus-ring"
+            >
+              <PlusIcon className="w-4 h-4" />
+              Add Task
+            </button>
+          </>
+        )}
+      </motion.div>
+
+      {/* 5. WEAK TOPICS REQUIRING ATTENTION */}
+      <motion.div
+        variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-semibold text-foreground/75">PRIORITY</h2>
+          <span className="text-xs text-foreground/50 font-medium">Needs Review</span>
+        </div>
+        <div className={weakTopicsLoading ? "space-y-2" : weakTopics.length === 0 ? "text-center py-4" : "space-y-2"}>
+          {weakTopicsLoading ? (
+            <div className="space-y-2">
+              {[1, 2].map((i) => (
+                <div key={i} className="h-16 bg-foreground/5 rounded-xl animate-pulse" />
+              ))}
+            </div>
+          ) : weakTopics.length === 0 ? (
+            <p className="text-foreground/40 text-sm">
+              No weak topics detected. Keep up the good work!
+            </p>
+          ) : (
+            weakTopics.slice(0, 3).map((topic) => (
+              <Link
+                key={`${topic.subject}-${topic.topic}`}
+                href={`/dashboard/quiz?topic=${encodeURIComponent(topic.topic)}&subject=${encodeURIComponent(topic.subject)}`}
+                className="p-3 rounded-xl border border-amber-800/50 bg-amber-950/30 flex items-center gap-3 hover:border-amber-400/50 hover:bg-amber-950/40 transition-all"
+              >
+                <div className="w-8 h-8 rounded-lg bg-amber-950/50 flex items-center justify-center text-amber-400 flex-shrink-0">
+                  <AcademicCapIcon className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground">{topic.subject}: {topic.topic}</p>
+                  <p className="text-xs text-foreground/50 mt-0.5">{topic.mastery}% mastery · {topic.mistakeCount} mistakes</p>
+                </div>
+                <span className="px-2.5 py-1 text-xs font-medium text-amber-400 bg-amber-950/50 rounded-full">
+                  Practice
+                </span>
+              </Link>
+            ))
+          )}
         </div>
       </motion.div>
 
-      {/* 3-Column Section: Today's Plan | AI Study Insight | Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Today's Plan */}
-        <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined} className="lg:col-span-1">
-          <div className="subtle-card rounded-xl p-5 h-full flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-semibold text-foreground/75">Today&apos;s Plan</h2>
-              <span className="text-xs text-foreground/50 font-medium">{todayProgress}% done</span>
-            </div>
+      {/* 6. QUICK STUDY ACTIONS */}
+      <motion.div
+        variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}
+      >
+        <h2 className="text-base font-semibold text-foreground/75 mb-3">QUICK STUDY</h2>
+        <QuickStudy actions={quickStudyActions} />
+      </motion.div>
 
-{planError && (
-              <motion.div
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-3 p-3 rounded-xl bg-red-950/30 border border-red-800/50 text-red-400 text-xs"
-              >
-                {planError}
-              </motion.div>
-            )}
-
-            {todayPlans.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center py-6">
-                <div className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center mb-3">
-                  <CalendarIcon className="w-5 h-5 text-foreground/30" />
-                </div>
-                <p className="text-sm text-foreground/50 mb-3">No tasks planned for today.</p>
-                <button
-                  onClick={() => setShowAddPlan(true)}
-                  className="text-xs font-medium text-primary hover:text-primary/80 flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-primary/5 transition-colors"
-                >
-                  <PlusIcon className="w-3.5 h-3.5" />
-                  Add Task
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-2.5 flex-1 overflow-y-auto max-h-[220px]">
-                  {todayPlans.map((item) => (
-                    <div
-                      key={item.id}
-                      className={`flex items-center gap-3 p-2.5 rounded-xl transition-colors ${
-                        item.completed ? "bg-foreground/[0.02]" : "bg-foreground/5 hover:bg-foreground/8"
-                      }`}
-                    >
-                      <button
-                        onClick={() => handleTogglePlan(user?.uid, item)}
-                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                          item.completed
-                            ? "bg-primary border-primary"
-                            : "border-foreground/25 hover:border-primary/50"
-                        }`}
-                      >
-                        {item.completed && (
-                          <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        )}
-                      </button>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm truncate ${item.completed ? "text-foreground/35 line-through" : "text-foreground/75"}`}>
-                          {item.subject} — {item.title}
-                        </p>
-                      </div>
-                      <span className="text-xs text-foreground/40 flex-shrink-0">{item.durationMinutes} min</span>
-                      <button
-                        onClick={() => handleDeletePlan(user?.uid, item.id, setDeletingPlanId, setPlanError)}
-                        disabled={deletingPlanId === item.id}
-                        className="p-1 rounded-md text-foreground/30 hover:text-red-500 hover:bg-red-950/20 transition-colors disabled:opacity-50"
-                        title="Delete task"
-                      >
-                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="3 6 5 6 21 6" />
-                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-3 pt-3 border-t border-border/50">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-foreground/50 font-medium">Progress</span>
-                    <span className="text-xs text-foreground/60 font-medium">{completedToday}/{todayPlans.length}</span>
-                  </div>
-                  <div className="h-1.5 bg-foreground/5 rounded-full overflow-hidden">
-                    <div
-className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500"
-                        style={{ width: `${todayProgress}%` }}
-                    />
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowAddPlan(true)}
-                  className="mt-3 w-full py-2 rounded-lg text-sm font-medium text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-1.5 focus-ring"
-                >
-                  <PlusIcon className="w-4 h-4" />
-                  Add Task
-                </button>
-              </>
-            )}
+      {/* 7. COMPACT PROGRESS / STREAK SUMMARY */}
+      <motion.div
+        variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}
+        className="grid grid-cols-2 sm:grid-cols-4 gap-3"
+      >
+        {/* Study Streak */}
+        <div className="subtle-card rounded-xl p-4 flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white flex-shrink-0 shadow-md">
+            <span className="text-xl font-bold">{streak?.currentStreak ?? 0}</span>
           </div>
-</motion.div>
+          <div className="flex-1 min-w-0">
+            <p className="text-base font-bold text-foreground tracking-tight">Day Streak</p>
+            <p className="text-xs text-foreground/50 font-medium">{streak?.streakMessage || "Start your streak today!"}</p>
+          </div>
+        </div>
 
-      <ReviewToday recentActivities={reviewTodayItems.map((r) => r.question)} />
+        {/* Study Time This Week */}
+        <div className="subtle-card rounded-xl p-4 flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white flex-shrink-0 shadow-md">
+            <ClockIcon className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-base font-bold text-foreground tracking-tight">{formatStudyTime(weeklyStudyMinutes)}</p>
+            <p className="text-xs text-foreground/50 font-medium">This Week</p>
+          </div>
+        </div>
 
-      <WeakTopics weakTopics={weakTopics} />
+        {/* Quizzes Taken */}
+        <div className="subtle-card rounded-xl p-4 flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white flex-shrink-0 shadow-md">
+            <BookOpenIcon className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-base font-bold text-foreground tracking-tight">{quizStats.total}</p>
+            <p className="text-xs text-foreground/50 font-medium">Quizzes Taken</p>
+          </div>
+        </div>
 
+        {/* Avg Score */}
+        <div className="subtle-card rounded-xl p-4 flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white flex-shrink-0 shadow-md">
+            <ChartBarIcon className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-base font-bold text-foreground tracking-tight">{quizStats.avgScore > 0 ? `${quizStats.avgScore}%` : "—"}</p>
+            <p className="text-xs text-foreground/50 font-medium">Avg Score</p>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* 8. THIS WEEK OVERVIEW */}
       <ThisWeekOverview studyStats={thisWeekOverviewStats} />
 
-      {/* AI Study Insight */}
-        <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined} className="lg:col-span-1">
-          <div className="subtle-card rounded-xl p-5 h-full">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-lg bg-blue-950/30 flex items-center justify-center text-primary">
-                <LightBulbIcon className="w-4 h-4" />
-              </div>
-              <h3 className="text-sm font-semibold text-foreground/75">AI Study Insight</h3>
-            </div>
-            {renderInsight()}
-          </div>
-        </motion.div>
-
+      {/* 9. RECENT ACTIVITY */}
+      <motion.div
+        variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}
+      >
         <RecentActivity recentActivities={recentDoubts.map((d) => ({
-  id: d.id,
-  type: d.type,
-  subject: d.type === "text" ? "Text" : "Photo",
-  time: Math.floor((new Date().getTime() - d.createdAt) / 60000),
-  completed: false,
-}))} />
-      </div>
-
-      {/* 2-Column Section: Study Streak | Progress Overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Study Streak */}
-        <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
-          <div className="subtle-card rounded-xl p-5 flex items-center gap-4">
-            <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white flex-shrink-0 shadow-md">
-              <span className="text-2xl font-bold">{studyStreak}</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-lg font-bold text-foreground tracking-tight">Day Streak</p>
-              <p className="text-xs text-foreground/50 font-medium">Keep it up!</p>
-            </div>
-            <div className="grid grid-cols-7 gap-1">
-              {Array.from({ length: 7 }).map((_, i) => (
-                <div key={i} className="w-2.5 h-2.5 rounded-full bg-primary/20" />
-              ))}
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Progress Overview */}
-        <motion.div variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}>
-          <div className="subtle-card rounded-xl p-5 flex items-center justify-center">
-            <div className="relative inline-flex items-center justify-center">
-              <svg className="w-32 h-32 -rotate-90" viewBox="0 0 120 120">
-                <circle
-                  cx="60"
-                  cy="60"
-                  r="52"
-                  fill="none"
-                  strokeWidth="10"
-                  className="stroke-foreground/8"
-                />
-                <circle
-                  cx="60"
-                  cy="60"
-                  r="52"
-                  fill="none"
-                  strokeWidth="10"
-                  strokeLinecap="round"
-                  stroke="url(#progressGradient)"
-                  strokeDasharray="326.7"
-                  strokeDashoffset={326.7 - (326.7 * (Math.max(0, Math.min(100, studyStreak > 0 ? Math.min(100, studyStreak * 14) : 0)) / 100))}
-                  className="transition-all duration-1000"
-                />
-                <defs>
-                  <linearGradient id="progressGradient" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stopColor="#8b5cf6" />
-                    <stop offset="100%" stopColor="#14b8a6" />
-                  </linearGradient>
-                </defs>
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <p className="text-3xl font-bold text-foreground">
-                    {studyStreak > 0 ? `${Math.min(100, studyStreak * 14)}%` : "0%"}
-                  </p>
-                  <p className="text-[10px] text-foreground/40 font-medium">Progress</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      </div>
+          id: d.id,
+          type: d.type,
+          subject: d.type === "text" ? "Text" : "Photo",
+          time: Math.floor((new Date().getTime() - d.createdAt) / 60000),
+          completed: false,
+        }))} />
+      </motion.div>
 
       {/* Add Task Modal */}
       <AnimatePresence>

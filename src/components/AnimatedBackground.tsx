@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion, useMotionValue, useSpring, useTransform, type MotionValue } from "framer-motion";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
 export type BackgroundVariant =
@@ -127,12 +127,16 @@ export default function AnimatedBackground({
   animate = true,
   variant: externalVariant,
 }: AnimatedBackgroundProps) {
+  const [mounted, setMounted] = useState(false);
   const reducedMotion = useReducedMotion();
-  const shouldAnimate = Boolean(animate) && !reducedMotion;
   const pathname = usePathname();
   const resolvedVariant = externalVariant ?? resolveVariant(pathname);
   const intensity = VARIANT_INTENSITY[resolvedVariant];
   const touch = isTouchDevice();
+
+  // During SSR and first render, use only the animate prop (no reduced motion check)
+  // After mount, respect the user's reduced motion preference
+  const shouldAnimate = mounted ? Boolean(animate) && !reducedMotion : Boolean(animate);
 
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
@@ -148,6 +152,10 @@ export default function AnimatedBackground({
   const layerFgY = useTransform(smoothY, [-1, 1], ANIMATION_CONFIG.parallax.fg as [number, number]);
 
   const enableParallax = shouldAnimate && !touch;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!enableParallax) return;
