@@ -8,6 +8,7 @@ import {
   UserIcon,
 } from "@heroicons/react/24/outline";
 import type { UserBoard, UserClass } from "@/types";
+import { safeFetch } from "@/lib/api-client";
 
 export default function ProfilePage() {
   const { user, preferences, reloadProfile } = useAuth();
@@ -36,14 +37,13 @@ export default function ProfilePage() {
       };
       if (photoURL.trim()) updates.photoURL = photoURL.trim();
 
-      const res = await fetch("/api/profile", {
+      const result = await safeFetch("/api/profile", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}` },
         body: JSON.stringify(updates),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!result.success) throw new Error(result.error || "Failed to update profile");
 
       setNotification({ type: "success", text: "Profile updated successfully" });
       reloadProfile();

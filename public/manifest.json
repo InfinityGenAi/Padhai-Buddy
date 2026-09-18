@@ -4,7 +4,7 @@
   "description": "Your AI study buddy for every doubt, every subject, every board.",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#0B0F14",
+  "background_color": "#FAFAF9",
   "theme_color": "#0D9488",
   "orientation": "portrait-primary",
   "scope": "/",

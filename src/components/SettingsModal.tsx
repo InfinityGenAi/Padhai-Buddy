@@ -51,6 +51,7 @@ import type { UserPreferences, UserSession, Conversation } from "@/types";
 import { playPasswordChange, playSessionLogout, playSaveSuccess } from "@/lib/sounds";
 import BrandLogo from "./BrandLogo";
 import KeyboardShortcutsDialog from "./KeyboardShortcutsDialog";
+import { PWAInstall } from "./PWAInstall";
 
 export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const router = useRouter();
@@ -894,6 +895,14 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                     </button>
                   )}
                 </div>
+              </div>
+
+              {/* PWA INSTALL */}
+              <div className="subtle-card rounded-xl p-4">
+                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40 mb-3">
+                  App Installation
+                </h4>
+                <PWAInstall />
               </div>
 
               {/* DANGER ZONE */}

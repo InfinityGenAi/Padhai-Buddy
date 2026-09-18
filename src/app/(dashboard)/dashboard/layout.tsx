@@ -6,7 +6,6 @@ import AnimatedBackground from "@/components/AnimatedBackground";
 import RequireAuth from "@/components/AuthWrapper";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import SettingsModal from "@/components/SettingsModal";
-import InstallPrompt from "@/components/InstallPrompt";
 import BrandLogo from "@/components/BrandLogo";
 import { SettingsModalProvider, useSettingsModal } from "@/contexts/SettingsModalContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,12 +19,9 @@ import {
   Cog6ToothIcon,
   ArrowLeftOnRectangleIcon,
   UserIcon,
-  DevicePhoneMobileIcon,
-  ComputerDesktopIcon,
 } from "@heroicons/react/24/outline";
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
 import { playLogout, playSettings } from "@/lib/sounds";
-import { isAndroid, isWindows, isApp } from "@/lib/platform";
 import type { Notification } from "@/types";
 
 function DashboardInner({ children }: { children: React.ReactNode }) {
@@ -139,6 +135,14 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
     await logout();
   }, [logout]);
 
+  useEffect(() => {
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {
+        // Silently fail - SW is optional
+      });
+    }
+  }, []);
+
   return (
     <>
       <AnimatedBackground animate={preferences.animationsEnabled} />
@@ -236,24 +240,6 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
                           Settings
                         </button>
                         <div className="border-t border-border/50" />
-                        {isApp() ? (
-                          <p className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-foreground/70 hover:bg-foreground/5 transition-colors cursor-default">
-                            Installed
-                          </p>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              if (isAndroid()) {
-                                window.location.href = '/download/android';
-                              } else if (isWindows()) {
-                                window.location.href = '/download/windows';
-                              }
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium text-foreground/70 hover:bg-foreground/5 transition-colors rounded-lg"
-                          >
-                            Download App
-                          </button>
-                        )}
                         <button
                           onClick={handleLogout}
                           className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-400 hover:bg-red-950/20 transition-colors"
@@ -300,7 +286,6 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
         <BottomNav />
       </div>
       <SettingsModal isOpen={isOpen} onClose={close} />
-      <InstallPrompt />
     </>
   );
 }
