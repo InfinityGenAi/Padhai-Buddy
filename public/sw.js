@@ -4,10 +4,12 @@
 
 const CACHE_NAME = 'padhai-buddy-v1';
 const STATIC_CACHE_NAME = 'padhai-buddy-static-v1';
+const OFFLINE_PAGE = '/offline.html';
 
 // Assets to cache on install
 const STATIC_ASSETS = [
   '/',
+  '/offline.html',
   '/manifest.json',
   '/brand/favicon-192.png',
   '/brand/favicon-512.png',
@@ -121,39 +123,46 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => {
-          // Offline fallback - try cache
-          return caches.match(request)
-            .then((cachedResponse) => {
-              if (cachedResponse) {
-                return cachedResponse;
-              }
-              // Return offline page or basic response
-              return new Response(
-                `<!DOCTYPE html>
-                <html>
-                <head>
-                  <meta charset="utf-8">
-                  <meta name="viewport" content="width=device-width, initial-scale=1">
-                  <title>Padhai Buddy - Offline</title>
-                  <style>
-                    body { font-family: system-ui; padding: 2rem; text-align: center; background: #0B0F14; color: white; }
-                    .icon { font-size: 4rem; margin-bottom: 1rem; }
-                  </style>
-                </head>
-                <body>
-                  <div class="icon">📚</div>
-                  <h1>Padhai Buddy</h1>
-                  <p>You're offline. Some features may not be available.</p>
-                  <p><a href="/" style="color: #0D9488;">Try again</a></p>
-                </body>
-                </html>`,
-                {
-                  status: 200,
-                  headers: { 'Content-Type': 'text/html' }
+.catch(() => {
+            // Offline fallback - try cache
+            return caches.match(request)
+              .then((cachedResponse) => {
+                if (cachedResponse) {
+                  return cachedResponse;
                 }
-              );
-            });
+                // Return dedicated offline page
+                return caches.match(OFFLINE_PAGE)
+                  .then((offlineResponse) => {
+                    if (offlineResponse) {
+                      return offlineResponse;
+                    }
+                    // Fallback inline if offline page not cached
+                    return new Response(
+                      `<!DOCTYPE html>
+                      <html>
+                      <head>
+                        <meta charset="utf-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1">
+                        <title>Padhai Buddy - Offline</title>
+                        <style>
+                          body { font-family: system-ui; padding: 2rem; text-align: center; background: #0B0F14; color: white; }
+                          .icon { font-size: 4rem; margin-bottom: 1rem; }
+                        </style>
+                      </head>
+                      <body>
+                        <div class="icon">📚</div>
+                        <h1>Padhai Buddy</h1>
+                        <p>You're offline. Some features may not be available.</p>
+                        <p><a href="/" style="color: #0D9488;">Try again</a></p>
+                      </body>
+                      </html>`,
+                      {
+                        status: 200,
+                        headers: { 'Content-Type': 'text/html' }
+                      }
+                    );
+                  });
+              });
         })
     );
     return;
