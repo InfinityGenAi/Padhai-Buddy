@@ -1,6 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 import * as path from "path";
 
+// Set emulator environment variables for test execution
+process.env.FIREBASE_AUTH_EMULATOR_HOST = "localhost:9099";
+process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
+
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,

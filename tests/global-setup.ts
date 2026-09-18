@@ -2,44 +2,50 @@ import { chromium } from "@playwright/test";
 import { readFileSync, existsSync, unlinkSync, writeFileSync } from "fs";
 import { resolve } from "path";
 import http from "http";
+import net from "net";
 
 const TEST_EMAIL = "test@padhai-buddy.test";
 const TEST_PASSWORD = "TestPassword123!";
 const PROJECT_ID = "infinity-gen-ai";
 
-function isPortInUse(port: number): Promise<boolean> {
+function isPortOpen(port: number, host = "127.0.0.1"): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
-    const req = http.get(`http://localhost:${port}`, () => resolve(true));
-    req.on("error", () => resolve(false));
-    req.setTimeout(1000, () => {
-      req.destroy();
+    const socket = new net.Socket();
+    socket.setTimeout(1000);
+    socket.once("connect", () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.once("error", () => resolve(false));
+    socket.once("timeout", () => {
+      socket.destroy();
       resolve(false);
     });
+    socket.connect(port, host);
   });
 }
 
-async function waitForPort(port: number, timeoutMs = 60000): Promise<void> {
+async function waitForPort(port: number, host = "127.0.0.1", timeoutMs = 60000): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const start = Date.now();
-    const interval = setInterval(() => {
-      const req = http.get(`http://localhost:${port}`, () => {
+    const interval = setInterval(async () => {
+      const open = await isPortOpen(port, host);
+      if (open) {
         clearInterval(interval);
         resolve();
-      });
-      req.on("error", () => {
-        if (Date.now() - start > timeoutMs) {
-          clearInterval(interval);
-          reject(new Error(`Timeout waiting for port ${port}`));
-        }
-      });
-      req.setTimeout(1000);
+        return;
+      }
+      if (Date.now() - start > timeoutMs) {
+        clearInterval(interval);
+        reject(new Error(`Timeout waiting for port ${port} on ${host}`));
+      }
     }, 500);
   });
 }
 
 async function createTestUser(): Promise<{ uid: string; idToken: string }> {
   const authPort = 9099;
-  await waitForPort(authPort, 120000);
+  await waitForPort(authPort, "127.0.0.1", 120000);
 
   const signupBody = JSON.stringify({
     email: TEST_EMAIL,
@@ -158,7 +164,7 @@ async function createTestUser(): Promise<{ uid: string; idToken: string }> {
 
 async function ensureFirestoreUser(uid: string, idToken: string) {
   const firestorePort = 8080;
-  await waitForPort(firestorePort, 120000);
+  await waitForPort(firestorePort, "127.0.0.1", 120000);
 
   const body = JSON.stringify({
     name: `projects/${PROJECT_ID}/databases/(default)/documents/users/${uid}`,
