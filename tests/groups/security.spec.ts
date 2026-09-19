@@ -26,7 +26,7 @@ loadEnv();
 function isPortInUseSync(port: number): boolean {
   try {
     const net = require("net");
-    const client = net.createConnection(port, "localhost");
+    const client = net.createConnection(port, "127.0.0.1");
     client.end();
     return true;
   } catch {
