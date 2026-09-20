@@ -5,7 +5,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
-  ChatBubbleLeftEllipsisIcon,
   PhotoIcon,
   ClockIcon,
   LightBulbIcon,
@@ -18,12 +17,17 @@ import {
   AcademicCapIcon,
   ArrowPathIcon,
   SparklesIcon,
+  ClockIcon as ClockIconSolid,
+  BookOpenIcon as BookOpenIconSolid,
+  ExclamationTriangleIcon as ExclamationTriangleIconSolid,
+  ArrowPathIcon as ArrowPathIconSolid,
+  SparklesIcon as SparklesIconSolid,
 } from "@heroicons/react/24/outline";
 import { getFirestoreDb } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, doc, onSnapshot, query, orderBy, deleteDoc } from "firebase/firestore";
 import { playTaskComplete } from "@/lib/sounds";
 import type { Doubt, StudyPlan } from "@/types";
-import { AiStudyBar, QuickStudy, ContinueLearning, ThisWeekOverview, RecentActivity } from "@/components/dashboard";
+import { QuickStudy, ThisWeekOverview, RecentActivity } from "@/components/dashboard";
 
 interface NextAction {
   id: string;

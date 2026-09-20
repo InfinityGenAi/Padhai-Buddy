@@ -4,63 +4,73 @@
 
 @layer base {
   :root {
-    /* Core neutrals - warm light theme */
-    --background: #fdfbf7;
-    --background-secondary: #faf8f3;
-    --background-tertiary: #f5f1ea;
-    --background-elevated: #efeae0;
-    --foreground: #1a1a2e;
-    --foreground-muted: #6b6b80;
-    --foreground-subtle: #9a9aa8;
-    /* Primary - restrained indigo/purple */
-    --primary: #6d57e0;
-    --primary-dark: #5b45c8;
-    --primary-light: #e8e4fa;
+    /* Core neutrals - warm light theme (premium education) */
+    --background: #fafaf0;
+    --background-secondary: #f6f4ed;
+    --background-tertiary: #f0ede6;
+    --background-elevated: #ebe8df;
+    --foreground: #212121;
+    --foreground-muted: #6b7280;
+    --foreground-subtle: #9ca3af;
+    /* Primary - refined purple */
+    --primary: #8b5cf6;
+    --primary-dark: #7c3aed;
+    --primary-light: #ede9fe;
     --primary-foreground: #ffffff;
     /* Card surfaces */
     --card-bg: #ffffff;
-    --card-border: #e8e3da;
-    --card-border-hover: #dcd5c8;
-    --border-color: #c9c2b3;
+    --card-border: #e4e4e4;
+    --card-border-hover: #e8e8e8;
+    --border-color: #e4e4e4;
     /* Sidebar */
-    --sidebar-bg: #faf8f3;
+    --sidebar-bg: #f9f6f2;
     /* Semantic colors - restrained usage */
-    --success: #0d9488;
-    --success-light: #e6f4f2;
+    --success: #10b981;
+    --success-light: #ecfdf5;
     --warning: #f59e0b;
     --warning-light: #fef3c7;
-    --error: #dc2626;
+    --error: #ef4444;
     --error-light: #fef2f2;
-    --muted: #9a9aa8;
+    --muted: #9ca3af;
     /* Accent colors - for specific educational contexts only */
     --teal: #0d9488;
     --teal-light: #14b8a6;
-    --teal-soft: #e6f4f2;
-    --indigo: #5b45c8;
-    --indigo-subtle: #6d57e0;
-    --indigo-soft: #ede9fa;
+    --teal-soft: #ecfdf5;
+    --indigo: #6366f1;
+    --indigo-subtle: #8b5cf6;
+    --indigo-soft: #ede9fe;
+    /* Subject colors */
+    --math: #8b5cf6;
+    --physics: #3b82f6;
+    --chemistry: #10b981;
+    --english: #f97316;
+    --cs: #6366f1;
+    --biology: #14b8a6;
     /* Glass effects */
-    --glass-bg: rgba(255, 255, 255, 0.9);
-    --glass-border: rgba(26, 26, 46, 0.08);
-    --glass-shadow: 0 4px 16px 0 rgba(26, 26, 46, 0.04);
-    --glass-strong-bg: rgba(255, 255, 255, 0.95);
-    --glass-strong-border: rgba(26, 26, 46, 0.12);
-    --glass-strong-shadow: 0 8px 32px 0 rgba(26, 26, 46, 0.06);
+    --glass-bg: rgba(255, 255, 255, 0.85);
+    --glass-border: rgba(139, 92, 246, 0.08);
+    --glass-shadow: 0 4px 12px rgba(109, 40, 217, 0.05);
+    --glass-strong-bg: rgba(255, 255, 255, 0.9);
+    --glass-strong-border: rgba(139, 92, 246, 0.12);
+    --glass-strong-shadow: 0 8px 32px rgba(109, 40, 217, 0.08);
     /* Form inputs */
     --input-bg: #ffffff;
-    --input-border: #e8e3da;
-    --input-border-focus: #6d57e0;
+    --input-border: #e4e4e4;
+    --input-border-focus: #8b5cf6;
     /* Overlay */
-    --overlay-bg: rgba(253, 251, 247, 0.9);
+    --overlay-bg: rgba(250, 250, 240, 0.9);
     /* Focus ring */
-    --focus-ring: rgba(109, 87, 224, 0.35);
-    /* Shadows */
-    --shadow-xs: 0 1px 2px 0 rgba(26, 26, 46, 0.02);
-    --shadow-sm: 0 1px 3px 0 rgba(26, 26, 46, 0.04), 0 1px 2px -1px rgba(26, 26, 46, 0.04);
-    --shadow-md: 0 4px 12px -2px rgba(26, 26, 46, 0.06), 0 2px 4px -2px rgba(26, 26, 46, 0.03);
-    --shadow-lg: 0 12px 24px -6px rgba(26, 26, 46, 0.08), 0 4px 6px -4px rgba(26, 26, 46, 0.04);
-    --shadow-xl: 0 20px 40px -12px rgba(26, 26, 46, 0.1), 0 8px 16px -8px rgba(26, 26, 46, 0.05);
-    --shadow-2xl: 0 28px 56px -16px rgba(26, 26, 46, 0.12), 0 12px 24px -12px rgba(26, 26, 46, 0.06);
+    --focus-ring: rgba(139, 92, 246, 0.35);
+    /* Shadows - refined */
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.03), 0 6px 16px -8px rgba(139, 40, 217, 0.08);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 28px -10px rgba(139, 40, 217, 0.12);
+    --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.04), 0 12px 28px -10px rgba(139, 40, 217, 0.12);
+    --shadow-lg: 0 4px 14px rgba(139, 92, 246, 0.35);
+    --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.3);
+    --shadow-2xl: 0 16px 48px rgba(0, 0, 0, 0.3);
+    /* Button shadows */
+    --shadow-button: 0 4px 14px rgba(139, 92, 246, 0.35);
+    --shadow-button-hover: 0 6px 20px rgba(139, 92, 246, 0.45);
   }
 
   body {

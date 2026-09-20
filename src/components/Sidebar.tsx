@@ -13,7 +13,6 @@ import {
   ClockIcon,
   Squares2X2Icon,
   ChartBarIcon,
-  MagnifyingGlassIcon,
   FolderIcon,
   UserIcon,
   Cog6ToothIcon,
@@ -27,25 +26,32 @@ import BrandLogo from "./BrandLogo";
 
 const navSections = [
   {
+    label: "HOME",
+    items: [
+      { name: "Home", href: "/dashboard", icon: HomeIcon, available: true },
+    ],
+  },
+  {
     label: "LEARN",
     items: [
       { name: "AI Tutor", href: "/dashboard/chat", icon: SparklesIcon, available: true },
-      { name: "Photo Doubt", href: "/dashboard/photo-doubt", icon: PhotoIcon, available: true },
+      { name: "Notes", href: "/dashboard/notes", icon: DocumentTextIcon, available: true },
+      { name: "Resources", href: "/dashboard/resources", icon: FolderIcon, available: true },
     ],
   },
   {
     label: "PRACTICE",
     items: [
       { name: "Quiz", href: "/dashboard/quiz", icon: BookOpenIcon, available: true },
-      { name: "Revision", href: "/dashboard/flashcards", icon: ArrowPathIcon, available: true },
+      { name: "Flashcards", href: "/dashboard/flashcards", icon: ArrowPathIcon, available: true },
+      { name: "Photo Doubt", href: "/dashboard/photo-doubt", icon: PhotoIcon, available: true },
     ],
   },
   {
     label: "ORGANIZE",
     items: [
-      { name: "Notes", href: "/dashboard/notes", icon: DocumentTextIcon, available: true },
       { name: "Planner", href: "/dashboard/planner", icon: CalendarIcon, available: true },
-      { name: "Resources", href: "/dashboard/resources", icon: FolderIcon, available: true },
+      { name: "Timer", href: "/dashboard/timer", icon: ClockIcon, available: true },
     ],
   },
   {
@@ -58,6 +64,7 @@ const navSections = [
 ];
 
 const actionItems = [
+  { name: "Profile", icon: UserIcon, href: "/dashboard/profile" },
   { name: "Settings", icon: Cog6ToothIcon, action: "settings" },
   { name: "Logout", icon: ArrowLeftOnRectangleIcon, action: "logout" },
 ];
