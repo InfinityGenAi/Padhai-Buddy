@@ -1207,8 +1207,8 @@ export default function ChatPage() {
                 onClick={() => setStudyMode(studyMode === mode.id ? null : mode.id)}
                 className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${
                   studyMode === mode.id
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "bg-card-subtle text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+                    ? "bg-primary/10 text-primary border border-primary/20 shadow-sm"
+                    : "bg-card-subtle text-foreground/70 hover:bg-foreground/5 hover:text-foreground border border-border/50 transition-colors"
                 }`}
                 aria-pressed={studyMode === mode.id}
                 title={mode.description}
@@ -1228,7 +1228,7 @@ export default function ChatPage() {
           <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:px-6">
             <button
               onClick={() => handleQuickAction("quiz")}
-              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap bg-card-subtle text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap hover:bg-primary/10 hover:text-primary transition-colors"
               title="Generate a quiz on this topic"
               disabled={isTyping}
             >
@@ -1237,7 +1237,7 @@ export default function ChatPage() {
             </button>
             <button
               onClick={() => handleQuickAction("simplify")}
-              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap bg-card-subtle text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap hover:bg-primary/10 hover:text-primary transition-colors"
               title="Simplify the last explanation"
               disabled={isTyping}
             >
@@ -1246,7 +1246,7 @@ export default function ChatPage() {
             </button>
             <button
               onClick={() => handleQuickAction("hint")}
-              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap bg-card-subtle text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap hover:bg-primary/10 hover:text-primary transition-colors"
               title="Give a hint for the current problem"
               disabled={isTyping}
             >
@@ -1255,7 +1255,7 @@ export default function ChatPage() {
             </button>
             <button
               onClick={() => handleQuickAction("save-note")}
-              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap bg-card-subtle text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap hover:bg-primary/10 hover:text-primary transition-colors"
               title="Save the last explanation as a note"
               disabled={isTyping || !activeConversationId}
             >
@@ -1264,7 +1264,7 @@ export default function ChatPage() {
             </button>
             <button
               onClick={() => handleQuickAction("practice")}
-              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap bg-card-subtle text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap hover:bg-primary/10 hover:text-primary transition-colors"
               title="Generate practice questions"
               disabled={isTyping}
             >
@@ -1273,7 +1273,7 @@ export default function ChatPage() {
             </button>
             <button
               onClick={() => handleQuickAction("explain-differently")}
-              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap bg-card-subtle text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap hover:bg-primary/10 hover:text-primary transition-colors"
               title="Explain the concept differently"
               disabled={isTyping}
             >
@@ -1356,10 +1356,10 @@ export default function ChatPage() {
                       <div className="flex items-center gap-2 mt-2">
                         <button
                           onClick={() => copyToClipboard(msg.content, msg.id, setCopiedMsgId)}
-                          className={`p-2 rounded-lg flex items-center gap-1.5 text-xs transition-all min-h-[44px] min-w-[44px] ${
+                          className={`p-2.5 rounded-lg flex items-center gap-2 text-xs transition-all min-h-[44px] min-w-[44px] ${
                             copiedMsgId === msg.id
-                              ? "bg-primary/10 text-primary"
-                              : "text-primary bg-primary/10 hover:text-white hover:bg-primary/80 transition-colors"
+                              ? "bg-primary/10 text-primary border border-primary/20"
+                              : "border border-border/50 hover:bg-primary/10 hover:text-primary transition-colors"}
                           }`}
                           aria-label="Copy response"
                           title={copiedMsgId === msg.id ? "Copied" : "Copy response"}
@@ -1372,10 +1372,10 @@ export default function ChatPage() {
                         <button
                           onClick={() => handleSave(msg.id, msg.content)}
                           disabled={!activeConversationId}
-                          className={`p-2 rounded-lg flex items-center gap-1.5 text-xs transition-all min-h-[44px] min-w-[44px] ${
+                          className={`p-2.5 rounded-lg flex items-center gap-2 text-xs transition-all min-h-[44px] min-w-[44px] ${
                             savedMsgIds.has(msg.id)
-                              ? "bg-primary/10 text-primary"
-                              : "text-primary bg-primary/10 hover:text-white hover:bg-primary/80 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                              ? "bg-primary/10 text-primary border border-primary/20"
+                              : "border border-border/50 hover:bg-primary/10 hover:text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"}
                           }`}
                           aria-label={savedMsgIds.has(msg.id) ? "Unsave" : "Save"}
                           title={savedMsgIds.has(msg.id) ? "Saved" : "Save"}
@@ -1388,10 +1388,10 @@ export default function ChatPage() {
                         <button
                           onClick={() => handleSimilarQuestion(msg.id, msg.content)}
                           disabled={!activeConversationId || isTyping || generatingSimilar.has(msg.id)}
-                          className={`p-2 rounded-lg flex items-center gap-1.5 text-xs transition-all min-h-[44px] min-w-[44px] ${
+                          className={`p-2.5 rounded-lg flex items-center gap-2 text-xs transition-all min-h-[44px] min-w-[44px] ${
                             generatingSimilar.has(msg.id)
-                              ? "bg-primary/10 text-primary cursor-wait"
-                              : "text-primary bg-primary/10 hover:text-white hover:bg-primary/80 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                              ? "bg-primary/10 text-primary border border-primary/20 cursor-wait"
+                              : "border border-border/50 hover:bg-primary/10 hover:text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"}
                           }`}
                           aria-label="Similar Question"
                           title={generatingSimilar.has(msg.id) ? "Generating..." : "Similar Question"}

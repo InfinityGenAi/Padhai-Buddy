@@ -6,9 +6,10 @@ import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePathname } from "next/navigation";
-import { BellIcon, BookOpenIcon, ChartBarIcon, DocumentTextIcon, HomeIcon, SparklesIcon, PhotoIcon, ArrowRightIcon, PlayIcon, AcademicCapIcon, ClockIcon, LightBulbIcon, RectangleStackIcon, TrophyIcon, CheckBadgeIcon, ChatBubbleLeftRightIcon, CameraIcon, ClipboardDocumentCheckIcon, PencilSquareIcon, CalendarIcon, ChartBarSquareIcon, BoltIcon, FireIcon } from "@heroicons/react/24/outline";
 import BrandLogo from "@/components/BrandLogo";
 import { DemoVideoModal } from "@/components/ui/DemoVideoModal";
+
+import { BellIcon, BookOpenIcon, ChartBarIcon, DocumentTextIcon, HomeIcon, SparklesIcon, PhotoIcon, ArrowRightIcon, PlayIcon, AcademicCapIcon, ClockIcon, LightBulbIcon, ExclamationTriangleIcon, RectangleStackIcon, ArrowPathIcon, TrophyIcon, CheckBadgeIcon, ChatBubbleLeftRightIcon, CameraIcon, ClipboardDocumentCheckIcon, PencilSquareIcon, CalendarIcon, ChartBarSquareIcon, BoltIcon, FireIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 
 type Feature = {
   icon: React.ComponentType<{ className?: string }>;
@@ -190,37 +191,38 @@ export default function Home() {
               </div>
 
               <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.1] tracking-tight text-foreground">
-                Your AI Study Buddy,
-                Whenever You Need It.
+                Study Smarter with Padhai Buddy
               </h1>
 
               <p className="text-lg text-foreground/60 max-w-xl leading-relaxed">
-                Understand difficult concepts, clear doubts, practice smarter, and stay on track with one AI-powered study companion built for Indian students.
+                Your AI study buddy helps you understand concepts, clear doubts, practice with quizzes, and track your progress — tailored to your class and board.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3 pt-4">
                 <motion.button
                   whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
                   whileTap={animationsEnabled ? { scale: 0.97 } : undefined}
-                  onClick={() => navigateToAuth("/signup")}
+                  onClick={() => router.push("/signup")}
                   className="px-8 py-3.5 rounded-full font-bold text-lg flex items-center justify-center gap-2 text-white bg-primary shadow-sm shadow-primary/15 hover:shadow-md transition-all"
+                  aria-label="Start Learning"
                 >
-                  Start Learning Free
+                  Start Learning
                   <ArrowRightIcon className="w-5 h-5" />
                 </motion.button>
                 <motion.button
                   whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
                   whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
-                  onClick={() => setDemoOpen(true)}
+                  onClick={() => router.push("/dashboard/chat")}
                   className="px-8 py-3.5 rounded-full font-bold text-lg bg-white border border-border text-foreground hover:bg-foreground/5 transition-all flex items-center justify-center gap-2 shadow-sm"
+                  aria-label="Try AI Tutor"
                 >
-                  <PlayIcon className="w-5 h-5 text-primary" />
-                  <span>See Padhai Buddy in Action</span>
+                  <AcademicCapIcon className="w-5 h-5 text-primary" />
+                  <span>Try AI Tutor</span>
                 </motion.button>
               </div>
             </motion.div>
 
-            {/* Right: Real Product UI Demo */}
+            
             <motion.div
               initial={animationsEnabled ? { opacity: 0, y: 30 } : false}
               animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
@@ -323,7 +325,88 @@ export default function Home() {
           </motion.div>
         </section>
 
-        {/* Features Section */}
+        {/* Photo Doubt Section */}
+        <section id="photo-doubt" className="mb-16">
+          <motion.div
+            initial={animationsEnabled ? { opacity: 0, y: 20 } : false}
+            animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="text-center mb-8"
+          >
+            <h2 className="text-4xl sm:text-5xl font-extrabold text-foreground mb-3 tracking-tight">
+              Snap a Question, Get Instant Solutions
+            </h2>
+            <p className="text-lg text-foreground/60 max-w-2xl mx-auto">
+              Take a photo of any doubt and let Padhai Buddy's AI provide step-by-step explanations tailored to your class and board.
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial={animationsEnabled ? { opacity: 0, y: 30 } : false}
+            animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
+            transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
+            className="relative rounded-3xl overflow-hidden border border-border bg-card backdrop-blur-sm shadow-sm"
+          >
+            <div className="h-12 bg-gradient-to-r from-teal/5 to-emerald/5 flex items-center justify-between px-6 border-b border-border/20">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal to-emerald flex items-center justify-center shadow-md">
+                  <CameraIcon className="w-3.5 h-3.5 text-teal-500" />
+                </div>
+                <div>
+                  <span className="text-sm font-bold text-foreground block leading-tight">Padhai Buddy AI</span>
+                  <span className="text-[10px] text-foreground/50 font-medium">Online · Class 10 CBSE</span>
+                </div>
+              </div>
+              <span className="text-[10px] font-semibold text-teal-500 bg-teal/10 px-2 py-0.5 rounded-lg">Photo Doubt</span>
+            </div>
+
+            <div className="p-8 h-[calc(100%-11rem)] overflow-y-auto space-y-6">
+              {/* Example AI message */}
+              <div className="flex gap-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal to-emerald flex items-center justify-center shadow-md">
+                  <CameraIcon className="w-3.5 h-3.5 text-teal-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="bg-white border border-border rounded-tl-lg rounded-tr-sm px-4 py-3 text-sm leading-relaxed border-border">
+                    Explain photosynthesis for Class 10.
+                  </div>
+                </div>
+              </div>
+
+              {/* Example user message */}
+              <div className="flex gap-3 justify-end">
+                <div className="flex-1 min-w-0">
+                  <div className="bg-teal/5 text-teal rounded-tr-lg rounded-bl-sm px-3 py-2.5 text-sm font-medium border border-teal/20">
+                    Explain photosynthesis in short.
+                  </div>
+                </div>
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal to-emerald flex items-center justify-center shadow-md">
+                  <CameraIcon className="w-3.5 h-3.5 text-teal-500" />
+                </div>
+              </div>
+            </div>
+
+            {/* Input area */}
+            <div className="p-6 border-t border-border bg-white/70 backdrop-blur-md">
+              <div className="flex items-end gap-2 px-6 py-3">
+                <div className="flex-1 bg-white/5 rounded-full px-4 py-1.5 border border-border/30">
+                  <span className="text-xs text-foreground/40 py-1.5">Type your question here...</span>
+                </div>
+                <button className="p-2 rounded-full text-foreground/50 hover:text-primary hover:bg-primary/10 transition-colors">
+                  <PhotoIcon className="w-3.5 h-3.5" />
+                </button>
+                <motion.button
+                  whileHover={animationsEnabled ? { scale: 1.05 } : undefined}
+                  whileTap={animationsEnabled ? { scale: 0.92 } : undefined}
+                  className="p-2 rounded-full bg-gradient-to-br from-primary to-indigo text-white shadow-sm shadow-primary/15 hover:shadow-md transition-all"
+                >
+                  <ArrowRightIcon className="w-3.5 h-3.5" />
+                </motion.button>
+              </div>
+          </div>
+        </motion.div>
+      </section>
+
         <section id="features" className="mb-16">
           <motion.div
             initial={animationsEnabled ? { opacity: 0, y: 20 } : false}
@@ -339,7 +422,7 @@ export default function Home() {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {FEATURES.map((feature, index) => {
               const Icon = feature.icon;
               return (
@@ -349,7 +432,7 @@ export default function Home() {
                   animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
                   transition={{ duration: 0.5, delay: 0.08 * index }}
                   whileHover={animationsEnabled ? { y: -3 } : undefined}
-                  className="group relative p-6 rounded-2xl border border-border bg-white hover:shadow-lg hover:border-primary/30 transition-all duration-300"
+                  className="group relative p-6 rounded-2xl border border-border bg-white hover:shadow-lg hover:border-primary/30 transition-all duration-300 cursor-default"
                 >
                   <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${feature.accent} flex items-center justify-center mb-4 shadow-sm`}>
                     <Icon className="w-6 h-6 text-white" />
@@ -362,8 +445,8 @@ export default function Home() {
           </div>
         </section>
 
-        {/* How It Works Section */}
-        <section id="how-it-works" className="mb-16">
+        {/* How the Study Loop Works */}
+        <section id="study-loop" className="mb-16">
           <motion.div
             initial={animationsEnabled ? { opacity: 0, y: 20 } : false}
             animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
@@ -371,38 +454,116 @@ export default function Home() {
             className="text-center mb-8"
           >
             <h2 className="text-4xl sm:text-5xl font-extrabold text-foreground mb-3 tracking-tight">
-              How It Works
+              How the Study Loop Works
             </h2>
             <p className="text-lg text-foreground/60 max-w-2xl mx-auto">
-              Start learning in three simple steps
+              A continuous learning cycle that adapts to your progress
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {HOW_IT_WORKS.map((step, index) => {
-              const Icon = step.icon;
-              return (
-                <motion.div
-                  key={step.step}
-                  initial={animationsEnabled ? { opacity: 0, y: 20 } : false}
-                  animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
-                  transition={{ duration: 0.5, delay: 0.15 * index }}
-                  className="relative text-center"
-                >
-                  <div className="relative inline-flex items-center justify-center mb-4">
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/10 to-indigo/10 flex items-center justify-center text-primary">
-                      <Icon className="w-7 h-7" />
+          <div className="relative">
+            <div className="hidden lg:block absolute top-1/2 left-0 right-0 -translate-y-1/2 h-0.5 bg-primary/20 pointer-events-none" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 relative z-10">
+              {[
+                { step: "01", title: "LEARN", desc: "Understand a concept with AI explanations tailored to your class and board", icon: LightBulbIcon },
+                { step: "02", title: "PRACTICE", desc: "Test yourself with quizzes and flashcards on the topic you just learned", icon: ClipboardDocumentCheckIcon },
+                { step: "03", title: "MISTAKES", desc: "Identify weak areas and concepts you need to revisit", icon: ExclamationTriangleIcon },
+                { step: "04", title: "REVISION", desc: "Review flagged topics with spaced repetition and simplified explanations", icon: ArrowPathIcon },
+                { step: "05", title: "PROGRESS", desc: "Track your improvement with real insights on your learning journey", icon: ChartBarSquareIcon },
+                { step: "06", title: "NEXT ACTION", desc: "Get AI-suggested next topics based on your study history", icon: BoltIcon },
+              ].map((stage, index) => {
+                const Icon = stage.icon;
+                return (
+                  <motion.div
+                    key={stage.step}
+                    initial={animationsEnabled ? { opacity: 0, y: 20 } : false}
+                    animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
+                    transition={{ duration: 0.5, delay: 0.1 * index }}
+                    className="text-center relative"
+                  >
+                    <div className="relative flex justify-center mb-4">
+                      <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-primary relative z-10 shadow-md bg-white border-2 border-primary/20">
+                        <Icon className="w-6 h-6" />
+                      </div>
                     </div>
-                    <div className="absolute -top-1 -right-1 w-7 h-7 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center shadow-sm">
-                      {step.step}
+                    <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center shadow-sm">
+                      {stage.step}
                     </div>
-                  </div>
-                  <h3 className="text-xl font-bold text-foreground mb-1">{step.title}</h3>
-                  <p className="text-foreground/60 text-sm leading-relaxed max-w-xs mx-auto">{step.desc}</p>
-                </motion.div>
-              );
-            })}
+                    <h3 className="text-lg font-bold text-foreground mb-1">{stage.title}</h3>
+                    <p className="text-foreground/60 text-sm leading-relaxed max-w-xs mx-auto">{stage.desc}</p>
+                    {index < 5 && (
+                      <motion.div
+                        initial={animationsEnabled ? { opacity: 0, scale: 0.5 } : false}
+                        animate={animationsEnabled ? { opacity: 1, scale: 1 } : false}
+                        transition={{ duration: 0.4, delay: 0.15 * index }}
+                        className="hidden lg:block absolute top-[34px] right-[-50%] w-full h-0.5 bg-primary/20"
+                      />
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
           </div>
+        </section>
+
+        {/* AI Tutor Showcase */}
+        <section id="ai-tutor" className="mb-16">
+          <motion.div
+            initial={animationsEnabled ? { opacity: 0, y: 20 } : false}
+            animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
+            transition={{ duration: 0.6, delay: 0.4 }}
+            className="text-center mb-8"
+          >
+            <h2 className="text-4xl sm:text-5xl font-extrabold text-foreground mb-3 tracking-tight">
+              AI Tutor — Your Personal Study Companion
+            </h2>
+            <p className="text-lg text-foreground/60 max-w-2xl mx-auto">
+              Choose how you want to learn — explain, teach, quiz, or get hints — all tailored to your class and board
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial={animationsEnabled ? { opacity: 0, y: 20 } : false}
+            animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
+            transition={{ duration: 0.6, delay: 0.5 }}
+            className="bg-white border border-border rounded-2xl p-4 sm:p-6 shadow-sm"
+          >
+            <div className="flex flex-col sm:flex-row gap-3 mb-6">
+              {[
+                { id: "explain", label: "Explain", icon: LightBulbIcon, desc: "Step-by-step concept breakdown" },
+                { id: "teach", label: "Teach Me", icon: AcademicCapIcon, desc: "Interactive guided learning" },
+                { id: "quiz", label: "Quiz Me", icon: ClipboardDocumentCheckIcon, desc: "Test your understanding" },
+                { id: "hint", label: "Hint", icon: MagnifyingGlassIcon, desc: "Gentle nudges to help you think" },
+                { id: "simplify", label: "Simplify", icon: SparklesIcon, desc: "Plain language & analogies" },
+                { id: "deep", label: "Deep Dive", icon: BookOpenIcon, desc: "Comprehensive detailed explanation" },
+                { id: "exam", label: "Exam Mode", icon: TrophyIcon, desc: "Exam-style questions & practice" },
+              ].map((mode) => {
+                const Icon = mode.icon;
+                return (
+                  <motion.button
+                    key={mode.id}
+                    whileHover={animationsEnabled ? { scale: 1.02, y: -1 } : undefined}
+                    whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
+                    className="flex-shrink-0 flex flex-col items-center gap-1.5 px-4 py-3 rounded-xl text-xs font-medium transition-all text-center bg-card-subtle text-foreground/70 hover:bg-primary/10 hover:text-primary border border-border/50 min-w-[80px]"
+                    title={mode.desc}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span className="hidden sm:inline">{mode.label}</span>
+                  </motion.button>
+                );
+              })}
+            </div>
+            <motion.button
+              whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
+              whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
+              onClick={() => router.push("/dashboard/chat")}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-bold text-base bg-primary text-white shadow-sm shadow-primary/15 hover:shadow-md transition-all mx-auto"
+              aria-label="Try AI Tutor"
+            >
+              Try AI Tutor
+              <ArrowRightIcon className="w-5 h-5" />
+            </motion.button>
+          </motion.div>
         </section>
 
         {/* Curriculum Section */}
@@ -504,6 +665,7 @@ export default function Home() {
                 <li><Link href="#features" className="hover:text-foreground transition-colors">Features</Link></li>
                 <li><Link href="#how-it-works" className="hover:text-foreground transition-colors">How It Works</Link></li>
                 <li><Link href="#curriculum" className="hover:text-foreground transition-colors">Curriculum</Link></li>
+                <li><Link href="#photo-doubt" className="hover:text-foreground transition-colors">Photo Doubt</Link></li>
               </ul>
             </div>
             <div>
