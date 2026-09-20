@@ -168,8 +168,14 @@ export default function NotesPage() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Failed to generate flashcards");
       }
-      setError("Flashcards created!");
-      setTimeout(() => setError(null), 3000);
+      const data = await res.json();
+      // Navigate to the flashcards page with the new deck
+      if (data.deck?.id) {
+        router.push(`/dashboard/flashcards?deckId=${data.deck.id}`);
+      } else {
+        setError("Flashcards created but could not navigate. Please check the Flashcards page.");
+        setTimeout(() => setError(null), 4000);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to generate flashcards");
       setTimeout(() => setError(null), 4000);

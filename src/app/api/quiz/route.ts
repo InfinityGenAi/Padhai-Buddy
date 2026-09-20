@@ -5,6 +5,45 @@ import { checkRateLimit } from "@/lib/rate-limiter";
 import type { QuizAttempt, QuizQuestion } from "@/types";
 import { inferTopic } from "@/lib/curriculum";
 
+export async function GET(req: NextRequest) {
+  try {
+    if (!adminAuth || !adminDb || initializationError) {
+      return NextResponse.json({ error: initializationError || "Server not initialized" }, { status: 500 });
+    }
+
+    const authHeader = req.headers.get("authorization") || "";
+    const token = authHeader.replace("Bearer ", "");
+    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    let decoded;
+    try {
+      decoded = await adminAuth.verifyIdToken(token);
+    } catch {
+      return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const attemptId = searchParams.get("attemptId");
+
+    if (!attemptId) {
+      return NextResponse.json({ error: "attemptId is required" }, { status: 400 });
+    }
+
+    const attemptRef = adminDb.collection("users").doc(decoded.uid).collection("quizAttempts").doc(attemptId);
+    const snap = await attemptRef.get();
+
+    if (!snap.exists) {
+      return NextResponse.json({ error: "Quiz attempt not found" }, { status: 404 });
+    }
+
+    const attemptData = snap.data() as QuizAttempt;
+    return NextResponse.json({ attempt: attemptData });
+  } catch (error: unknown) {
+    console.error("[QUIZ GET] error:", error);
+    return NextResponse.json({ error: "Failed to fetch quiz attempt" }, { status: 500 });
+  }
+}
+
 function validateQuestions(questions: unknown[]): QuizQuestion[] | null {
   if (!Array.isArray(questions) || questions.length < 1 || questions.length > 20) {
     return null;

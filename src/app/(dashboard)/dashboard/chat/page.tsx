@@ -21,6 +21,7 @@ import {
   writeBatch,
   Timestamp,
   addDoc,
+  where,
 } from "firebase/firestore";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
@@ -123,6 +124,25 @@ async function saveItem(
     conversationId,
     createdAt: Date.now(),
   });
+}
+
+async function unsaveItem(
+  uid: string,
+  sourceMessageId: string,
+  conversationId: string
+) {
+  const db = getFirestoreDb();
+  if (!db) return;
+  const savedRef = collection(db, "users", uid, "savedItems");
+  const q = query(
+    savedRef,
+    where("sourceMessageId", "==", sourceMessageId),
+    where("conversationId", "==", conversationId)
+  );
+  const snapshot = await getDocs(q);
+  for (const doc of snapshot.docs) {
+    await deleteDoc(doc.ref);
+  }
 }
 
 
@@ -458,6 +478,16 @@ export default function ChatPage() {
       router.replace("/dashboard/chat", { scroll: false });
     }
   }, [searchParams, router, startNewChat]);
+
+  // Handle message query parameter from Notes -> Ask AI
+  useEffect(() => {
+    const message = searchParams.get("message");
+    if (message && !activeConversationId && messages.length === 0) {
+      setInput(message);
+      // Focus the textarea so user can immediately send or edit
+      textareaRef.current?.focus();
+    }
+  }, [searchParams, activeConversationId, messages.length]);
 
   useEffect(() => {
     if (!activeConversationId && messages.length === 0) {
@@ -805,13 +835,18 @@ export default function ChatPage() {
   const handleSave = async (msgId: string, content: string) => {
     if (!user?.uid || !activeConversationId) return;
     if (savedMsgIds.has(msgId)) {
-      // Would need to find the savedItemId to unsave - for now just toggle local state
-      // In a full implementation, we'd query the savedItems collection
-      setSavedMsgIds((prev) => {
-        const next = new Set(prev);
-        next.delete(msgId);
-        return next;
-      });
+      // Unsave: delete from Firestore
+      try {
+        await unsaveItem(user.uid, msgId, activeConversationId);
+        setSavedMsgIds((prev) => {
+          const next = new Set(prev);
+          next.delete(msgId);
+          return next;
+        });
+      } catch {
+        setChatError("Failed to unsave. Please try again.");
+        setTimeout(() => setChatError(null), 4000);
+      }
       return;
     }
     try {

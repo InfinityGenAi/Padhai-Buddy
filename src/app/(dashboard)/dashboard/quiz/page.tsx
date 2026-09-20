@@ -1,7 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSearchParams } from "next/navigation";
+import { getFirebaseIdToken } from "@/lib/auth-utils";
+import { getFirestoreDb } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
@@ -17,6 +21,7 @@ type QuizState = "setup" | "active" | "result";
 
 export default function QuizPage() {
   const { user, preferences } = useAuth();
+  const searchParams = useSearchParams();
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
 
@@ -34,6 +39,37 @@ export default function QuizPage() {
   const currentQuestion = attempt?.questions[currentIndex];
   const totalAnswered = attempt?.questions.filter((q) => q.selectedIndex !== undefined).length || 0;
   const correctCount = attempt?.questions.filter((q) => q.selectedIndex === q.correctIndex).length || 0;
+
+  // Load quiz attempt from query parameter
+  useEffect(() => {
+    const attemptId = searchParams.get("attempt");
+    if (attemptId && !attempt) {
+      const loadAttempt = async () => {
+        try {
+          const token = await (await import("@/lib/auth-utils")).getFirebaseIdToken();
+          const db = getFirestoreDb();
+          if (!db) return;
+
+          const res = await fetch(`/api/quiz?attemptId=${encodeURIComponent(attemptId)}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          if (res.ok && data.attempt) {
+            setAttempt(data.attempt);
+            setState("active");
+            setCurrentIndex(0);
+            setSelectedIndex(null);
+            setShowExplanation(false);
+          } else {
+            setError(data.error || "Failed to load quiz attempt");
+          }
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Failed to load quiz");
+        }
+      };
+      loadAttempt();
+    }
+  }, [searchParams, attempt]);
 
   const generateQuiz = async () => {
     if (!user?.class || !user.board) {
