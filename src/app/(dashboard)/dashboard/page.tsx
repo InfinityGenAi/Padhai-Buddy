@@ -17,11 +17,6 @@ import {
   AcademicCapIcon,
   ArrowPathIcon,
   SparklesIcon,
-  ClockIcon as ClockIconSolid,
-  BookOpenIcon as BookOpenIconSolid,
-  ExclamationTriangleIcon as ExclamationTriangleIconSolid,
-  ArrowPathIcon as ArrowPathIconSolid,
-  SparklesIcon as SparklesIconSolid,
 } from "@heroicons/react/24/outline";
 import { getFirestoreDb } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, doc, onSnapshot, query, orderBy, deleteDoc } from "firebase/firestore";
@@ -546,6 +541,22 @@ export default function DashboardPage() {
     );
   };
 
+  // Helper to get greeting based on time
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+  };
+
+  // Helper to format time ago
+  const formatTimeAgo = (minutes: number) => {
+    if (minutes < 1) return "Just now";
+    if (minutes < 60) return `${Math.floor(minutes)}m ago`;
+    if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
+    return `${Math.floor(minutes / 1440)}d ago`;
+  };
+
   return (
     <motion.div
       variants={animationsEnabled ? {
@@ -562,30 +573,32 @@ export default function DashboardPage() {
       animate={animationsEnabled ? "visible" : undefined}
       className="space-y-6 w-full"
     >
-      {/* 1. GREETING + CLASS/BOARD CONTEXT */}
+      {/* 1. HEADER - Greeting + Class/Board + Streak + Notifications */}
       <motion.div
-        variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}
+        variants={animationsEnabled ? { hidden: { opacity: 0, y: -8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}
+        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4"
       >
-        <div className="flex items-center justify-between flex-wrap gap-3 mb-2">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-              Hi, {user?.name?.split(" ")[0] || "there"}!
-            </h1>
-          </div>
+        <div className="flex items-center gap-3 min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+            {getGreeting()}, {user?.name?.split(" ")[0] || "there"}!
+          </h1>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
           {user?.class && user?.board && (
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary whitespace-nowrap">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary whitespace-nowrap hidden sm:inline-flex">
               Class {user.class} — {user.board}
             </span>
           )}
         </div>
-        <p className="text-sm sm:text-base text-foreground/55">
+        <p className="text-sm sm:text-base text-foreground/55 mt-1 sm:mt-0 ml-auto sm:ml-0">
           What should we tackle today?
         </p>
       </motion.div>
 
-      {/* 2. TODAY'S PRIMARY STUDY ACTION (Above the fold) */}
+      {/* 2. TODAY'S FOCUS - Primary Study Action */}
       <motion.div
         variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}
+        className="relative"
       >
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-semibold text-foreground/75">TODAY</h2>
@@ -594,7 +607,7 @@ export default function DashboardPage() {
         {renderPrimaryAction()}
       </motion.div>
 
-      {/* 3. SECONDARY ACTIONS */}
+      {/* 3. Secondary Actions */}
       {renderSecondaryActions() && (
         <motion.div
           variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}
@@ -604,108 +617,7 @@ export default function DashboardPage() {
         </motion.div>
       )}
 
-      {/* 4. TODAY'S PLAN / PROGRESS */}
-      <motion.div
-        variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}
-        className="subtle-card rounded-xl p-5"
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-foreground/75">TODAY'S PLAN</h2>
-          <span className="text-xs text-foreground/50 font-medium">{todayProgress}% done</span>
-        </div>
-
-        {planError && (
-          <motion.div
-            initial={{ opacity: 0, y: -5 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-3 p-3 rounded-xl bg-red-950/30 border border-red-800/50 text-red-400 text-xs"
-          >
-            {planError}
-          </motion.div>
-        )}
-
-        {todayPlans.length === 0 ? (
-          <div className="flex flex-col items-center justify-center text-center py-4">
-            <div className="w-10 h-10 rounded-full bg-foreground/5 flex items-center justify-center mb-3">
-              <CalendarIcon className="w-5 h-5 text-foreground/30" />
-            </div>
-            <p className="text-sm text-foreground/50 mb-3">No tasks planned for today.</p>
-            <button
-              onClick={() => setShowAddPlan(true)}
-              className="text-xs font-medium text-primary hover:text-primary/80 flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-primary/5 transition-colors"
-            >
-              <PlusIcon className="w-3.5 h-3.5" />
-              Add Task
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="space-y-2 flex-1 max-h-[200px] overflow-y-auto">
-              {todayPlans.map((item) => (
-                <div
-                  key={item.id}
-                  className={`flex items-center gap-3 p-2.5 rounded-xl transition-colors ${
-                    item.completed ? "bg-foreground/[0.02]" : "bg-foreground/5 hover:bg-foreground/8"
-                  }`}
-                >
-                  <button
-                    onClick={() => handleTogglePlan(user?.uid, item)}
-                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                      item.completed
-                        ? "bg-primary border-primary"
-                        : "border-foreground/25 hover:border-primary/50"
-                    }`}
-                  >
-                    {item.completed && (
-                      <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm truncate ${item.completed ? "text-foreground/35 line-through" : "text-foreground/75"}`}>
-                      {item.subject} — {item.title}
-                    </p>
-                  </div>
-                  <span className="text-xs text-foreground/40 flex-shrink-0">{item.durationMinutes} min</span>
-                  <button
-                    onClick={() => handleDeletePlan(user?.uid, item.id, setDeletingPlanId, setPlanError)}
-                    disabled={deletingPlanId === item.id}
-                    className="p-1 rounded-md text-foreground/30 hover:text-red-500 hover:bg-red-950/20 transition-colors disabled:opacity-50"
-                    title="Delete task"
-                  >
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 pt-3 border-t border-border/50">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-foreground/50 font-medium">Progress</span>
-                <span className="text-xs text-foreground/60 font-medium">{completedToday}/{todayPlans.length}</span>
-              </div>
-              <div className="h-1.5 bg-foreground/5 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500"
-                  style={{ width: `${todayProgress}%` }}
-                />
-              </div>
-            </div>
-            <button
-              onClick={() => setShowAddPlan(true)}
-              className="mt-3 w-full py-2 rounded-lg text-sm font-medium text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-1.5 focus-ring"
-            >
-              <PlusIcon className="w-4 h-4" />
-              Add Task
-            </button>
-          </>
-        )}
-      </motion.div>
-
-      {/* 5. WEAK TOPICS REQUIRING ATTENTION */}
+      {/* 3. PRIORITY - Weak Topics */}
       <motion.div
         variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}
       >
@@ -747,15 +659,45 @@ export default function DashboardPage() {
         </div>
       </motion.div>
 
-      {/* 6. QUICK STUDY ACTIONS */}
+      {/* QUICK STUDY - Compact Action Grid */}
       <motion.div
         variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}
       >
         <h2 className="text-base font-semibold text-foreground/75 mb-3">QUICK STUDY</h2>
-        <QuickStudy actions={quickStudyActions} />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 gap-3">
+          {quickStudyActions.map((action) => (
+            <Link
+              key={action.key}
+              href={action.href}
+              className="rounded-xl p-4 flex items-center gap-3 bg-foreground/5 hover:bg-primary/5 hover:border-primary/20 border border-border transition-all"
+            >
+              <div className="w-10 h-10 rounded flex-shrink-0 flex items-center justify-center text-primary">
+                {action.label.startsWith("A") ? (
+                  <SparklesIcon className="w-5 h-5" />
+                ) : action.label.startsWith("Q")
+                  ? (
+                    <BookOpenIcon className="w-5 h-5" />
+                  ) : action.label.startsWith("F")
+                  ? (
+                    <Squares2X2Icon className="w-5 h-5" />
+                  ) : action.label.startsWith("Ph")
+                  ? (
+                    <PhotoIcon className="w-5 h-5" />
+                  ) : (
+                    <SparklesIcon className="w-5 h-5" />
+                  )
+                }
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground truncate">{action.label}</p>
+                <p className="text-xs text-foreground/60 truncate">{action.desc}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
       </motion.div>
 
-      {/* 7. COMPACT PROGRESS / STREAK SUMMARY */}
+      {/* PROGRESS - Compact Metrics Row */}
       <motion.div
         variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}
         className="grid grid-cols-2 sm:grid-cols-4 gap-3"
@@ -805,10 +747,10 @@ export default function DashboardPage() {
         </div>
       </motion.div>
 
-      {/* 8. THIS WEEK OVERVIEW */}
+      {/* THIS WEEK OVERVIEW */}
       <ThisWeekOverview studyStats={thisWeekOverviewStats} />
 
-      {/* 9. RECENT ACTIVITY */}
+      {/* RECENT ACTIVITY */}
       <motion.div
         variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}
       >
