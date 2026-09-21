@@ -269,7 +269,7 @@ export default function ProgressPage() {
                       <button onClick={() => router.push(`/dashboard/quiz?topic=${encodeURIComponent(topic.topic)}&subject=${encodeURIComponent(topic.subject)}`)} className="flex-1 px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors">
                         Practice Quiz
                       </button>
-                      <button onClick={() => router.push(`/dashboard/chat?message=${encodeURIComponent(`Help me understand ${topic.topic} in ${topic.subject} for Class ${user?.class} ${user?.board}`)}`)} className="flex-1 px-3 py-1.5 text-xs font-medium text-indigo-400 bg-indigo-950/30 hover:bg-indigo-950/50 rounded-lg transition-colors">
+                      <button onClick={() => router.push(`/dashboard/chat?message=${encodeURIComponent(`Help me understand ${topic.topic} in ${topic.subject}. I'm in Class ${user?.class} ${user?.board}.`)}`)} className="flex-1 px-3 py-1.5 text-xs font-medium text-indigo-400 bg-indigo-950/30 hover:bg-indigo-950/50 rounded-lg transition-colors">
                         Ask AI
                       </button>
                       <button onClick={() => router.push(`/dashboard/flashcards`)} className="flex-1 px-3 py-1.5 text-xs font-medium text-emerald-400 bg-emerald-950/30 hover:bg-emerald-950/50 rounded-lg transition-colors">

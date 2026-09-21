@@ -212,14 +212,6 @@ export default function FlashcardsPage() {
 
   const markCard = async (status: CardStatus) => {
     if (!activeDeckId || !currentCard) return;
-    if (status === "known") {
-      try {
-        const learned = Number(localStorage.getItem("pb-flashcards-learned")) || 0;
-        localStorage.setItem("pb-flashcards-learned", String(learned + 1));
-      } catch {
-        // ignore storage errors
-      }
-    }
     const optimistic = { ...currentCard, status };
     setCards(cards.map((c) => (c.id === currentCard.id ? optimistic : c)));
     if (currentCardIndex < cards.length - 1) {

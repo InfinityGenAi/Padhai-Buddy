@@ -4,18 +4,22 @@ import { checkRateLimit } from "@/lib/rate-limiter";
 import { validateProviderConfig, getAllProviders, getProviderConfig, AIProviderId, UserAIConfig } from "@/lib/ai-providers";
 import * as crypto from "crypto";
 
-const isProduction = process.env.NODE_ENV === "production";
 const ENCRYPTION_KEY = process.env.AI_CONFIG_ENCRYPTION_KEY;
 
-if (isProduction && !ENCRYPTION_KEY) {
-  throw new Error("AI_CONFIG_ENCRYPTION_KEY must be set in production environment");
+function getEffectiveEncryptionKey(): string {
+  if (!ENCRYPTION_KEY) {
+    if (process.env.NODE_ENV === "production") {
+      console.warn("[AI-CONFIG] AI_CONFIG_ENCRYPTION_KEY not set. Using ephemeral key. User AI configs will not persist across restarts.");
+    }
+    return "ephemeral-dev-key-do-not-use-in-production";
+  }
+  return ENCRYPTION_KEY;
 }
 
-const effectiveEncryptionKey = ENCRYPTION_KEY || "default-dev-key-change-in-production";
-
 function encrypt(text: string): string {
+  const key = getEffectiveEncryptionKey();
   const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv("aes-256-gcm", Buffer.from(effectiveEncryptionKey.padEnd(32).slice(0, 32)), iv);
+  const cipher = crypto.createCipheriv("aes-256-gcm", Buffer.from(key.padEnd(32).slice(0, 32)), iv);
   const encrypted = Buffer.concat([cipher.update(text, "utf8"), cipher.final()]);
   const authTag = cipher.getAuthTag();
   return iv.toString("hex") + ":" + authTag.toString("hex") + ":" + encrypted.toString("hex");
@@ -23,6 +27,7 @@ function encrypt(text: string): string {
 
 function decrypt(encryptedText: string): string {
   try {
+    const key = getEffectiveEncryptionKey();
     const parts = encryptedText.split(":");
     if (parts.length !== 3) return "";
     const iv = Buffer.from(parts[0], "hex");
@@ -30,7 +35,7 @@ function decrypt(encryptedText: string): string {
     const encrypted = Buffer.from(parts[2], "hex");
     const decipher = crypto.createDecipheriv(
       "aes-256-gcm",
-      Buffer.from(effectiveEncryptionKey.padEnd(32).slice(0, 32)),
+      Buffer.from(key.padEnd(32).slice(0, 32)),
       iv
     );
     decipher.setAuthTag(authTag);

@@ -30,7 +30,7 @@ export default function TimerPage() {
   const [elapsed, setElapsed] = useState(0);
   const [soundEnabled, setSoundEnabled] = useState(preferences.soundEnabled);
   const [saving, setSaving] = useState(false);
-  const [completedSessions, setCompletedSessions] = useState<{ id: string; mode: string; durationMinutes: number; createdAt: number }[]>([]);
+  const [completedSessions, setCompletedSessions] = useState<{ id: string; mode: string; durationMinutes: number; durationSeconds?: number; createdAt: number }[]>([]);
   const saveAttemptedRef = useRef(false);
 
   const intervalRef = useRef<number | null>(null);
@@ -41,7 +41,15 @@ export default function TimerPage() {
     return 0;
   }, [mode, customMinutes]);
 
-  const saveSession = useCallback(async (duration: number) => {
+  const formatDuration = (seconds?: number, minutes?: number) => {
+    const totalSeconds = seconds ?? (minutes ? minutes * 60 : 0);
+    if (totalSeconds < 60) return `${totalSeconds}s`;
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return s > 0 ? `${m}m ${s}s` : `${m}m`;
+  };
+
+  const saveSession = useCallback(async (durationSeconds: number) => {
     if (!user?.uid) return;
     setSaving(true);
     try {
@@ -49,7 +57,7 @@ export default function TimerPage() {
       const res = await fetch("/api/timer", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ action: "create", mode, durationMinutes: duration, completed: true }),
+        body: JSON.stringify({ action: "create", mode, durationSeconds, completed: true }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
       const data = await res.json();
@@ -110,9 +118,9 @@ export default function TimerPage() {
             if (soundEnabled) playTimerComplete();
             if (!saveAttemptedRef.current) {
               saveAttemptedRef.current = true;
-              const duration = Math.floor(getDuration() / 60);
-              if (duration > 0) {
-                saveSession(duration);
+              const durationSeconds = getDuration();
+              if (durationSeconds > 0) {
+                saveSession(durationSeconds);
               }
             }
             return 0;
@@ -130,9 +138,9 @@ export default function TimerPage() {
   const handleComplete = async () => {
     if (saveAttemptedRef.current) return;
     saveAttemptedRef.current = true;
-    const duration = mode === "stopwatch" ? Math.floor(elapsed / 60) : Math.floor(getDuration() / 60);
-    if (duration > 0) {
-      await saveSession(duration);
+    const durationSeconds = mode === "stopwatch" ? elapsed : getDuration();
+    if (durationSeconds > 0) {
+      await saveSession(durationSeconds);
     }
     reset();
   };
@@ -235,7 +243,7 @@ export default function TimerPage() {
           <div className="space-y-2">
             {completedSessions.slice(0, 5).map((s) => (
               <div key={s.id} className="flex items-center justify-between text-xs text-foreground/60">
-                <span className="capitalize">{s.mode} — {s.durationMinutes} min</span>
+                <span className="capitalize">{s.mode} — {formatDuration(s.durationSeconds, s.durationMinutes)}</span>
                 <span>{new Date(s.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</span>
               </div>
             ))}

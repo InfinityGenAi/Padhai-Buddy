@@ -18,13 +18,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
 
-    let body: { action?: string; sessionId?: string; mode?: string; durationMinutes?: number; completed?: boolean };
+    let body: { action?: string; sessionId?: string; mode?: string; durationMinutes?: number; durationSeconds?: number; completed?: boolean };
     try {
       body = await req.json();
     } catch {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
-    const { action, sessionId, mode, durationMinutes, completed } = body;
+    const { action, sessionId, mode, durationMinutes, durationSeconds, completed } = body;
 
     const VALID_MODES = ["pomodoro", "stopwatch", "custom"];
 
@@ -32,12 +32,22 @@ export async function POST(req: NextRequest) {
       if (!mode || !VALID_MODES.includes(String(mode))) {
         return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
       }
-      if (typeof durationMinutes !== "number" || !Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 600) {
-        return NextResponse.json({ error: "durationMinutes must be an integer between 1 and 600" }, { status: 400 });
+      // Accept durationSeconds (preferred) or durationMinutes (legacy)
+      let totalSeconds = 0;
+      if (typeof durationSeconds === "number" && Number.isInteger(durationSeconds) && durationSeconds > 0) {
+        totalSeconds = durationSeconds;
+      } else if (typeof durationMinutes === "number" && Number.isInteger(durationMinutes) && durationMinutes > 0) {
+        totalSeconds = durationMinutes * 60;
+      } else {
+        return NextResponse.json({ error: "durationSeconds (preferred) or durationMinutes must be a positive integer" }, { status: 400 });
+      }
+      if (totalSeconds > 600 * 60) {
+        return NextResponse.json({ error: "Duration exceeds maximum allowed (600 minutes)" }, { status: 400 });
       }
 
+      const durationMinutesRounded = Math.max(1, Math.round(totalSeconds / 60));
       const sessionRef = adminDb.collection("users").doc(decoded.uid).collection("studySessions").doc();
-      const session = { mode: String(mode), durationMinutes, completed: completed === true, createdAt: Date.now() };
+      const session = { mode: String(mode), durationSeconds: totalSeconds, durationMinutes: durationMinutesRounded, completed: completed === true, createdAt: Date.now() };
       await sessionRef.set(session);
       return NextResponse.json({ session: { id: sessionRef.id, ...session } });
     }

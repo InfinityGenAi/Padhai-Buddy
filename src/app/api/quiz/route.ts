@@ -102,6 +102,7 @@ export async function POST(req: NextRequest) {
       difficulty?: unknown;
       numberOfQuestions?: unknown;
       questions?: unknown;
+      noteBody?: unknown;
     };
     try {
       body = await req.json();
@@ -317,7 +318,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const { subject, class: studentClass, board, difficulty, numberOfQuestions } = body;
+    const { subject, class: studentClass, board, difficulty, numberOfQuestions, noteBody } = body;
 
     if (!subject || !studentClass || !board || !difficulty || !numberOfQuestions) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -359,9 +360,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid difficulty" }, { status: 400 });
     }
 
-    const systemPrompt = `You are a quiz generator for a Class ${studentClass} ${board} student in India. Generate a ${difficulty} difficulty quiz on the subject: ${subject}. Create exactly ${numQuestions} multiple-choice questions. Each question must have exactly 4 options and one correct answer.`;
+    const systemPrompt = noteBody
+      ? `You are a quiz generator for a Class ${studentClass} ${board} student in India. Generate a ${difficulty} difficulty quiz based on the provided note content. Create exactly ${numQuestions} multiple-choice questions. Each question must have exactly 4 options and one correct answer. Base questions ONLY on the note content provided.`
+      : `You are a quiz generator for a Class ${studentClass} ${board} student in India. Generate a ${difficulty} difficulty quiz on the subject: ${subject}. Create exactly ${numQuestions} multiple-choice questions. Each question must have exactly 4 options and one correct answer.`;
 
-    const userPrompt = `Generate ${numQuestions} multiple-choice questions about ${subject} for Class ${studentClass} ${board} students at ${difficulty} difficulty level. Format your response as a JSON array of objects with the following structure: { "question": "string", "options": ["A", "B", "C", "D"], "correctIndex": 0, "explanation": "string" }. Return ONLY valid JSON, no markdown, no extra text.`;
+    const userPrompt = noteBody
+      ? `Generate ${numQuestions} multiple-choice questions based on this note for Class ${studentClass} ${board} students at ${difficulty} difficulty level. The note content:\n\n${noteBody}\n\nFormat your response as a JSON array of objects with the following structure: { "question": "string", "options": ["A", "B", "C", "D"], "correctIndex": 0, "explanation": "string" }. Return ONLY valid JSON, no markdown, no extra text.`
+      : `Generate ${numQuestions} multiple-choice questions about ${subject} for Class ${studentClass} ${board} students at ${difficulty} difficulty level. Format your response as a JSON array of objects with the following structure: { "question": "string", "options": ["A", "B", "C", "D"], "correctIndex": 0, "explanation": "string" }. Return ONLY valid JSON, no markdown, no extra text.`;
 
     try {
       const completion = await getGroqClient().chat.completions.create({

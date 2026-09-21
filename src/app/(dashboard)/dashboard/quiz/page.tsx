@@ -179,18 +179,6 @@ export default function QuizPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to submit quiz");
       if (preferences.soundEnabled) playQuizComplete();
-      try {
-        const prevQuizzes = Number(localStorage.getItem("pb-quizzes-taken")) || 0;
-        localStorage.setItem("pb-quizzes-taken", String(prevQuizzes + 1));
-        const score = Number(data.attempt?.score);
-        if (Number.isFinite(score)) {
-          const prevAvg = Number(localStorage.getItem("pb-avg-score")) || 0;
-          const newAvg = Math.round((prevAvg * prevQuizzes + score) / (prevQuizzes + 1));
-          localStorage.setItem("pb-avg-score", String(newAvg));
-        }
-      } catch {
-        // ignore storage errors
-      }
       setAttempt(data.attempt);
       setState("result");
     } catch (err: unknown) {

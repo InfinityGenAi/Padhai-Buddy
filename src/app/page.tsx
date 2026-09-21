@@ -9,7 +9,7 @@ import { usePathname } from "next/navigation";
 import BrandLogo from "@/components/BrandLogo";
 import { DemoVideoModal } from "@/components/ui/DemoVideoModal";
 
-import { BellIcon, BookOpenIcon, ChartBarIcon, DocumentTextIcon, HomeIcon, SparklesIcon, PhotoIcon, ArrowRightIcon, PlayIcon, AcademicCapIcon, ClockIcon, LightBulbIcon, ExclamationTriangleIcon, RectangleStackIcon, ArrowPathIcon, TrophyIcon, CheckBadgeIcon, ChatBubbleLeftRightIcon, CameraIcon, ClipboardDocumentCheckIcon, PencilSquareIcon, CalendarIcon, ChartBarSquareIcon, BoltIcon, FireIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { BellIcon, BookOpenIcon, ChartBarIcon, DocumentTextIcon, HomeIcon, SparklesIcon, PhotoIcon, ArrowRightIcon, PlayIcon, AcademicCapIcon, ClockIcon, LightBulbIcon, ExclamationTriangleIcon, RectangleStackIcon, ArrowPathIcon, TrophyIcon, ChatBubbleLeftRightIcon, CameraIcon, ClipboardDocumentCheckIcon, PencilSquareIcon, CalendarIcon, ChartBarSquareIcon, BoltIcon, FireIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 
 type Feature = {
   icon: React.ComponentType<{ className?: string }>;
@@ -79,10 +79,10 @@ const HOW_IT_WORKS = [
 ];
 
 const BENEFITS = [
-  { icon: AcademicCapIcon, title: "Board-Aligned", desc: "CBSE, ICSE & State Boards" },
+  { icon: AcademicCapIcon, title: "CBSE, ICSE & State Boards", desc: "Curriculum-aligned content" },
   { icon: BoltIcon, title: "Instant Answers", desc: "No waiting, no friction" },
   { icon: FireIcon, title: "Stay Consistent", desc: "Build your study streak" },
-  { icon: CheckBadgeIcon, title: "Verified Quality", desc: "Reviewed by educators" },
+  { icon: SparklesIcon, title: "AI-Powered", desc: "Smart explanations & practice" },
 ];
 
 const CURRICULUM = [
@@ -95,10 +95,10 @@ const CURRICULUM = [
 ];
 
 const STATS = [
-  { value: "Class 5-12", label: "All Boards" },
-  { value: "6+", label: "AI Tutor Modes" },
-  { value: "100%", label: "Free to Start" },
-  { value: "24/7", label: "Always Available" },
+  { value: "6", label: "Study Modes" },
+  { value: "7", label: "AI Tools" },
+  { value: "5-12", label: "Classes" },
+  { value: "3", label: "Boards" },
 ];
 
 export default function Home() {
@@ -620,9 +620,9 @@ export default function Home() {
               <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
                 Ready to study smarter?
               </h2>
-              <p className="text-lg text-white/85 max-w-xl mx-auto">
-                Join thousands of Indian students learning every day with Padhai Buddy.
-              </p>
+<p className="text-lg text-white/85 max-w-xl mx-auto">
+            Start studying smarter with AI-powered tools built for your curriculum.
+          </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
                 <motion.button
                   whileHover={animationsEnabled ? { scale: 1.04 } : undefined}

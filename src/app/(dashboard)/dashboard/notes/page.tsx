@@ -133,6 +133,7 @@ export default function NotesPage() {
           board: user.board,
           difficulty: "medium",
           numberOfQuestions: 5,
+          noteBody: note.body,
         }),
       });
       if (!res.ok) {
