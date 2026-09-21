@@ -205,6 +205,7 @@ jobs:
         working-directory: ./padhai-buddy
         env:
           CAPACITOR_BUILD: "true"
+          CAPACITOR_SERVER_URL: ${{ secrets.CAPACITOR_SERVER_URL }}
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
@@ -217,6 +218,8 @@ jobs:
 
       - name: Sync Capacitor Android
         working-directory: ./padhai-buddy
+        env:
+          CAPACITOR_SERVER_URL: ${{ secrets.CAPACITOR_SERVER_URL }}
         run: npx cap sync android
 
       - name: Build Android APK (Debug)
