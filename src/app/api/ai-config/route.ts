@@ -9,9 +9,13 @@ const ENCRYPTION_KEY = process.env.AI_CONFIG_ENCRYPTION_KEY;
 function getEffectiveEncryptionKey(): string {
   if (!ENCRYPTION_KEY) {
     if (process.env.NODE_ENV === "production") {
-      console.warn("[AI-CONFIG] AI_CONFIG_ENCRYPTION_KEY not set. Using ephemeral key. User AI configs will not persist across restarts.");
+      throw new Error("AI_CONFIG_ENCRYPTION_KEY must be set in production environment. Generate with: openssl rand -hex 32");
     }
-    return "ephemeral-dev-key-do-not-use-in-production";
+    if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
+      console.warn("[AI-CONFIG] AI_CONFIG_ENCRYPTION_KEY not set. Using ephemeral development key. User AI configs will not persist across restarts.");
+      return "ephemeral-dev-key-do-not-use-in-production";
+    }
+    throw new Error("AI_CONFIG_ENCRYPTION_KEY must be set. Generate with: openssl rand -hex 32");
   }
   return ENCRYPTION_KEY;
 }

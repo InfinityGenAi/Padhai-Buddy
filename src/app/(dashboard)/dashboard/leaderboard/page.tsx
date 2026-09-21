@@ -57,13 +57,13 @@ export default function LeaderboardPage() {
 
   const totalScore = stats.doubts * 10 + stats.quizzes * 20 + stats.sessions * 5 + stats.flashcards * 5 + stats.notes * 5 + stats.plansCompleted * 15;
 
-  const rank = totalScore >= 500 ? "Gold" : totalScore >= 200 ? "Silver" : totalScore >= 50 ? "Bronze" : "Beginner";
+  const tier = totalScore >= 500 ? "Gold" : totalScore >= 200 ? "Silver" : totalScore >= 50 ? "Bronze" : "Beginner";
 
   const activities = [
     { label: "Doubts Solved", value: stats.doubts, icon: ChatBubbleLeftEllipsisIcon, points: 10 },
     { label: "Quizzes Taken", value: stats.quizzes, icon: BookOpenIcon, points: 20 },
     { label: "Study Sessions", value: stats.sessions, icon: ClockIcon, points: 5 },
-    { label: "Flashcards", value: stats.flashcards, icon: SparklesIcon, points: 5 },
+    { label: "Flashcards Reviewed", value: stats.flashcards, icon: SparklesIcon, points: 5 },
     { label: "Notes Created", value: stats.notes, icon: DocumentTextIcon, points: 5 },
     { label: "Plans Completed", value: stats.plansCompleted, icon: CheckCircleIcon, points: 15 },
   ];
@@ -72,15 +72,24 @@ export default function LeaderboardPage() {
     <motion.div initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined} animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined} className="space-y-6 w-full">
       <div className="flex items-center gap-2">
         <TrophyIcon className="w-6 h-6 text-primary" />
-        <h1 className="text-xl font-semibold">My Study Rank</h1>
+        <h1 className="text-xl font-semibold">Study Progress</h1>
       </div>
 
       <div className="subtle-card rounded-xl p-6 text-center">
         <div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-2xl font-bold mx-auto mb-3">
-          {rank === "Gold" ? "🥇" : rank === "Silver" ? "🥈" : rank === "Bronze" ? "🥉" : "🌟"}
+          {tier === "Gold" ? (
+            <TrophyIcon className="w-10 h-10" />
+          ) : tier === "Silver" ? (
+            <TrophyIcon className="w-10 h-10" />
+          ) : tier === "Bronze" ? (
+            <TrophyIcon className="w-10 h-10" />
+          ) : (
+            <span className="text-3xl">🌱</span>
+          )}
         </div>
-        <h2 className="text-lg font-bold">{rank} Rank</h2>
-        <p className="text-sm text-foreground/60">Your personal study score: <span className="font-semibold text-primary">{totalScore}</span></p>
+        <h2 className="text-lg font-bold">{tier} Tier</h2>
+        <p className="text-sm text-foreground/60 mt-1">Your personal study score: <span className="font-semibold text-primary">{totalScore}</span></p>
+        <p className="text-xs text-foreground/50 mt-2">This is your personal progress tracker, not a global leaderboard.</p>
       </div>
 
       <div className="subtle-card rounded-xl p-5">
@@ -103,6 +112,19 @@ export default function LeaderboardPage() {
             ))}
           </div>
         )}
+      </div>
+
+      <div className="subtle-card rounded-xl p-5 bg-primary/5 border-primary/20">
+        <h3 className="text-sm font-semibold text-foreground/75 mb-2">How Scoring Works</h3>
+        <dl className="space-y-1 text-sm text-foreground/70">
+          <div className="flex justify-between"><dt>Doubts Solved</dt><dd>10 pts each</dd></div>
+          <div className="flex justify-between"><dt>Quizzes Taken</dt><dd>20 pts each</dd></div>
+          <div className="flex justify-between"><dt>Study Sessions</dt><dd>5 pts each</dd></div>
+          <div className="flex justify-between"><dt>Flashcards Reviewed</dt><dd>5 pts each</dd></div>
+          <div className="flex justify-between"><dt>Notes Created</dt><dd>5 pts each</dd></div>
+          <div className="flex justify-between"><dt>Plans Completed</dt><dd>15 pts each</dd></div>
+        </dl>
+        <p className="text-xs text-foreground/50 mt-3">Scores are personal and not compared with other users.</p>
       </div>
     </motion.div>
   );

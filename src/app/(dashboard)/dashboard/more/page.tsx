@@ -103,8 +103,8 @@ export default function MorePage() {
     },
     {
       icon: TrophyIcon,
-      title: "Leaderboard",
-      desc: "See how you compare with other learners",
+      title: "Study Progress",
+      desc: "Your personal tier, score, and activity breakdown",
       href: "/dashboard/leaderboard",
     },
     {

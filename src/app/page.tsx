@@ -673,15 +673,13 @@ export default function Home() {
               <ul className="space-y-2 text-sm text-foreground/55">
                 <li><span className="hover:text-foreground transition-colors cursor-default">About</span></li>
                 <li><span className="hover:text-foreground transition-colors cursor-default">Contact</span></li>
-                <li><span className="hover:text-foreground transition-colors cursor-default">Privacy</span></li>
               </ul>
             </div>
             <div>
               <h3 className="text-sm font-bold text-foreground mb-3">Legal</h3>
               <ul className="space-y-2 text-sm text-foreground/55">
-                <li><span className="hover:text-foreground transition-colors cursor-default">Terms</span></li>
-                <li><span className="hover:text-foreground transition-colors cursor-default">Privacy</span></li>
-                <li><span className="hover:text-foreground transition-colors cursor-default">Cookies</span></li>
+                <li><Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link></li>
+                <li><Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link></li>
               </ul>
             </div>
           </div>

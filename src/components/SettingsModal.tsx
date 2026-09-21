@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -941,14 +942,14 @@ export default function SettingsModal({ isOpen, onClose }: { isOpen: boolean; on
                     <span className="text-sm text-foreground/60">App Version</span>
                     <span className="text-xs font-medium text-foreground/40 bg-foreground/5 px-2.5 py-1 rounded-lg">1.0.0</span>
                   </div>
-                  <button className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium text-foreground/70 hover:bg-foreground/5 transition-colors">
+                  <Link href="/privacy" className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium text-foreground/70 hover:bg-foreground/5 transition-colors">
                     <span>Privacy Policy</span>
                     <ArrowTopRightOnSquareIcon className="w-4 h-4 text-foreground/30" />
-                  </button>
-                  <button className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium text-foreground/70 hover:bg-foreground/5 transition-colors">
+                  </Link>
+                  <Link href="/terms" className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium text-foreground/70 hover:bg-foreground/5 transition-colors">
                     <span>Terms of Service</span>
                     <ArrowTopRightOnSquareIcon className="w-4 h-4 text-foreground/30" />
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>

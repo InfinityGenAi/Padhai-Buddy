@@ -26,7 +26,7 @@ const nextConfig = {
     const groqApiOrigin = "https://api.groq.com";
     const firebaseProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "infinity-gen-ai";
     const firebaseAuthDomain = `${firebaseProjectId}.firebaseapp.com`;
-    
+
     // CSP directives - kept as restrictive as possible while supporting Firebase Auth, Google Sign-in, Groq AI, and Next.js
     const cspDirectives = [
       "default-src 'self'",
