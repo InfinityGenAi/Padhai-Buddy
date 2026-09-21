@@ -12,6 +12,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   title: "Padhai Buddy — Your AI Study Buddy",
   description: "Your AI study buddy for every doubt, every subject, every board. Get instant step-by-step explanations for Class 5–12 CBSE, ICSE & State Board students.",
   keywords: ["AI tutor", "study buddy", "CBSE", "ICSE", "doubt solver", "India students"],

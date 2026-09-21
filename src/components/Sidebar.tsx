@@ -23,6 +23,7 @@ import { useSettingsModal } from "@/contexts/SettingsModalContext";
 import { motion, useReducedMotion } from "framer-motion";
 import { playLogout, playSettings } from "@/lib/sounds";
 import BrandLogo from "./BrandLogo";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 const navSections = [
   {
@@ -73,10 +74,16 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { logout, preferences } = useAuth();
   const { open } = useSettingsModal();
+  const { trackFeatureUse } = useAnalytics();
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
+
+  const handleNavClick = (feature: string, href: string) => {
+    trackFeatureUse(feature);
+    // Link will handle navigation
+  };
 
   return (
     <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:border-r lg:border-border lg:shadow-sm lg:overflow-y-auto lg:overflow-x-hidden bg-sidebar relative z-20" style={{ backgroundColor: 'var(--sidebar-bg)' }}>
@@ -96,7 +103,11 @@ export default function Sidebar() {
               {section.items.map((item) => {
                 const active = isActive(item.href);
                 return (
-                  <Link key={item.name} href={item.href}>
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    onClick={() => handleNavClick(item.name, item.href)}
+                  >
                     <motion.div
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all relative focus-ring ${
                         active
@@ -126,6 +137,7 @@ export default function Sidebar() {
               <motion.button
                 key={item.name}
                 onClick={() => {
+                  trackFeatureUse(item.name);
                   if (item.action === "settings") {
                     playSettings();
                     open();

@@ -29,7 +29,13 @@ export default function PlannerPage() {
   const [newTitle, setNewTitle] = useState("");
   const [newSubject, setNewSubject] = useState("");
   const [newDuration, setNewDuration] = useState(30);
-  const [newDate, setNewDate] = useState(new Date().toISOString().split("T")[0]);
+  const [newDate, setNewDate] = useState(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  });
   const [newPriority, setNewPriority] = useState<PlanPriority>("medium");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingPlan, setEditingPlan] = useState<StudyPlan | null>(null);
@@ -97,12 +103,23 @@ export default function PlannerPage() {
     }
   };
 
+  const getLocalDateString = (date?: string) => {
+    if (!date) {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+    return date;
+  };
+
   const startEdit = (plan: StudyPlan) => {
     setEditingPlan(plan);
     setNewTitle(plan.title);
     setNewSubject(plan.subject);
     setNewDuration(plan.durationMinutes);
-    setNewDate(plan.plannedDate || new Date().toISOString().split("T")[0]);
+    setNewDate(getLocalDateString(plan.plannedDate));
     setNewPriority(plan.priority || "medium");
     setShowAdd(true);
   };

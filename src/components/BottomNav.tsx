@@ -15,6 +15,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 const navItems = [
   { name: "Home", href: "/dashboard", icon: HomeIcon },
@@ -27,6 +28,7 @@ const navItems = [
 export default function BottomNav() {
   const pathname = usePathname();
   const { preferences } = useAuth();
+  const { trackFeatureUse } = useAnalytics();
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
 
@@ -39,7 +41,12 @@ export default function BottomNav() {
           const active = isActive(item.href);
           const Icon = item.icon;
           return (
-            <Link key={item.name} href={item.href} className="flex-1">
+            <Link
+              key={item.name}
+              href={item.href}
+              onClick={() => trackFeatureUse(item.name)}
+              className="flex-1"
+            >
               <motion.div
                 className={`flex flex-col items-center justify-center h-14 rounded-xl text-[10px] font-medium transition-all ${
                     active

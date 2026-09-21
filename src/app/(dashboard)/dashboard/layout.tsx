@@ -23,6 +23,7 @@ import {
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
 import { playLogout, playSettings } from "@/lib/sounds";
 import type { Notification } from "@/types";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 function DashboardInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -40,11 +41,14 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
   const sessionRegisteredRef = useRef(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  const { trackPageView, trackFeatureUse, trackSessionStart } = useAnalytics();
+
   useEffect(() => {
     if (!user?.uid || sessionRegisteredRef.current) return;
 
     sessionRegisteredRef.current = true;
     registerSession();
+    trackSessionStart();
 
     let cancelled = false;
     const interval = setInterval(() => {
@@ -56,7 +60,13 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [user?.uid]);
+  }, [user?.uid, trackSessionStart]);
+
+  // Track page views
+  useEffect(() => {
+    if (!user?.uid) return;
+    trackPageView(pathname);
+  }, [pathname, trackPageView, user?.uid]);
 
   // Notifications listener
   useEffect(() => {
