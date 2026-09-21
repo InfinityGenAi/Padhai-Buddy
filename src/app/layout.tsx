@@ -29,6 +29,27 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Padhai Buddy — Your AI Study Buddy",
     description: "Your AI study buddy for every doubt, every subject, every board.",
+    type: "website",
+    url: "https://padhaibuddy.com/",
+    siteName: "Padhai Buddy",
+    images: [
+      {
+        url: "/brand/favicon-512.png",
+        width: 512,
+        height: 512,
+        alt: "Padhai Buddy Logo",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Padhai Buddy — Your AI Study Buddy",
+    description: "Your AI study buddy for every doubt, every subject, every board.",
+    images: ["/brand/favicon-512.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
 };
 

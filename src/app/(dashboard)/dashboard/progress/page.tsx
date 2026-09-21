@@ -17,8 +17,19 @@ import {
   ArrowPathIcon,
   MagnifyingGlassIcon,
   ExclamationTriangleIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import type { ProgressStats } from "@/types";
+
+interface SubjectMastery {
+  subject: string;
+  mastery: number;
+  totalQuestions: number;
+  correctAnswers: number;
+  topicsCount: number;
+  weakTopicsCount: number;
+  lastPracticed: number;
+}
 
 interface WeakTopic {
   subject: string;
@@ -90,6 +101,8 @@ export default function ProgressPage() {
   const [weakTopicsLoading, setWeakTopicsLoading] = useState(true);
   const [streak, setStreak] = useState<StreakData | null>(null);
   const [streakLoading, setStreakLoading] = useState(true);
+  const [subjectMastery, setSubjectMastery] = useState<SubjectMastery[]>([]);
+  const [subjectMasteryLoading, setSubjectMasteryLoading] = useState(true);
 
   // Fetch stats
   useEffect(() => {
@@ -146,6 +159,26 @@ export default function ProgressPage() {
         // ignore
       } finally {
         if (!cancelled) setStreakLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.uid]);
+
+  // Fetch subject mastery
+  useEffect(() => {
+    if (!user?.uid) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await (await import("@/lib/auth-utils")).getFirebaseIdToken();
+        const res = await fetch("/api/subject-mastery", { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        if (!cancelled) setSubjectMastery(data.subjectMastery || []);
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setSubjectMasteryLoading(false);
       }
     })();
     return () => { cancelled = true; };
@@ -285,23 +318,47 @@ export default function ProgressPage() {
           {/* Subject Mastery Overview */}
           <div className="subtle-card rounded-xl p-5">
             <h3 className="text-sm font-semibold text-foreground/75 mb-4">Subject Mastery</h3>
-            {stats && stats.totalQuizzes > 0 ? (
+            {subjectMasteryLoading ? (
               <div className="space-y-3">
-                {/* This would ideally come from topicMastery API, for now show a placeholder */}
-                <p className="text-sm text-foreground/60">Complete more quizzes to see subject-level mastery breakdown.</p>
-                <div className="grid grid-cols-2 gap-2 mt-3">
-                  <Link href="/dashboard/quiz" className="px-3 py-2 text-sm font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg text-center transition-colors">
-                    Take a Quiz
-                  </Link>
-                  <Link href="/dashboard/flashcards" className="px-3 py-2 text-sm font-medium text-emerald-400 bg-emerald-950/30 hover:bg-emerald-950/50 rounded-lg text-center transition-colors">
-                    Review Flashcards
-                  </Link>
-                </div>
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-20 bg-foreground/5 rounded-xl animate-pulse" />
+                ))}
               </div>
-            ) : (
+            ) : subjectMastery.length === 0 ? (
               <div className="text-center py-8">
                 <BookOpenIcon className="w-8 h-8 text-foreground/20 mx-auto mb-2" />
                 <p className="text-xs text-foreground/40">Take quizzes to build your mastery profile.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {subjectMastery.map((sm) => (
+                  <div key={sm.subject} className="p-3 rounded-xl border border-foreground/10 bg-foreground/5">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{sm.subject}</p>
+                        <p className="text-xs text-foreground/50 mt-0.5">{sm.topicsCount} topics · {sm.totalQuestions} questions · {sm.correctAnswers} correct</p>
+                      </div>
+                      <span className="px-2 py-0.5 text-[10px] font-medium rounded-full
+                        {sm.mastery >= 80 ? 'bg-emerald-950/30 text-emerald-400' : sm.mastery >= 60 ? 'bg-amber-950/30 text-amber-400' : 'bg-red-950/30 text-red-400'}
+                      ">
+                        {sm.mastery}% mastery
+                      </span>
+                    </div>
+                    <div className="h-2 bg-foreground/5 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full transition-all duration-500 ${
+                        sm.mastery >= 80 ? 'bg-emerald-500' : sm.mastery >= 60 ? 'bg-amber-500' : 'bg-red-500'
+                      }`} style={{ width: `${sm.mastery}%` }} />
+                    </div>
+                    {sm.weakTopicsCount > 0 && (
+                      <p className="text-xs text-red-400 mt-1">{sm.weakTopicsCount} topic{sm.weakTopicsCount > 1 ? 's' : ''} need review</p>
+                    )}
+                    {sm.lastPracticed > 0 && (
+                      <p className="text-[10px] text-foreground/40 mt-1">
+                        Last practiced: {new Date(sm.lastPracticed).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      </p>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>

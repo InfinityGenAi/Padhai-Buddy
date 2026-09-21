@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 
-function getTodayInIST(): string {
+// Get today's date in YYYY-MM-DD format using local timezone
+function getTodayLocal(): string {
   const now = new Date();
-  // Convert to IST (UTC+5:30)
-  const istOffset = 5.5 * 60 * 60 * 1000;
-  const istTime = new Date(now.getTime() + istOffset);
-  return istTime.toISOString().split("T")[0];
+  return now.toISOString().split("T")[0];
 }
 
 export async function GET(req: NextRequest) {
@@ -39,7 +37,7 @@ export async function GET(req: NextRequest) {
     const snap = await adminDb.collection("users").doc(decoded.uid).collection("studyPlans").orderBy("createdAt", "desc").get();
     let plans = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-    const today = getTodayInIST();
+    const today = getTodayLocal();
     if (filter === "today") {
       plans = plans.filter((p: Record<string, unknown>) => p.plannedDate === today);
     } else if (filter === "upcoming") {

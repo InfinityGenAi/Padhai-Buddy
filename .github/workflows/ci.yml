@@ -229,3 +229,27 @@ jobs:
           name: padhai-buddy-debug-apk
           path: padhai-buddy/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
+
+      - name: Build Android AAB (Release)
+        if: env.ANDROID_KEYSTORE_BASE64 != '' && env.ANDROID_KEYSTORE_PASSWORD != '' && env.ANDROID_KEY_ALIAS != '' && env.ANDROID_KEY_PASSWORD != ''
+        working-directory: ./padhai-buddy/android
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > app/release.keystore
+          echo "storeFile=release.keystore" > signing.properties
+          echo "storePassword=$ANDROID_KEYSTORE_PASSWORD" >> signing.properties
+          echo "keyAlias=$ANDROID_KEY_ALIAS" >> signing.properties
+          echo "keyPassword=$ANDROID_KEY_PASSWORD" >> signing.properties
+          ./gradlew bundleRelease
+
+      - name: Upload AAB artifact
+        if: env.ANDROID_KEYSTORE_BASE64 != '' && env.ANDROID_KEYSTORE_PASSWORD != '' && env.ANDROID_KEY_ALIAS != '' && env.ANDROID_KEY_PASSWORD != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: padhai-buddy-release-aab
+          path: padhai-buddy/android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30
