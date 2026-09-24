@@ -117,13 +117,20 @@ jobs:
 
       - name: Start Firebase emulators
         run: |
-          npx firebase emulators:start --only auth,firestore --project ${{ secrets.FIREBASE_ADMIN_PROJECT_ID }} > emulator.log 2>&1 &
+          # For local emulators, don't specify --project (requires auth and valid project)
+          # Local emulators run without a project ID
+          npx firebase emulators:start --only auth,firestore > emulator.log 2>&1 &
           echo $! > emulator.pid
-          # Wait for emulators to be ready
-          for i in {1..60}; do
+          # Wait for emulators to be ready (up to 180s)
+          for i in {1..90}; do
             if curl -s http://localhost:9099 > /dev/null 2>&1 && curl -s http://localhost:8080 > /dev/null 2>&1; then
               echo "Emulators ready"
               break
+            fi
+            if [ $i -eq 90 ]; then
+              echo "ERROR: Emulators failed to start"
+              cat emulator.log
+              exit 1
             fi
             sleep 2
           done
@@ -231,10 +238,14 @@ jobs:
       - name: Install Capacitor CLI
         run: npm install -g @capacitor/cli@latest
 
+      # Sync Capacitor Android
       - name: Sync Capacitor Android
         env:
           CAPACITOR_SERVER_URL: ${{ secrets.CAPACITOR_SERVER_URL }}
           CAPACITOR_BUILD: 'true'
+          FIREBASE_ADMIN_PROJECT_ID: ${{ secrets.FIREBASE_ADMIN_PROJECT_ID }}
+          FIREBASE_ADMIN_CLIENT_EMAIL: ${{ secrets.FIREBASE_ADMIN_CLIENT_EMAIL }}
+          FIREBASE_ADMIN_PRIVATE_KEY: ${{ secrets.FIREBASE_ADMIN_PRIVATE_KEY }}
         run: npx cap sync android
 
       # Configure Android signing (if keystore provided)
