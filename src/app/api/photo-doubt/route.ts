@@ -31,19 +31,22 @@ function validateFileSignature(buffer: Buffer, mimeType: string): boolean {
   return signature.every((byte, i) => buffer[i] === byte);
 }
 
-async function toDataUri(file: File): Promise<string> {
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-  const base64 = buffer.toString("base64");
-  const mime = ALLOWED_MIME_TYPES.has(file.type) ? file.type : "application/octet-stream";
-  return `data:${mime};base64,${base64}`;
-}
-
 export async function POST(req: NextRequest) {
   try {
+    // Check server configuration early
     if (!adminAuth || initializationError) {
+      console.error("[PHOTO-DOUBT] Firebase Admin not initialized:", initializationError);
       return NextResponse.json(
-        { error: "Server configuration error" },
+        { error: "Server configuration error: Firebase Admin not initialized" },
+        { status: 500 },
+      );
+    }
+
+    // Check for required environment variables
+    if (!process.env.GROQ_API_KEY) {
+      console.error("[PHOTO-DOUBT] GROQ_API_KEY not configured");
+      return NextResponse.json(
+        { error: "Server configuration error: AI service not configured" },
         { status: 500 },
       );
     }
@@ -196,11 +199,37 @@ export async function POST(req: NextRequest) {
         temperature: 0.3,
         max_tokens: 2048,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("[PHOTO-DOUBT] Groq API error:", error);
+      
+      // Provide more specific error messages based on error type
+      let errorMessage = "Failed to analyze image. Please try again.";
+      let statusCode = 502;
+      
+      if (error instanceof Error) {
+        // Check for common Groq API error patterns
+        const errorMsg = error.message.toLowerCase();
+        if (errorMsg.includes("api key") || errorMsg.includes("unauthorized") || errorMsg.includes("401")) {
+          errorMessage = "AI service authentication failed. Please contact support.";
+          statusCode = 500;
+        } else if (errorMsg.includes("model") && (errorMsg.includes("not found") || errorMsg.includes("decommissioned") || errorMsg.includes("deprecated"))) {
+          errorMessage = "AI model unavailable. Please contact support.";
+          statusCode = 500;
+        } else if (errorMsg.includes("rate limit") || errorMsg.includes("429")) {
+          errorMessage = "AI service rate limit exceeded. Please try again later.";
+          statusCode = 429;
+        } else if (errorMsg.includes("payload") || errorMsg.includes("too large") || errorMsg.includes("413")) {
+          errorMessage = "Image too large for AI processing. Please try a smaller image.";
+          statusCode = 400;
+        } else if (errorMsg.includes("timeout") || errorMsg.includes("timed out")) {
+          errorMessage = "AI processing timed out. Please try again.";
+          statusCode = 504;
+        }
+      }
+      
       return NextResponse.json(
-        { error: "Failed to analyze image. Please try again." },
-        { status: 502 },
+        { error: errorMessage },
+        { status: statusCode },
       );
     }
 

@@ -36,8 +36,8 @@ const nextConfig = {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       // Fonts: Google Fonts (if used) + self
       "font-src 'self' data: https://fonts.gstatic.com",
-      // Images: self, data URIs, Firebase Storage, Google profile images
-      "img-src 'self' data: https://firebasestorage.googleapis.com https://lh3.googleusercontent.com https://www.gstatic.com",
+      // Images: self, data URIs, blob: (for local previews), Firebase Storage, Google profile images
+      "img-src 'self' data: blob: https://firebasestorage.googleapis.com https://lh3.googleusercontent.com https://www.gstatic.com",
       // Connect: Firebase Auth/Google Sign-in, Firestore, Groq AI, Next.js HMR
       `connect-src 'self' https://${firebaseAuthDomain} https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://www.googleapis.com ${groqApiOrigin} wss://${firebaseProjectId}.firebaseio.com`,
       // Frames: Google Sign-in popup + Firebase Auth domain for popup redirect
