@@ -23,6 +23,9 @@ jobs:
       FIREBASE_ADMIN_PRIVATE_KEY: ${{ secrets.FIREBASE_ADMIN_PRIVATE_KEY }}
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       NODE_OPTIONS: "--max-old-space-size=4096"
+      NEXT_PUBLIC_USE_EMULATORS: "true"
+      NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST: "localhost:9099"
+      NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST: "localhost:8080"
 
     steps:
       - name: Checkout repository

@@ -86,6 +86,9 @@ jobs:
       FIREBASE_ADMIN_PRIVATE_KEY: ${{ secrets.FIREBASE_ADMIN_PRIVATE_KEY }}
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       NODE_OPTIONS: "--max-old-space-size=4096"
+      NEXT_PUBLIC_USE_EMULATORS: "true"
+      NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST: "localhost:9099"
+      NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST: "localhost:8080"
 
     steps:
       - name: Checkout repository
@@ -161,24 +164,34 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint-and-typecheck
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    env:
+      JAVA_VERSION: '21'
+      GRADLE_VERSION: '8.13'
+      NODE_VERSION: '20'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: "package-lock.json"
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'package-lock.json'
 
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: "temurin"
-          java-version: "17"
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: 'gradle'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ env.GRADLE_VERSION }}
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -187,8 +200,20 @@ jobs:
           ndk-version: r26c
           emulator: false
 
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            **/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
       - name: Install dependencies
         run: npm ci
+        env:
+          NODE_ENV: production
 
       - name: Build web assets for Capacitor
         env:
@@ -204,14 +229,37 @@ jobs:
           NODE_OPTIONS: "--max-old-space-size=4096"
         run: npm run build
 
+      - name: Install Capacitor CLI
+        run: npm install -g @capacitor/cli@latest
+
       - name: Sync Capacitor Android
         env:
           CAPACITOR_SERVER_URL: ${{ secrets.CAPACITOR_SERVER_URL }}
+          CAPACITOR_BUILD: 'true'
         run: npx cap sync android
+
+      # Configure Android signing (if keystore provided)
+      - name: Configure Android signing
+        id: signing
+        run: |
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ] && [ -n "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ] && [ -n "${{ secrets.ANDROID_KEY_ALIAS }}" ] && [ -n "${{ secrets.ANDROID_KEY_PASSWORD }}" ]; then
+            echo "Keystore provided - configuring release signing"
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
+            cat << EOF > android/app/signing.properties
+            storeFile=keystore.jks
+            storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+            keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+            keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+            EOF
+            echo "signing_configured=true" >> $GITHUB_OUTPUT
+          else
+            echo "No keystore provided - building unsigned APK (not suitable for Play Store)"
+            echo "signing_configured=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Build Android APK (Debug)
         working-directory: ./android
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug --no-daemon -Dorg.gradle.jvmargs="-Xmx2048m"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -234,7 +282,7 @@ jobs:
           echo "storePassword=$ANDROID_KEYSTORE_PASSWORD" >> signing.properties
           echo "keyAlias=$ANDROID_KEY_ALIAS" >> signing.properties
           echo "keyPassword=$ANDROID_KEY_PASSWORD" >> signing.properties
-          ./gradlew bundleRelease
+          ./gradlew bundleRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx2048m"
 
       - name: Upload AAB artifact
         if: env.ANDROID_KEYSTORE_BASE64 != '' && env.ANDROID_KEYSTORE_PASSWORD != '' && env.ANDROID_KEY_ALIAS != '' && env.ANDROID_KEY_PASSWORD != ''

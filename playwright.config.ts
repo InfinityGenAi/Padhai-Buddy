@@ -44,7 +44,7 @@ export default defineConfig({
     command: "node scripts/start-test-server.js",
     url: "http://localhost:3000",
     timeout: 300000,
-    reuseExistingServer: true,
+    reuseExistingServer: false,
   },
   globalSetup: path.resolve(__dirname, "tests/global-setup"),
   globalTeardown: path.resolve(__dirname, "tests/global-teardown"),
