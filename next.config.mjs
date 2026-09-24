@@ -40,8 +40,8 @@ const nextConfig = {
       "img-src 'self' data: https://firebasestorage.googleapis.com https://lh3.googleusercontent.com https://www.gstatic.com",
       // Connect: Firebase Auth/Google Sign-in, Firestore, Groq AI, Next.js HMR
       `connect-src 'self' https://${firebaseAuthDomain} https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://www.googleapis.com ${groqApiOrigin} wss://${firebaseProjectId}.firebaseio.com`,
-      // Frames: Google Sign-in popup
-      "frame-src 'self' https://accounts.google.com",
+      // Frames: Google Sign-in popup + Firebase Auth domain for popup redirect
+      `frame-src 'self' https://accounts.google.com https://${firebaseAuthDomain}`,
       // Object: none
       "object-src 'none'",
       // Base URI: self
@@ -79,6 +79,10 @@ const nextConfig = {
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
+          },
+          {
+            key: "Cross-Origin-Opener-Policy",
+            value: "same-origin-allow-popups",
           },
           // HSTS only in production (HTTPS)
           ...(!isDev ? [{
