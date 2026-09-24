@@ -1,6 +1,7 @@
 "use client";
 
-import { motion, useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import { DevicePhoneMobileIcon, CheckCircleIcon, GlobeAltIcon, ArrowDownTrayIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import BrandLogo from "@/components/BrandLogo";
 import Link from "next/link";
