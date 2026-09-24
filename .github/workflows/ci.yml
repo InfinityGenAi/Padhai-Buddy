@@ -21,18 +21,15 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: "padhai-buddy/package-lock.json"
+          cache-dependency-path: "package-lock.json"
 
       - name: Install dependencies
-        working-directory: ./padhai-buddy
         run: npm ci
 
       - name: Run ESLint
-        working-directory: ./padhai-buddy
         run: npm run lint
 
       - name: Run TypeScript check
-        working-directory: ./padhai-buddy
         run: npx tsc --noEmit
 
   build:
@@ -50,14 +47,12 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: "padhai-buddy/package-lock.json"
+          cache-dependency-path: "package-lock.json"
 
       - name: Install dependencies
-        working-directory: ./padhai-buddy
         run: npm ci
 
       - name: Build application
-        working-directory: ./padhai-buddy
         env:
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
@@ -103,7 +98,7 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: "padhai-buddy/package-lock.json"
+          cache-dependency-path: "package-lock.json"
 
       - name: Setup Java (for Firebase emulators)
         uses: actions/setup-java@v4
@@ -112,15 +107,12 @@ jobs:
           java-version: "21"
 
       - name: Install dependencies
-        working-directory: ./padhai-buddy
         run: npm ci
 
       - name: Install Playwright browsers
-        working-directory: ./padhai-buddy
         run: npx playwright install --with-deps chromium
 
       - name: Start Firebase emulators
-        working-directory: ./padhai-buddy
         run: |
           npx firebase emulators:start --only auth,firestore --project ${{ secrets.FIREBASE_ADMIN_PROJECT_ID }} > emulator.log 2>&1 &
           echo $! > emulator.pid
@@ -135,7 +127,6 @@ jobs:
           cat emulator.log
 
       - name: Run Playwright tests
-        working-directory: ./padhai-buddy
         env:
           FIREBASE_AUTH_EMULATOR_HOST: "localhost:9099"
           FIRESTORE_EMULATOR_HOST: "localhost:8080"
@@ -147,7 +138,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: padhai-buddy/playwright-report/
+          path: playwright-report/
           retention-days: 7
 
       - name: Upload test results
@@ -155,12 +146,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: padhai-buddy/test-results/
+          path: test-results/
           retention-days: 7
 
       - name: Stop Firebase emulators
         if: always()
-        working-directory: ./padhai-buddy
         run: |
           if [ -f emulator.pid ]; then
             kill $(cat emulator.pid) 2>/dev/null || true
@@ -182,7 +172,7 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: "padhai-buddy/package-lock.json"
+          cache-dependency-path: "package-lock.json"
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -198,11 +188,9 @@ jobs:
           emulator: false
 
       - name: Install dependencies
-        working-directory: ./padhai-buddy
         run: npm ci
 
       - name: Build web assets for Capacitor
-        working-directory: ./padhai-buddy
         env:
           CAPACITOR_BUILD: "true"
           CAPACITOR_SERVER_URL: ${{ secrets.CAPACITOR_SERVER_URL }}
@@ -217,25 +205,24 @@ jobs:
         run: npm run build
 
       - name: Sync Capacitor Android
-        working-directory: ./padhai-buddy
         env:
           CAPACITOR_SERVER_URL: ${{ secrets.CAPACITOR_SERVER_URL }}
         run: npx cap sync android
 
       - name: Build Android APK (Debug)
-        working-directory: ./padhai-buddy/android
+        working-directory: ./android
         run: ./gradlew assembleDebug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: padhai-buddy-debug-apk
-          path: padhai-buddy/android/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
 
       - name: Build Android AAB (Release)
         if: env.ANDROID_KEYSTORE_BASE64 != '' && env.ANDROID_KEYSTORE_PASSWORD != '' && env.ANDROID_KEY_ALIAS != '' && env.ANDROID_KEY_PASSWORD != ''
-        working-directory: ./padhai-buddy/android
+        working-directory: ./android
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -254,5 +241,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: padhai-buddy-release-aab
-          path: padhai-buddy/android/app/build/outputs/bundle/release/app-release.aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
           retention-days: 30

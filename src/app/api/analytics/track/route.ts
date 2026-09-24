@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { checkRateLimit } from "@/lib/rate-limiter";
+import { FieldValue } from "firebase-admin/firestore";
 
 export interface AnalyticsEvent {
   event: "page_view" | "feature_use" | "download" | "signup" | "session_start";
@@ -64,33 +65,37 @@ export async function POST(req: NextRequest) {
 
     const batch = adminDb.batch();
 
-    // Track daily analytics
+    // Track daily analytics - use atomic increments to avoid read-then-write race conditions
+    // and avoid storing large activeUserIds arrays (Firestore doc limit: 1MB)
     const dailyRef = adminDb.collection("dailyAnalytics").doc(dateStr);
-    const dailySnap = await dailyRef.get();
-    const dailyData = dailySnap.data() || {};
-
-    const newActiveUsers = new Set(dailyData.activeUserIds || []);
-    newActiveUsers.add(decoded.uid);
-    const newSignups = (dailyData.signups || 0) + (event === "signup" ? 1 : 0);
-
-    batch.set(dailyRef, {
+    
+    // Prepare update data with atomic increments
+    const dailyUpdate: Record<string, unknown> = {
       date: dateStr,
-      activeUsers: newActiveUsers.size,
-      activeUserIds: Array.from(newActiveUsers),
-      signups: newSignups,
-      pageViews: (dailyData.pageViews || 0) + (event === "page_view" ? 1 : 0),
-      featureUses: (dailyData.featureUses || 0) + (event === "feature_use" ? 1 : 0),
       updatedAt: now,
-    }, { merge: true });
+    };
+
+    // Use FieldValue.increment for atomic counter updates
+    if (event === "page_view") {
+      dailyUpdate.pageViews = FieldValue.increment(1);
+    }
+    if (event === "feature_use") {
+      dailyUpdate.featureUses = FieldValue.increment(1);
+    }
+    if (event === "signup") {
+      dailyUpdate.signups = FieldValue.increment(1);
+    }
+    // Note: activeUsers tracking removed to avoid large array growth
+    // Use a separate dailyActiveUsers collection if needed for exact counts
+
+    batch.set(dailyRef, dailyUpdate, { merge: true });
 
     // Track feature usage
     if (event === "feature_use" && feature) {
       const featureRef = adminDb.collection("featureUsage").doc(feature);
-      const featureSnap = await featureRef.get();
-      const featureData = featureSnap.data() || {};
       batch.set(featureRef, {
         feature,
-        count: (featureData.count || 0) + 1,
+        count: FieldValue.increment(1),
         lastUsedAt: now,
       }, { merge: true });
     }

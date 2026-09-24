@@ -16,6 +16,7 @@ Configure these in **Settings → Secrets and variables → Actions**:
 | `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase client config | **Yes** |
 | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Firebase client config | **Yes** |
 | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Firebase client config | **Yes** |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Firebase client config | **Yes** |
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase client config | **Yes** |
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase client config | **Yes** |
 | `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` | Firebase client config | **Yes** |
@@ -65,7 +66,7 @@ The workflow runs automatically on:
 
 1. **Checkout** - Gets full git history for version detection
 2. **Setup** - Node.js 20, Java 21 (Temurin), Gradle 8.13
-3. **Install** - `npm ci` with production env vars
+3. **Install** - `npm ci` (tailwindcss is now in dependencies, so it installs in production)
 4. **Build Next.js** - Production build with all API routes
 5. **Capacitor Sync** - Syncs web assets to Android project
 6. **Signing Config** - Creates `signing.properties` if keystore secrets exist
@@ -140,6 +141,10 @@ Ensure `CAPACITOR_SERVER_URL` is configured in GitHub Secrets and is a valid HTT
 ### Build Fails: "Keystore not found"
 
 If you want signed APKs, add all 4 signing secrets to GitHub Secrets. Without them, the build produces an unsigned APK (only for testing).
+
+### Build Fails: "Cannot find module 'tailwindcss'"
+
+Ensure `tailwindcss` is in `dependencies` (not `devDependencies`) in `package.json`. The workflow runs `npm ci` with `NODE_ENV=production`, which skips devDependencies.
 
 ### APK Too Large
 

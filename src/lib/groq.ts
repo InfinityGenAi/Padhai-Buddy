@@ -14,7 +14,9 @@ export function getGroqClient(): Groq {
 }
 
 export const GROQ_TEXT_MODEL = "openai/gpt-oss-120b";
-export const GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+// Use Qwen 3.8 27B - production vision model per Groq docs
+// https://console.groq.com/docs/vision
+export const GROQ_VISION_MODEL = "qwen/qwen3.8-27b";
 
 export type StudyMode = "explain" | "teach" | "quiz" | "hint" | "simplify" | "deep" | "exam" | null;
 

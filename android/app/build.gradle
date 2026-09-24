@@ -16,10 +16,29 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+
+    // Signing config for release builds (only applies if keystore.jks exists)
+    signingConfigs {
+        release {
+            def keystoreFile = file("keystore.jks")
+            if (keystoreFile.exists()) {
+                storeFile keystoreFile
+                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD") ?: ""
+                keyAlias System.getenv("ANDROID_KEY_ALIAS") ?: ""
+                keyPassword System.getenv("ANDROID_KEY_PASSWORD") ?: ""
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // Apply signing config only if keystore exists
+            def keystoreFile = file("keystore.jks")
+            if (keystoreFile.exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
