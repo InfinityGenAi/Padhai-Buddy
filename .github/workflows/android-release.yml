@@ -56,6 +56,17 @@ jobs:
         with:
           gradle-version: ${{ env.GRADLE_VERSION }}
 
+      # Setup Android SDK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 34
+          ndk-version: r26c
+          emulator: false
+          platform-tools-version: '35.0.1'
+          build-tools-version: '34.0.0'
+          platform-version: '34'
+
       # Cache Node modules
       - name: Cache node_modules
         uses: actions/cache@v4
@@ -70,8 +81,6 @@ jobs:
       # Install dependencies
       - name: Install dependencies
         run: npm ci
-        env:
-          NODE_ENV: production
 
       # Build Next.js production app
       - name: Build Next.js production app
