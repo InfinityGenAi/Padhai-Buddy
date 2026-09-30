@@ -19,10 +19,7 @@ env:
   JAVA_VERSION: '21'
   GRADLE_VERSION: '8.13'
   NODE_VERSION: '22'
-  CAPACITOR_SERVER_URL: ${{ secrets.CAPACITOR_SERVER_URL }}
-  FIREBASE_ADMIN_PROJECT_ID: ${{ secrets.FIREBASE_ADMIN_PROJECT_ID }}
-  FIREBASE_ADMIN_CLIENT_EMAIL: ${{ secrets.FIREBASE_ADMIN_CLIENT_EMAIL }}
-  FIREBASE_ADMIN_PRIVATE_KEY: ${{ secrets.FIREBASE_ADMIN_PRIVATE_KEY }}
+  CAPACITOR_SERVER_URL: https://padhaibuddy.onrender.com
 
 jobs:
   build-android:
@@ -63,9 +60,6 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          api-level: 34
-          ndk-version: r26c
-          emulator: false
           packages: platform-tools platforms;android-34 build-tools;34.0.0 ndk;26.1.10909125
 
       # Cache Node modules
@@ -124,12 +118,6 @@ jobs:
           if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ] && [ -n "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ] && [ -n "${{ secrets.ANDROID_KEY_ALIAS }}" ] && [ -n "${{ secrets.ANDROID_KEY_PASSWORD }}" ]; then
             echo "Keystore provided - configuring release signing"
             echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
-            cat << EOF > android/app/signing.properties
-            storeFile=keystore.jks
-            storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-            keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-            keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-            EOF
             echo "signing_configured=true" >> $GITHUB_OUTPUT
           else
             echo "No keystore provided - building unsigned APK (not suitable for Play Store)"
@@ -145,6 +133,9 @@ jobs:
         env:
           CAPACITOR_SERVER_URL: https://padhaibuddy.onrender.com
           CAPACITOR_BUILD: 'true'
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
       # Verify APK was built
       - name: Verify APK

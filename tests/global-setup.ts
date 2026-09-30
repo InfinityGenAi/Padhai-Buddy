@@ -238,6 +238,24 @@ export default async function globalSetup() {
   const context = await browser.newContext();
   const page = await context.newPage();
 
+  // Capture console messages and network failures for diagnostics
+  page.on("console", msg => {
+    if (msg.type() === "error" || msg.type() === "warning") {
+      console.log(`[Browser Console ${msg.type()}] ${msg.text()}`);
+    }
+  });
+  page.on("pageerror", error => {
+    console.log(`[Browser Page Error] ${error.message}`);
+  });
+  page.on("requestfailed", request => {
+    console.log(`[Network Failed] ${request.method()} ${request.url()} - ${request.failure()?.errorText}`);
+  });
+  page.on("response", response => {
+    if (response.status() >= 400) {
+      console.log(`[Network Error ${response.status()}] ${response.url()}`);
+    }
+  });
+
   try {
     console.log("Global setup - navigating to login page...");
     await page.addInitScript(() => {
@@ -268,8 +286,16 @@ export default async function globalSetup() {
     await page.click('button[type="submit"]', { force: true });
 
     console.log("Global setup - waiting for dashboard...");
-    await page.waitForURL(/\/dashboard/, { timeout: 120000 });
-    await page.waitForLoadState("domcontentloaded", { timeout: 60000 });
+    try {
+      await page.waitForURL(/\/dashboard/, { timeout: 120000 });
+      await page.waitForLoadState("domcontentloaded", { timeout: 60000 });
+    } catch (e) {
+      const finalUrl = page.url();
+      console.error("Global setup - failed to reach dashboard. Current URL:", finalUrl);
+      const finalBody = await page.locator("body").innerText();
+      console.error("Global setup - page content:", finalBody.substring(0, 500));
+      throw e;
+    }
 
     const dashboardText = await page.locator("body").innerText();
     console.log("Global setup - dashboard loaded, first 200 chars:", dashboardText.substring(0, 200));

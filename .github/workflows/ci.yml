@@ -202,9 +202,9 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          api-level: 34
-          ndk-version: r26c
-          emulator: false
+          
+          
+          
           packages: platform-tools platforms;android-34 build-tools;34.0.0 ndk;26.1.10909125
 
       - name: Cache node_modules
@@ -258,12 +258,6 @@ jobs:
           if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ] && [ -n "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ] && [ -n "${{ secrets.ANDROID_KEY_ALIAS }}" ] && [ -n "${{ secrets.ANDROID_KEY_PASSWORD }}" ]; then
             echo "Keystore provided - configuring release signing"
             echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
-            cat << EOF > android/app/signing.properties
-            storeFile=keystore.jks
-            storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-            keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-            keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-            EOF
             echo "signing_configured=true" >> $GITHUB_OUTPUT
           else
             echo "No keystore provided - building unsigned APK (not suitable for Play Store)"
@@ -291,10 +285,6 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > app/release.keystore
-          echo "storeFile=release.keystore" > signing.properties
-          echo "storePassword=$ANDROID_KEYSTORE_PASSWORD" >> signing.properties
-          echo "keyAlias=$ANDROID_KEY_ALIAS" >> signing.properties
-          echo "keyPassword=$ANDROID_KEY_PASSWORD" >> signing.properties
           ./gradlew bundleRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx2048m"
 
       - name: Upload AAB artifact
