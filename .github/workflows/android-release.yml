@@ -99,8 +99,8 @@ jobs:
           FIREBASE_ADMIN_PROJECT_ID: ${{ secrets.FIREBASE_ADMIN_PROJECT_ID }}
           FIREBASE_ADMIN_CLIENT_EMAIL: ${{ secrets.FIREBASE_ADMIN_CLIENT_EMAIL }}
           FIREBASE_ADMIN_PRIVATE_KEY: ${{ secrets.FIREBASE_ADMIN_PRIVATE_KEY }}
-          CAPACITOR_SERVER_URL: ${{ secrets.CAPACITOR_SERVER_URL }}
-          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
+          CAPACITOR_SERVER_URL: https://padhaibuddy.onrender.com
+          NEXT_PUBLIC_SITE_URL: https://padhaibuddy.onrender.com
           CAPACITOR_BUILD: 'true'
 
       # Install Capacitor CLI
@@ -111,7 +111,7 @@ jobs:
       - name: Sync Capacitor Android
         run: npx cap sync android
         env:
-          CAPACITOR_SERVER_URL: ${{ secrets.CAPACITOR_SERVER_URL }}
+          CAPACITOR_SERVER_URL: https://padhaibuddy.onrender.com
           CAPACITOR_BUILD: 'true'
           FIREBASE_ADMIN_PROJECT_ID: ${{ secrets.FIREBASE_ADMIN_PROJECT_ID }}
           FIREBASE_ADMIN_CLIENT_EMAIL: ${{ secrets.FIREBASE_ADMIN_CLIENT_EMAIL }}
@@ -143,7 +143,7 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx2048m"
         env:
-          CAPACITOR_SERVER_URL: ${{ secrets.CAPACITOR_SERVER_URL }}
+          CAPACITOR_SERVER_URL: https://padhaibuddy.onrender.com
           CAPACITOR_BUILD: 'true'
 
       # Verify APK was built

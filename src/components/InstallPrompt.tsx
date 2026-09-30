@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowDownTrayIcon, XMarkIcon, DevicePhoneMobileIcon, ComputerDesktopIcon } from "@heroicons/react/24/outline";
-import { isAndroid, isWindows, isApp, shouldShowInstallPrompt } from "@/lib/platform";
+import { isAndroid, isApp, shouldShowInstallPrompt } from "@/lib/platform";
 
 interface InstallPromptProps {
   onDismiss?: () => void;
@@ -11,6 +12,7 @@ interface InstallPromptProps {
 
 export default function InstallPrompt({ onDismiss }: InstallPromptProps) {
   const [show, setShow] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -30,22 +32,12 @@ export default function InstallPrompt({ onDismiss }: InstallPromptProps) {
     return () => clearTimeout(timer);
   }, []);
 
-  const handleDismiss = () => {
-    setShow(false);
-    localStorage.setItem('install-prompt-dismissed', 'true');
-    onDismiss?.();
-  };
-
   const handleInstall = () => {
     const platform = typeof window !== 'undefined' ? 
       (navigator.userAgent.toLowerCase().includes('android') ? 'android' : 'windows') : 'web';
     
-    // Navigate to download page or trigger native install
-    if (platform === 'android') {
-      window.location.href = '/download/android';
-    } else {
-      window.location.href = '/download/windows';
-    }
+    // Navigate to download page
+    router.push(platform === 'android' ? '/download/android' : '/download/windows');
   };
 
   if (!show) return null;

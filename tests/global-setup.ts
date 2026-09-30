@@ -6,7 +6,7 @@ import net from "net";
 
 const TEST_EMAIL = "test@padhai-buddy.test";
 const TEST_PASSWORD = "TestPassword123!";
-const PROJECT_ID = "infinity-gen-ai";
+const PROJECT_ID = "test-project";
 
 function isPortOpen(port: number, host = "127.0.0.1"): Promise<boolean> {
   return new Promise<boolean>((resolve) => {

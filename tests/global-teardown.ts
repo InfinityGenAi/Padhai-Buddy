@@ -3,7 +3,7 @@ import { resolve } from "path";
 import http from "http";
 
 const TEST_EMAIL = "test@padhai-buddy.test";
-const PROJECT_ID = "infinity-gen-ai";
+const PROJECT_ID = "test-project";
 
 function isPortInUse(port: number): Promise<boolean> {
   return new Promise<boolean>((resolve) => {

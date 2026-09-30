@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
         { status: 500 },
       );
     }
-    log("GROQ_API_KEY_OK", { keyPrefix: process.env.GROQ_API_KEY?.slice(0, 8) });
+    log("GROQ_API_KEY_OK");
 
     const authHeader = req.headers.get("authorization") || "";
     const token = authHeader.replace("Bearer ", "");

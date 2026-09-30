@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { XMarkIcon, PlayIcon, PauseIcon } from "@heroicons/react/24/outline";
 import { Button } from "./Button";
@@ -42,9 +42,10 @@ export function DemoVideoModal({ isOpen, onClose }: DemoVideoModalProps) {
       setCurrentStep(0);
       setProgress(0);
       setIsMuted(true);
+      setIsPlaying(true);
+    } else {
+      setIsPlaying(false);
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIsPlaying(isOpen);
   }, [isOpen]);
 
   useEffect(() => {
@@ -54,8 +55,8 @@ export function DemoVideoModal({ isOpen, onClose }: DemoVideoModalProps) {
     }
 
     intervalRef.current = setInterval(() => {
-      setProgress((prev) => {
-        const next = prev + (100 / (totalDuration / 100));
+      setProgress((prevProgress) => {
+        const next = prevProgress + (100 / (totalDuration / 100));
         if (next >= 100) {
           setIsPlaying(false);
           clearInterval(intervalRef.current!);
@@ -64,7 +65,7 @@ export function DemoVideoModal({ isOpen, onClose }: DemoVideoModalProps) {
         return next;
       });
 
-      setCurrentStep((prev) => {
+      setCurrentStep((_prevStep) => {
         const stepProgress = (progress + (100 / (totalDuration / 100))) / 100;
         const nextStep = Math.min(Math.floor(stepProgress * totalSteps), totalSteps - 1);
         return nextStep;
@@ -74,11 +75,11 @@ export function DemoVideoModal({ isOpen, onClose }: DemoVideoModalProps) {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isPlaying, isOpen, progress]);
+  }, [isPlaying, isOpen, progress, totalDuration, totalSteps]);
 
-  const handlePlayPause = () => {
-    setIsPlaying(!isPlaying);
-  };
+  const handlePlayPause = useCallback(() => {
+    setIsPlaying((prev) => !prev);
+  }, []);
 
   const handleMuteToggle = () => {
     setIsMuted(!isMuted);
@@ -91,31 +92,31 @@ export function DemoVideoModal({ isOpen, onClose }: DemoVideoModalProps) {
     setCurrentStep(Math.min(Math.floor((value / 100) * totalSteps), totalSteps - 1));
   };
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     onClose();
-  };
+  }, [onClose]);
 
-  const handleKeyDown = (e: KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === "Escape") handleClose();
     if (e.key === " ") {
       e.preventDefault();
       handlePlayPause();
     }
     if (e.key === "ArrowLeft") {
-      setCurrentStep(Math.max(0, currentStep - 1));
-      setProgress((currentStep - 1) / totalSteps * 100);
+      setCurrentStep((prev) => Math.max(0, prev - 1));
+      setProgress((prev) => Math.max(0, (prev - 1) / totalSteps * 100));
     }
     if (e.key === "ArrowRight") {
-      setCurrentStep(Math.min(totalSteps - 1, currentStep + 1));
-      setProgress((currentStep + 1) / totalSteps * 100);
+      setCurrentStep((prev) => Math.min(totalSteps - 1, prev + 1));
+      setProgress((prev) => Math.min(100, (prev + 1) / totalSteps * 100));
     }
-  };
+  }, [totalSteps, handleClose, handlePlayPause]);
 
   useEffect(() => {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen]);
+  }, [isOpen, handleKeyDown]);
 
   const currentDemoStep = DEMO_STEPS[currentStep];
 
