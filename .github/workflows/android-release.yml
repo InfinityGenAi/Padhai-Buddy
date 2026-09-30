@@ -139,18 +139,26 @@ jobs:
 
       # Verify APK was built
       - name: Verify APK
+        id: verify
         run: |
-          APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
+          if [ "${{ steps.signing.outputs.signing_configured }}" == "true" ]; then
+            APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
+            APK_TYPE="signed"
+          else
+            APK_PATH="android/app/build/outputs/apk/release/app-release-unsigned.apk"
+            APK_TYPE="unsigned"
+          fi
           if [ ! -f "$APK_PATH" ]; then
-            echo "ERROR: APK not found at $APK_PATH"
+            echo "ERROR: ${APK_TYPE} APK not found at $APK_PATH"
             echo "Checking build outputs..."
             find android/app/build/outputs -name "*.apk" -o -name "*.aab" 2>/dev/null || echo "No APK/AAB found"
             exit 1
           fi
           APK_SIZE=$(stat -c%s "$APK_PATH")
-          echo "APK found: $APK_PATH (${APK_SIZE} bytes)"
+          echo "APK found: $APK_PATH (${APK_SIZE} bytes) [${APK_TYPE}]"
           echo "APK_PATH=$APK_PATH" >> $GITHUB_OUTPUT
           echo "APK_SIZE=$APK_SIZE" >> $GITHUB_OUTPUT
+          echo "APK_TYPE=$APK_TYPE" >> $GITHUB_OUTPUT
 
       # Determine version info
       - name: Determine version
@@ -173,14 +181,14 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: padhai-buddy-apk
+          name: padhai-buddy-apk-${{ steps.verify.outputs.APK_TYPE }}
           path: ${{ steps.verify.outputs.APK_PATH }}
           retention-days: 30
           if-no-files-found: error
 
-      # Create GitHub Release (only on tags or manual trigger with version)
+      # Create GitHub Release (only on tags or manual trigger with version, and only for signed builds)
       - name: Create GitHub Release
-        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+        if: (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')) && steps.signing.outputs.signing_configured == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.VERSION }}
