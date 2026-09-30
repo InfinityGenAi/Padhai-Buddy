@@ -132,6 +132,14 @@ async function main() {
       NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST: `localhost:${FIRESTORE_PORT}`,
       FIRESTORE_EMULATOR_HOST: `localhost:${FIRESTORE_PORT}`,
       FIREBASE_AUTH_EMULATOR_HOST: `localhost:${AUTH_PORT}`,
+      // Firebase client config must be available for the app to initialize
+      NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "test",
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "test.firebaseapp.com",
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "infinity-gen-ai",
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "infinity-gen-ai.appspot.com",
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "123456789",
+      NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:123456789:web:abcdef",
+      NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-XXXXXXXXXX",
     },
   });
 
