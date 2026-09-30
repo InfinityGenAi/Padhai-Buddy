@@ -2,12 +2,14 @@ import { fileURLToPath } from "url";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
+const isCapacitorBuild = process.env.CAPACITOR_BUILD === 'true';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   outputFileTracingRoot: __dirname,
-  // Changed from 'export' to enable server-side API routes
-  // (e.g. /api/chat, /api/progress, /api/sessions, /admin/login)
-  // dynamic = "force-static" can be added to specific routes that need static export
+  // Enable static export for Capacitor builds (CAPACITOR_BUILD=true)
+  // For production server builds, API routes are dynamic
+  output: isCapacitorBuild ? 'export' : undefined,
   trailingSlash: true,
   images: {
     contentDispositionType: "inline",

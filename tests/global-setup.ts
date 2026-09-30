@@ -3,10 +3,23 @@ import { readFileSync, existsSync, unlinkSync, writeFileSync } from "fs";
 import { resolve } from "path";
 import http from "http";
 import net from "net";
+import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { getAuth as getAdminAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 
 const TEST_EMAIL = "test@padhai-buddy.test";
 const TEST_PASSWORD = "TestPassword123!";
 const PROJECT_ID = "test-project";
+
+// Initialize Firebase Admin for emulator
+function initializeFirebaseAdmin() {
+  if (getApps().length > 0) return getApps()[0];
+  return initializeApp({ projectId: PROJECT_ID });
+}
+
+const adminApp = initializeFirebaseAdmin();
+const adminAuth = getAdminAuth(adminApp);
+const adminDb = getFirestore(adminApp);
 
 function isPortOpen(port: number, host = "127.0.0.1"): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
@@ -162,66 +175,43 @@ async function createTestUser(): Promise<{ uid: string; idToken: string }> {
   throw new Error(`Auth signup failed: ${JSON.stringify(signupResult)}`);
 }
 
-async function ensureFirestoreUser(uid: string, idToken: string) {
-  const firestorePort = 8080;
-  await waitForPort(firestorePort, "127.0.0.1", 120000);
+async function ensureFirestoreUser(uid: string) {
+  console.log(`[global-setup] Creating Firestore user document for uid: ${uid}`);
 
-  const body = JSON.stringify({
-    name: `projects/${PROJECT_ID}/databases/(default)/documents/users/${uid}`,
-    fields: {
-      uid: { stringValue: uid },
-      name: { stringValue: "Test User" },
-      email: { stringValue: TEST_EMAIL },
-      class: { integerValue: 10 },
-      board: { stringValue: "CBSE" },
-      createdAt: { integerValue: Date.now() },
-      preferences: {
-        mapValue: {
-          fields: {
-            soundEnabled: { booleanValue: false },
-            animationsEnabled: { booleanValue: true },
-            theme: { stringValue: "system" },
-            notificationsEnabled: { booleanValue: true },
-            enterToSend: { booleanValue: true },
-            autoScroll: { booleanValue: true },
-            responseStyle: { stringValue: "balanced" },
-            stepByStep: { booleanValue: true },
-            language: { stringValue: "english" },
-          },
-        },
-      },
+  const userData = {
+    uid,
+    name: "Test User",
+    email: TEST_EMAIL,
+    class: 10,
+    board: "CBSE",
+    createdAt: Date.now(),
+    preferences: {
+      soundEnabled: false,
+      animationsEnabled: true,
+      theme: "system",
+      notificationsEnabled: true,
+      enterToSend: true,
+      autoScroll: true,
+      responseStyle: "balanced",
+      stepByStep: true,
+      language: "english",
     },
-  });
+  };
 
-  return new Promise((resolve, reject) => {
-    const options = {
-      hostname: "localhost",
-      port: firestorePort,
-      path: `/v1/projects/${PROJECT_ID}/databases/(default)/documents/users/${uid}`,
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${idToken}`,
-        "Content-Length": Buffer.byteLength(body),
-      },
-    };
+  try {
+    await adminDb.collection("users").doc(uid).set(userData);
+    console.log("[global-setup] Firestore user document created successfully");
 
-    const req = http.request(options, (res) => {
-      let data = "";
-      res.on("data", (chunk) => (data += chunk));
-      res.on("end", () => {
-        try {
-          resolve(JSON.parse(data));
-        } catch {
-          resolve(data);
-        }
-      });
-    });
-
-    req.on("error", reject);
-    req.write(body);
-    req.end();
-  });
+    // Verify the document exists
+    const docSnap = await adminDb.collection("users").doc(uid).get();
+    if (!docSnap.exists) {
+      throw new Error("User document was not created");
+    }
+    console.log("[global-setup] User document verified:", docSnap.data());
+  } catch (error) {
+    console.error("[global-setup] Failed to create Firestore user document:", error);
+    throw error;
+  }
 }
 
 export default async function globalSetup() {
@@ -237,7 +227,7 @@ export default async function globalSetup() {
     testIdToken = result.idToken;
     console.log("Global setup - test user ready with uid:", testUid);
 
-    await ensureFirestoreUser(testUid, testIdToken);
+    await ensureFirestoreUser(testUid);
     console.log("Global setup - ensured Firestore user document");
   } catch (error) {
     console.error("Global setup - failed to ensure test user:", error);
@@ -251,9 +241,6 @@ export default async function globalSetup() {
   try {
     console.log("Global setup - navigating to login page...");
     await page.addInitScript(() => {
-      // Per spec, /login is gated against direct URL entry. The global setup
-      // needs to be able to perform a real sign-in, so set the internal-nav
-      // flag the landing page would set after a click.
       try { sessionStorage.setItem("pb-internal-nav", "1"); } catch {}
     });
     await page.goto("http://localhost:3000/login?from=landing", { waitUntil: "domcontentloaded", timeout: 60000 });
@@ -287,13 +274,13 @@ export default async function globalSetup() {
     const dashboardText = await page.locator("body").innerText();
     console.log("Global setup - dashboard loaded, first 200 chars:", dashboardText.substring(0, 200));
 
-  await context.storageState({ path: storageStatePath });
-  console.log("Global setup - storage state saved to:", storageStatePath);
+    await context.storageState({ path: storageStatePath });
+    console.log("Global setup - storage state saved to:", storageStatePath);
 
-  const metaPath = resolve(__dirname, "../test-user-meta.json");
-  writeFileSync(metaPath, JSON.stringify({ uid: testUid, idToken: testIdToken }, null, 2));
-  console.log("Global setup - test user metadata saved to:", metaPath);
-} catch (error) {
+    const metaPath = resolve(__dirname, "../test-user-meta.json");
+    writeFileSync(metaPath, JSON.stringify({ uid: testUid, idToken: testIdToken }, null, 2));
+    console.log("Global setup - test user metadata saved to:", metaPath);
+  } catch (error) {
     console.error("Global setup failed:", error);
     try {
       await page.screenshot({ path: "test-results/global-setup-failure.png" });

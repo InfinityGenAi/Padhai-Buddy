@@ -83,9 +83,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Build Next.js production app
+      # Build Next.js production app for Capacitor
       - name: Build Next.js production app
-        run: npm run build
+        run: npm run build:capacitor
         env:
           NODE_ENV: production
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
