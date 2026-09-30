@@ -19,7 +19,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: "package-lock.json"
 
@@ -45,7 +45,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: "package-lock.json"
 
@@ -99,7 +99,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: "package-lock.json"
 
@@ -174,7 +174,7 @@ jobs:
     env:
       JAVA_VERSION: '21'
       GRADLE_VERSION: '8.13'
-      NODE_VERSION: '20'
+      NODE_VERSION: '22'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
