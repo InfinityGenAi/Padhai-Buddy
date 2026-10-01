@@ -132,7 +132,9 @@ async function main() {
       NEXT_PUBLIC_FIREBASE_EMULATOR_HOST: `localhost:${FIRESTORE_PORT}`,
       FIRESTORE_EMULATOR_HOST: `localhost:${FIRESTORE_PORT}`,
       FIREBASE_AUTH_EMULATOR_HOST: `localhost:${AUTH_PORT}`,
-      // Firebase Admin needs this for emulator mode
+      // Firebase Admin needs these for emulator mode
+      FIRESTORE_EMULATOR_HOST: `localhost:${FIRESTORE_PORT}`,
+      FIREBASE_AUTH_EMULATOR_HOST: `localhost:${AUTH_PORT}`,
       FIREBASE_ADMIN_PROJECT_ID: "test-project",
       // Firebase client config must be available for the app to initialize
       // Use test-project to match the emulator project ID

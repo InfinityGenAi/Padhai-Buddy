@@ -124,12 +124,14 @@ jobs:
             echo "signing_configured=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Make gradlew executable
+        working-directory: ./android
+        run: chmod +x gradlew
+
       # Build Release APK
       - name: Build Release APK
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx2048m"
+        working-directory: ./android
+        run: ./gradlew assembleRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx2048m"
         env:
           CAPACITOR_SERVER_URL: https://padhaibuddy.onrender.com
           CAPACITOR_BUILD: 'true'

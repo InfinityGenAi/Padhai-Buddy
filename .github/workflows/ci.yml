@@ -138,6 +138,7 @@ jobs:
         env:
           FIREBASE_AUTH_EMULATOR_HOST: "localhost:9099"
           FIRESTORE_EMULATOR_HOST: "localhost:8080"
+          FIREBASE_ADMIN_PROJECT_ID: "test-project"
         run: |
           npx playwright test --config=playwright.config.ts --reporter=line
 
@@ -241,6 +242,10 @@ jobs:
       - name: Install Capacitor CLI
         run: npm install -g @capacitor/cli@latest
 
+      - name: Make gradlew executable
+        working-directory: ./android
+        run: chmod +x gradlew
+
       # Sync Capacitor Android
       - name: Sync Capacitor Android
         env:
@@ -263,6 +268,10 @@ jobs:
             echo "No keystore provided - building unsigned APK (not suitable for Play Store)"
             echo "signing_configured=false" >> $GITHUB_OUTPUT
           fi
+
+      - name: Make gradlew executable
+        working-directory: ./android
+        run: chmod +x gradlew
 
       - name: Build Android APK (Debug)
         working-directory: ./android
