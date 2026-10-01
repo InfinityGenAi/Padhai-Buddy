@@ -1,27 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import http from "http";
 import { cert, getApps, initializeApp, deleteApp } from "firebase-admin/app";
 import { getAuth, type Auth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
-
-function loadEnv() {
-  const envPath = resolve(__dirname, "../../.env.local");
-  const content = readFileSync(envPath, "utf-8");
-  for (const line of content.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq > 0) {
-      const key = trimmed.slice(0, eq).trim();
-      const val = trimmed.slice(eq + 1).trim();
-      process.env[key] = val;
-    }
-  }
-}
-
-loadEnv();
 
 function isPortInUseSync(port: number): boolean {
   try {
@@ -34,6 +16,8 @@ function isPortInUseSync(port: number): boolean {
   }
 }
 
+// In CI, these are set via GitHub Actions env. In local dev, they come from .env.local
+// In Playwright CI, they are set via workflow env (test values for emulator mode)
 const API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "";
 const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "";
 const PASSWORD = "AuditTest123!";
@@ -55,6 +39,7 @@ function initAdmin() {
     process.env.FIREBASE_AUTH_EMULATOR_HOST = "localhost:9099";
     initializeApp({ projectId: PROJECT_ID });
   } else {
+    // Production mode - requires FIREBASE_ADMIN_* env vars to be set
     const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
     if (!privateKey) throw new Error("FIREBASE_ADMIN_PRIVATE_KEY is not set");
     initializeApp({
