@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function RequireAuth({
@@ -10,17 +10,21 @@ export default function RequireAuth({
   children: ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { firebaseUser, loading, authError, needsOnboarding } = useAuth();
 
   useEffect(() => {
     if (!loading) {
-      if (!firebaseUser) {
+      // Explicitly check if we're on a protected dashboard route
+      const isProtectedRoute = pathname.startsWith("/dashboard");
+      
+      if (isProtectedRoute && !firebaseUser) {
         router.replace("/login");
-      } else if (needsOnboarding) {
+      } else if (firebaseUser && needsOnboarding) {
         router.replace("/onboarding");
       }
     }
-  }, [firebaseUser, loading, needsOnboarding, router]);
+  }, [firebaseUser, loading, needsOnboarding, pathname, router]);
 
   if (loading && !firebaseUser) {
     return (
