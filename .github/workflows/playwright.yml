@@ -75,6 +75,7 @@ jobs:
         env:
           FIREBASE_AUTH_EMULATOR_HOST: "localhost:9099"
           FIRESTORE_EMULATOR_HOST: "localhost:8080"
+          FIREBASE_ADMIN_PROJECT_ID: "test-project"
         run: |
           npx playwright test --config=playwright.config.ts --reporter=line
 

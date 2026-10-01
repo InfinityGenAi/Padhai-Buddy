@@ -2,7 +2,7 @@ const { spawn } = require("child_process");
 const path = require("path");
 const http = require("http");
 
-const PROJECT_ID = "test-project";
+const PROJECT_ID = process.env.FIREBASE_ADMIN_PROJECT_ID || "test-project";
 const AUTH_PORT = 9099;
 const FIRESTORE_PORT = 8080;
 const NEXTJS_PORT = 3000;
@@ -36,10 +36,10 @@ function startEmulators() {
     let args;
     if (isWindows) {
       cmd = `"${firebaseBin}.cmd"`;
-      args = ["emulators:start", "--only", `auth:${AUTH_PORT},firestore:${FIRESTORE_PORT}`, "--project", PROJECT_ID];
+      args = ["emulators:start", "--only", `auth:${AUTH_PORT},firestore:${FIRESTORE_PORT}`];
     } else {
       cmd = firebaseBin;
-      args = ["emulators:start", "--only", `auth:${AUTH_PORT},firestore:${FIRESTORE_PORT}`, "--project", PROJECT_ID];
+      args = ["emulators:start", "--only", `auth:${AUTH_PORT},firestore:${FIRESTORE_PORT}`];
     }
     const emulator = spawn(cmd, args, {
       cwd: root,
@@ -130,12 +130,10 @@ async function main() {
       NEXT_PUBLIC_USE_EMULATORS: "true",
       NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST: `localhost:${AUTH_PORT}`,
       NEXT_PUBLIC_FIREBASE_EMULATOR_HOST: `localhost:${FIRESTORE_PORT}`,
+      // Server-side Firebase Admin needs these for emulator initialization
       FIRESTORE_EMULATOR_HOST: `localhost:${FIRESTORE_PORT}`,
       FIREBASE_AUTH_EMULATOR_HOST: `localhost:${AUTH_PORT}`,
-      // Firebase Admin needs these for emulator mode
-      FIRESTORE_EMULATOR_HOST: `localhost:${FIRESTORE_PORT}`,
-      FIREBASE_AUTH_EMULATOR_HOST: `localhost:${AUTH_PORT}`,
-      FIREBASE_ADMIN_PROJECT_ID: "test-project",
+      FIREBASE_ADMIN_PROJECT_ID: PROJECT_ID,
       // Firebase client config must be available for the app to initialize
       // Use test-project to match the emulator project ID
       NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "test",
