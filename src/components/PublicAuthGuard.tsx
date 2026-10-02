@@ -61,7 +61,8 @@ export default function PublicAuthGuard({
       (typeof window !== "undefined" &&
         window.location.search.includes("from=landing")) ||
       (docReferrer &&
-        new URL(docReferrer, window.location.origin).pathname === "/");
+        (new URL(docReferrer, window.location.origin).pathname === "/" ||
+          new URL(docReferrer, window.location.origin).pathname.startsWith("/dashboard")));
 
     if (fromInternal) {
       setAllowRender(true);
