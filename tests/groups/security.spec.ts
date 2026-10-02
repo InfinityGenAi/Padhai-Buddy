@@ -69,6 +69,9 @@ async function createThrowawayUser(prefix: string): Promise<{ email: string; uid
       displayName: "Audit User",
     });
 
+    // Small delay to ensure user is propagated to Auth emulator
+    await new Promise((r) => setTimeout(r, 100));
+
     const signinBody = JSON.stringify({ email, password: PASSWORD, returnSecureToken: true });
     const signinResult = await new Promise<any>((resolve, reject) => {
       const req = http.request(
