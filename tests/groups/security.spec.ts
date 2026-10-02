@@ -69,38 +69,42 @@ async function createThrowawayUser(prefix: string): Promise<{ email: string; uid
       displayName: "Audit User",
     });
 
-    // Small delay to ensure user is propagated to Auth emulator
-    await new Promise((r) => setTimeout(r, 100));
-
+    // Poll until user is available for sign-in (emulator propagation)
     const signinBody = JSON.stringify({ email, password: PASSWORD, returnSecureToken: true });
-    const signinResult = await new Promise<any>((resolve, reject) => {
-      const req = http.request(
-        {
-          hostname: "localhost",
-          port: 9099,
-          path: "/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=test",
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(signinBody) },
-        },
-        (res) => {
-          let data = "";
-          res.on("data", (chunk) => (data += chunk));
-          res.on("end", () => {
-            try {
-              resolve(JSON.parse(data));
-            } catch {
-              resolve(data);
-            }
-          });
-        },
-      );
-      req.on("error", reject);
-      req.write(signinBody);
-      req.end();
-    });
+    let signinResult: any;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      signinResult = await new Promise<any>((resolve, reject) => {
+        const req = http.request(
+          {
+            hostname: "localhost",
+            port: 9099,
+            path: "/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=test",
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(signinBody) },
+          },
+          (res) => {
+            let data = "";
+            res.on("data", (chunk) => (data += chunk));
+            res.on("end", () => {
+              try {
+                resolve(JSON.parse(data));
+              } catch {
+                resolve(data);
+              }
+            });
+          },
+        );
+        req.on("error", reject);
+        req.write(signinBody);
+        req.end();
+      });
 
-    if (!signinResult.idToken) {
-      throw new Error(`Failed to sign in throwaway user: ${JSON.stringify(signinResult)}`);
+      if (signinResult.idToken) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+
+    if (!signinResult?.idToken) {
+      throw new Error(`Failed to sign in throwaway user after retries: ${JSON.stringify(signinResult)}`);
     }
 
     return { email, uid: userRecord.uid, token: signinResult.idToken };

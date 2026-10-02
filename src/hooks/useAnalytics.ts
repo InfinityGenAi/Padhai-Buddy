@@ -69,18 +69,6 @@ export function useAnalytics() {
     trackEventRef.current = trackEvent;
   }, [trackEvent]);
 
-  // Track when user is ready (auth loaded and user exists)
-  useEffect(() => {
-    if (!authLoading && firebaseUser) {
-      setUserReady(true);
-      // Flush pending events
-      pendingEventsRef.current.forEach((event) => {
-        trackEventRef.current?.(event);
-      });
-      pendingEventsRef.current = [];
-    }
-  }, [authLoading, firebaseUser]);
-
   const trackPageView = useCallback((page: string) => {
     trackEventRef.current?.({ event: "page_view", page });
   }, []);
