@@ -764,17 +764,27 @@ export default function ChatPage() {
       pendingConversationId.current = null;
 
       // Then persist the AI answer and refresh the conversation metadata.
-      const aiBatch = writeBatch(db);
-      aiBatch.set(doc(messagesCol), {
-        ...aiMessage,
-        createdAt: serverTimestamp(),
-        tempId: aiMessage.id,
-      });
-      aiBatch.update(convRef, {
-        updatedAt: serverTimestamp(),
-        lastMessage: aiMessage.content.slice(0, 60),
-      });
-      await aiBatch.commit();
+      // Retry AI batch commit on failure (emulator flakiness, network blips)
+      let aiBatchCommitted = false;
+      for (let attempt = 0; attempt < 3 && !aiBatchCommitted; attempt++) {
+        const aiBatch = writeBatch(db);
+        aiBatch.set(doc(messagesCol), {
+          ...aiMessage,
+          createdAt: serverTimestamp(),
+          tempId: aiMessage.id,
+        });
+        aiBatch.update(convRef, {
+          updatedAt: serverTimestamp(),
+          lastMessage: aiMessage.content.slice(0, 60),
+        });
+        try {
+          await aiBatch.commit();
+          aiBatchCommitted = true;
+        } catch (err) {
+          if (attempt === 2) throw err;
+          await new Promise((r) => setTimeout(r, 150 * (attempt + 1)));
+        }
+      }
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       if (preferences.soundEnabled) {

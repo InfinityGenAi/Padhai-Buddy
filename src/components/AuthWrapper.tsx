@@ -19,7 +19,9 @@ export default function RequireAuth({
       const isProtectedRoute = pathname.startsWith("/dashboard");
       
       if (isProtectedRoute && !firebaseUser) {
-        router.replace("/login");
+        // Pass the current path so login page knows where the redirect originated
+        const redirectFrom = encodeURIComponent(pathname);
+        router.replace(`/login?redirectFrom=${redirectFrom}`);
       } else if (firebaseUser && needsOnboarding) {
         router.replace("/onboarding");
       }

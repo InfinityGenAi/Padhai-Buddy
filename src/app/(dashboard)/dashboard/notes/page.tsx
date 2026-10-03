@@ -337,13 +337,13 @@ export default function NotesPage() {
                   <h3 className="font-semibold text-sm truncate flex-1">{note.title}</h3>
                   <span className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary rounded-full whitespace-nowrap">{note.subject}</span>
                 </div>
-                {note.tags.length > 0 && (
+                {(note.tags || []).length > 0 && (
                   <div className="flex flex-wrap gap-1 mb-2">
-                    {note.tags.slice(0, 4).map((tag) => (
+                    {(note.tags || []).slice(0, 4).map((tag) => (
                       <span key={tag} className="px-1.5 py-0.5 text-[10px] bg-foreground/5 text-foreground/60 rounded-full">{tag}</span>
                     ))}
-                    {note.tags.length > 4 && (
-                      <span className="px-1.5 py-0.5 text-[10px] bg-foreground/5 text-foreground/40 rounded-full">+{note.tags.length - 4}</span>
+                    {(note.tags || []).length > 4 && (
+                      <span className="px-1.5 py-0.5 text-[10px] bg-foreground/5 text-foreground/40 rounded-full">+{(note.tags || []).length - 4}</span>
                     )}
                   </div>
                 )}

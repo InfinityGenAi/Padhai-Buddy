@@ -166,7 +166,7 @@ export default function ForgotPasswordPage() {
               variants={animationsEnabled ? staggerItem : undefined}
               className="text-center space-y-4"
             >
-              <div className="flex flex-col items-center gap-3 py-4">
+            <div className="flex flex-col items-center gap-3 py-4">
                 <div className="w-12 h-12 rounded-full bg-green-950/30 flex items-center justify-center">
                   <CheckCircleIcon className="w-6 h-6 text-green-400" />
                 </div>
@@ -199,7 +199,7 @@ export default function ForgotPasswordPage() {
             </motion.div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-              <motion.div variants={animationsEnabled ? staggerItem : undefined}>
+              <div>
                 <label className="block text-sm font-medium mb-1.5 text-foreground/70">
                   Email
                 </label>
@@ -216,7 +216,7 @@ export default function ForgotPasswordPage() {
                     autoComplete="email"
                   />
                 </div>
-              </motion.div>
+              </div>
 
               <motion.button
                 type="submit"

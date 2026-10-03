@@ -19,33 +19,21 @@ export interface AnalyticsEvent {
 }
 
 export function useAnalytics() {
-  const { firebaseUser, loading: authLoading } = useAuth();
+  const { firebaseUser, loading: authLoading, user } = useAuth();
   const [userReady, setUserReady] = useState(false);
   const pendingEventsRef = useRef<AnalyticsEvent[]>([]);
-  const trackEventRef = useRef<((event: AnalyticsEvent) => Promise<void>) | null>(null);
 
-  // Track when user is ready (auth loaded and user exists)
+  // Track when user is ready (auth loaded, user exists, and profile loaded)
   useEffect(() => {
-    if (!authLoading && firebaseUser) {
+    if (!authLoading && firebaseUser && user) {
       setUserReady(true);
-      // Flush pending events
-      pendingEventsRef.current.forEach((event) => {
-        trackEventRef.current?.(event);
-      });
-      pendingEventsRef.current = [];
     }
-  }, [authLoading, firebaseUser]);
+  }, [authLoading, firebaseUser, user]);
 
-  const trackEvent = useCallback(async (event: AnalyticsEvent) => {
-    if (!userReady) {
-      // Queue event for later
-      pendingEventsRef.current.push(event);
-      return;
-    }
-
+  const sendEvent = useCallback(async (event: AnalyticsEvent) => {
     try {
       const token = await getFirebaseIdToken();
-      if (!token) return;
+      if (!token) return false; // Signal to re-queue
 
       const res = await fetch("/api/analytics/track", {
         method: "POST",
@@ -57,37 +45,61 @@ export function useAnalytics() {
       });
 
       if (!res.ok) {
-        console.warn("[Analytics] Failed to track event:", await res.text());
+        const errorText = await res.text();
+        if (errorText.includes("Invalid or expired token")) {
+          return false; // Signal to re-queue and reset userReady
+        }
+        console.warn("[Analytics] Failed to track event:", errorText);
       }
+      return true;
     } catch (err) {
       console.warn("[Analytics] Failed to track event:", err);
+      return false;
     }
-  }, [userReady]);
+  }, []);
 
-  // Update ref after trackEvent is defined
+  const trackEvent = useCallback(async (event: AnalyticsEvent) => {
+    if (!userReady) {
+      pendingEventsRef.current.push(event);
+      return;
+    }
+
+    const success = await sendEvent(event);
+    if (!success) {
+      // Re-queue and reset readiness to retry
+      pendingEventsRef.current.push(event);
+      setUserReady(false);
+    }
+  }, [userReady, sendEvent]);
+
+  // Flush pending events when user becomes ready
   useEffect(() => {
-    trackEventRef.current = trackEvent;
-  }, [trackEvent]);
+    if (userReady && pendingEventsRef.current.length > 0) {
+      const events = [...pendingEventsRef.current];
+      pendingEventsRef.current = [];
+      events.forEach((event) => trackEvent(event));
+    }
+  }, [userReady, trackEvent]);
 
   const trackPageView = useCallback((page: string) => {
-    trackEventRef.current?.({ event: "page_view", page });
-  }, []);
+    trackEvent({ event: "page_view", page });
+  }, [trackEvent]);
 
   const trackFeatureUse = useCallback((feature: string, metadata?: Record<string, unknown>) => {
-    trackEventRef.current?.({ event: "feature_use", feature, metadata });
-  }, []);
+    trackEvent({ event: "feature_use", feature, metadata });
+  }, [trackEvent]);
 
   const trackDownload = useCallback((metadata: { platform?: string; version?: string } = {}) => {
-    trackEventRef.current?.({ event: "download", metadata });
-  }, []);
+    trackEvent({ event: "download", metadata });
+  }, [trackEvent]);
 
   const trackSignup = useCallback(() => {
-    trackEventRef.current?.({ event: "signup" });
-  }, []);
+    trackEvent({ event: "signup" });
+  }, [trackEvent]);
 
   const trackSessionStart = useCallback(() => {
-    trackEventRef.current?.({ event: "session_start" });
-  }, []);
+    trackEvent({ event: "session_start" });
+  }, [trackEvent]);
 
   return {
     trackPageView,

@@ -29,7 +29,10 @@ export async function GET(req: NextRequest) {
     }
 
     const snap = await adminDb.collection("users").doc(decoded.uid).collection("notes").orderBy("updatedAt", "desc").get();
-    const notes = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const notes = snap.docs.map((d) => {
+      const data = d.data();
+      return { id: d.id, ...data, tags: Array.isArray(data.tags) ? data.tags : [] };
+    });
 
     if (search.trim()) {
       const q = search.toLowerCase();
