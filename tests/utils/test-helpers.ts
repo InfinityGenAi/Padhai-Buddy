@@ -136,6 +136,15 @@ export async function mockSessionsRoute(page: Page) {
       body: JSON.stringify({ error: "Not found" }),
     });
   });
+
+  // Mock analytics endpoint to prevent 401 errors during tests
+  await page.route("/api/analytics/track", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ success: true }),
+    });
+  });
 }
 
 export async function mockAllFirestore(page: Page) {

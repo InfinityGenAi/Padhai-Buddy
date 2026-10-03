@@ -36,6 +36,12 @@ export default function PublicAuthGuard({
     if (loading) return;
 
     if (firebaseUser) {
+      // For pages with blockDirectUrlEntry=false (forgot-password, reset-password),
+      // allow authenticated users to access the page instead of redirecting to dashboard
+      if (!blockDirectUrlEntry) {
+        setAllowRender(true);
+        return;
+      }
       setAllowRender(true);
       router.replace("/dashboard");
       return;

@@ -795,14 +795,8 @@ export default function ChatPage() {
       if (process.env.NODE_ENV === "development") {
         console.error("[CHAT CLIENT] Firestore save failed:", error);
       }
-      const warningMsg: ChatMessage = {
-        id: generateId(),
-        role: "assistant",
-        content: "Answer generated, but conversation could not be saved. Please try again.",
-        createdAt: Date.now(),
-      };
-      messagesRef.current = [...messagesRef.current, warningMsg];
-      setMessages((prev) => [...prev, warningMsg]);
+      // Re-throw to let caller handle - don't silently fail
+      throw err;
     } finally {
       setIsTyping(false);
     }
