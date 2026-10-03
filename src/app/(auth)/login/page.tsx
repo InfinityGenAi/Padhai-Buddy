@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendEmailVerification } from "firebase/auth";
 import { motion, useReducedMotion } from "framer-motion";
@@ -26,9 +27,27 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const { signIn, signInWithGoogle, firebaseUser, loading, preferences } = useAuth();
+  const router = useRouter();
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
   const emailInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle post-login redirect using sessionStorage
+  useEffect(() => {
+    if (firebaseUser && !loading) {
+      try {
+        const redirectTarget = sessionStorage.getItem("pb-redirect-after-login");
+        if (redirectTarget) {
+          sessionStorage.removeItem("pb-redirect-after-login");
+          router.replace(redirectTarget);
+          return;
+        }
+      } catch {
+        // ignore storage errors
+      }
+      router.replace("/dashboard");
+    }
+  }, [firebaseUser, loading, router]);
 
   useEffect(() => {
     if (!firebaseUser || !firebaseUser.emailVerified || resendCooldown <= 0) return;

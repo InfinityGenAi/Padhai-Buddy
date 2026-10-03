@@ -54,14 +54,10 @@ export default function PublicAuthGuard({
       }
     })();
 
-    // Check for redirectFrom query parameter (set by RequireAuth when redirecting from protected routes)
-    const fromRedirect = typeof window !== "undefined" && window.location.search.includes("redirectFrom=");
-
     const docReferrer =
       typeof document !== "undefined" ? document.referrer : "";
     const fromInternal =
       internalFlag ||
-      fromRedirect ||
       (typeof window !== "undefined" &&
         window.location.search.includes("from=landing")) ||
       (docReferrer &&
