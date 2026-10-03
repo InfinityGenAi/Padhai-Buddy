@@ -18,8 +18,8 @@ function isPortInUseSync(port: number): boolean {
 
 // In CI, these are set via GitHub Actions env. In local dev, they come from .env.local
 // In Playwright CI, they are set via workflow env (test values for emulator mode)
-const API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "";
-const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "";
+const API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "test";
+const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "test-project";
 const PASSWORD = "AuditTest123!";
 
 let adminDb: Firestore;
@@ -63,21 +63,53 @@ async function createThrowawayUser(prefix: string): Promise<{ email: string; uid
   const email = uniqueEmail(prefix);
 
   if (useEmulator) {
-    const userRecord = await adminAuth.createUser({
+    // Use REST API signUp endpoint directly (like global-setup) for reliable emulator user creation
+    const authPort = 9099;
+    const signupBody = JSON.stringify({
       email,
       password: PASSWORD,
       displayName: "Audit User",
+      returnSecureToken: true,
     });
 
-    // Poll until user is available for sign-in (emulator propagation)
-    const signinBody = JSON.stringify({ email, password: PASSWORD, returnSecureToken: true });
-    let signinResult: any;
-    for (let attempt = 0; attempt < 20; attempt++) {
-      signinResult = await new Promise<any>((resolve, reject) => {
+    const signupResult = await new Promise<any>((resolve, reject) => {
+      const req = http.request(
+        {
+          hostname: "localhost",
+          port: authPort,
+          path: "/identitytoolkit.googleapis.com/v1/accounts:signUp?key=test",
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(signupBody) },
+        },
+        (res) => {
+          let data = "";
+          res.on("data", (chunk) => (data += chunk));
+          res.on("end", () => {
+            try {
+              resolve(JSON.parse(data));
+            } catch {
+              resolve(data);
+            }
+          });
+        },
+      );
+      req.on("error", reject);
+      req.write(signupBody);
+      req.end();
+    });
+
+    if (signupResult.localId) {
+      return { email, uid: signupResult.localId, token: signupResult.idToken };
+    }
+
+    // If user already exists (EMAIL_EXISTS), sign in instead
+    if (signupResult.error && signupResult.error.message === "EMAIL_EXISTS") {
+      const signinBody = JSON.stringify({ email, password: PASSWORD, returnSecureToken: true });
+      const signinResult = await new Promise<any>((resolve, reject) => {
         const req = http.request(
           {
             hostname: "localhost",
-            port: 9099,
+            port: authPort,
             path: "/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=test",
             method: "POST",
             headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(signinBody) },
@@ -99,15 +131,14 @@ async function createThrowawayUser(prefix: string): Promise<{ email: string; uid
         req.end();
       });
 
-      if (signinResult.idToken) break;
-      await new Promise((r) => setTimeout(r, 100));
+      if (signinResult.localId && signinResult.idToken) {
+        return { email, uid: signinResult.localId, token: signinResult.idToken };
+      }
+
+      throw new Error(`Failed to sign in existing throwaway user: ${JSON.stringify(signinResult)}`);
     }
 
-    if (!signinResult?.idToken) {
-      throw new Error(`Failed to sign in throwaway user after retries: ${JSON.stringify(signinResult)}`);
-    }
-
-    return { email, uid: userRecord.uid, token: signinResult.idToken };
+    throw new Error(`Failed to create throwaway user: ${JSON.stringify(signupResult)}`);
   }
 
   const res = await fetch(
