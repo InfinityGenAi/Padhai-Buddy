@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,7 +19,7 @@ import GoogleIcon from "@/components/GoogleIcon";
 import PublicAuthGuard from "@/components/PublicAuthGuard";
 import { AuthCard, Divider } from "@/components/ui/AuthCard";
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -272,5 +272,18 @@ export default function LoginPage() {
       </AuthCard>
     </div>
     </PublicAuthGuard>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen w-full items-center justify-center gap-3 bg-background">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <span className="text-sm text-foreground/60">Loading…</span>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }
