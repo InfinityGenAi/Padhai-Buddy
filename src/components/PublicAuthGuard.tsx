@@ -54,15 +54,18 @@ export default function PublicAuthGuard({
       }
     })();
 
+    // Check for redirectTo query parameter (set by RequireAuth when redirecting from protected routes)
+    const fromRedirect = typeof window !== "undefined" && window.location.search.includes("redirectTo=");
+
     const docReferrer =
       typeof document !== "undefined" ? document.referrer : "";
     const fromInternal =
       internalFlag ||
+      fromRedirect ||
       (typeof window !== "undefined" &&
         window.location.search.includes("from=landing")) ||
       (docReferrer &&
-        (new URL(docReferrer, window.location.origin).pathname === "/" ||
-          new URL(docReferrer, window.location.origin).pathname.startsWith("/dashboard")));
+        new URL(docReferrer, window.location.origin).pathname === "/");
 
     if (fromInternal) {
       setAllowRender(true);

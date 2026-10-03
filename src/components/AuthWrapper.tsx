@@ -19,14 +19,10 @@ export default function RequireAuth({
       const isProtectedRoute = pathname.startsWith("/dashboard");
       
       if (isProtectedRoute && !firebaseUser) {
-        // Store intended destination in sessionStorage for post-login redirect
-        // This keeps the login URL clean (/login/) while preserving redirect target
-        try {
-          sessionStorage.setItem("pb-redirect-after-login", pathname);
-        } catch {
-          // ignore storage errors
-        }
-        router.replace("/login");
+        // Pass redirect target as query param so PublicAuthGuard allows access
+        // This distinguishes legitimate redirects from protected routes vs direct URL entry
+        const redirectTo = encodeURIComponent(pathname);
+        router.replace(`/login?redirectTo=${redirectTo}`);
       } else if (firebaseUser && needsOnboarding) {
         router.replace("/onboarding");
       }
