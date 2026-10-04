@@ -458,10 +458,10 @@ export default function DashboardPage() {
   // Quick study actions
   const quickStudyActions = useMemo(() => {
     const actions = [
-      { key: "ai-tutor", href: "/dashboard/chat", label: "Ask AI Tutor", desc: "Get help with any topic" },
-      { key: "quiz", href: "/dashboard/quiz", label: "Practice Quiz", desc: "Test your knowledge" },
-      { key: "flashcards", href: "/dashboard/flashcards", label: "Flashcards", desc: "Spaced repetition" },
-      { key: "photo", href: "/dashboard/photo-doubt", label: "Photo Doubt", desc: "Snap & solve problems" },
+      { key: "ai-tutor", href: "/dashboard/chat", label: "Ask AI Tutor", desc: "Get help with any topic", icon: SparklesIcon },
+      { key: "quiz", href: "/dashboard/quiz", label: "Practice Quiz", desc: "Test your knowledge", icon: BookOpenIcon },
+      { key: "flashcards", href: "/dashboard/flashcards", label: "Flashcards", desc: "Spaced repetition", icon: Squares2X2Icon },
+      { key: "photo", href: "/dashboard/photo-doubt", label: "Photo Doubt", desc: "Snap & solve problems", icon: PhotoIcon },
     ];
     return actions;
   }, []);
@@ -564,7 +564,7 @@ export default function DashboardPage() {
         visible: {
           opacity: 1,
           transition: {
-            staggerChildren: 0.06,
+            staggerChildren: 0.05,
             delayChildren: 0.04,
           },
         },
@@ -573,10 +573,10 @@ export default function DashboardPage() {
       animate={animationsEnabled ? "visible" : undefined}
       className="space-y-6 w-full"
     >
-      {/* 1. HEADER - Greeting + Class/Board + Streak + Notifications */}
+      {/* 1. HEADER - Greeting + Class/Board + Streak */}
       <motion.div
         variants={animationsEnabled ? { hidden: { opacity: 0, y: -8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}
-        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4"
+        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2"
       >
         <div className="flex items-center gap-3 min-w-0">
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
@@ -617,7 +617,7 @@ export default function DashboardPage() {
         </motion.div>
       )}
 
-      {/* 3. PRIORITY - Weak Topics */}
+      {/* 4. PRIORITY - Weak Topics */}
       <motion.div
         variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}
       >
@@ -664,7 +664,7 @@ export default function DashboardPage() {
         variants={animationsEnabled ? { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } } } : undefined}
       >
         <h2 className="text-base font-semibold text-foreground/75 mb-3">QUICK STUDY</h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {quickStudyActions.map((action) => (
             <Link
               key={action.key}
@@ -672,21 +672,7 @@ export default function DashboardPage() {
               className="rounded-xl p-4 flex items-center gap-3 bg-foreground/5 hover:bg-primary/5 hover:border-primary/20 border border-border transition-all"
             >
               <div className="w-10 h-10 rounded flex-shrink-0 flex items-center justify-center text-primary">
-                {action.label.startsWith("A") ? (
-                  <SparklesIcon className="w-5 h-5" />
-                ) : action.label.startsWith("Q")
-                  ? (
-                    <BookOpenIcon className="w-5 h-5" />
-                  ) : action.label.startsWith("F")
-                  ? (
-                    <Squares2X2Icon className="w-5 h-5" />
-                  ) : action.label.startsWith("Ph")
-                  ? (
-                    <PhotoIcon className="w-5 h-5" />
-                  ) : (
-                    <SparklesIcon className="w-5 h-5" />
-                  )
-                }
+                <action.icon className="w-5 h-5" />
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-foreground truncate">{action.label}</p>

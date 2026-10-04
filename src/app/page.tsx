@@ -97,11 +97,9 @@ const studyLoop = [
 
 const trustSignals = [
   { icon: ShieldCheckIcon, title: "Board-Aligned", desc: "CBSE, ICSE & State Board curriculum" },
-  { icon: UsersIcon, title: "Trusted by Students", desc: "Used by thousands across India" },
   { icon: ClockIcon, title: "24/7 Availability", desc: "Study anytime, anywhere" },
   { icon: DevicePhoneMobileIcon, title: "Works Everywhere", desc: "Web, mobile, and PWA" },
   { icon: GlobeAltIcon, title: "Multi-Language", desc: "English, Hindi, and more" },
-  { icon: SparklesIcon, title: "Always Improving", desc: "Weekly updates & new features" },
 ];
 
 const demoChatMessages = [
@@ -235,7 +233,7 @@ export default function Home() {
                     <Button
                       size="lg"
                       variant="pill-secondary"
-                      onClick={() => router.push("/dashboard/chat")}
+                      onClick={() => navigateToAuth("/signup")}
                       leftIcon={<AcademicCapIcon className="w-5 h-5 text-primary" />}
                       className="bg-white border-border text-foreground hover:bg-background-tertiary"
                     >
@@ -381,7 +379,7 @@ export default function Home() {
                 <Button
                   size="lg"
                   variant="pill-primary"
-                  onClick={() => router.push("/dashboard/chat")}
+                  onClick={() => navigateToAuth("/signup")}
                   rightIcon={<ArrowRightIcon className="w-5 h-5" />}
                   className="shadow-primary-sm hover:shadow-primary-md"
                 >
@@ -421,7 +419,7 @@ export default function Home() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => router.push(feature.href)}
+                    onClick={() => navigateToAuth(feature.href)}
                     rightIcon={<ArrowRightIcon className="w-4 h-4" />}
                     className="text-primary hover:text-primary-dark hover:bg-primary/5"
                   >

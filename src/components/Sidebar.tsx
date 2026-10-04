@@ -29,13 +29,14 @@ const navSections = [
   {
     label: "HOME",
     items: [
-      { name: "Home", href: "/dashboard", icon: HomeIcon, available: true },
+      { name: "Dashboard", href: "/dashboard", icon: HomeIcon, available: true },
     ],
   },
   {
     label: "LEARN",
     items: [
       { name: "AI Tutor", href: "/dashboard/chat", icon: SparklesIcon, available: true },
+      { name: "Photo Doubt", href: "/dashboard/photo-doubt", icon: PhotoIcon, available: true },
       { name: "Notes", href: "/dashboard/notes", icon: DocumentTextIcon, available: true },
       { name: "Resources", href: "/dashboard/resources", icon: FolderIcon, available: true },
     ],
@@ -45,7 +46,6 @@ const navSections = [
     items: [
       { name: "Quiz", href: "/dashboard/quiz", icon: BookOpenIcon, available: true },
       { name: "Flashcards", href: "/dashboard/flashcards", icon: ArrowPathIcon, available: true },
-      { name: "Photo Doubt", href: "/dashboard/photo-doubt", icon: PhotoIcon, available: true },
     ],
   },
   {
@@ -60,6 +60,12 @@ const navSections = [
     items: [
       { name: "Progress", href: "/dashboard/progress", icon: ChartBarIcon, available: true },
       { name: "History", href: "/dashboard/history", icon: ClockIcon, available: true },
+    ],
+  },
+  {
+    label: "MORE",
+    items: [
+      { name: "More", href: "/dashboard/more", icon: Squares2X2Icon, available: true },
     ],
   },
 ];

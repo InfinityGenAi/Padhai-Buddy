@@ -21,7 +21,7 @@ export const AuthCard = forwardRef<HTMLDivElement, AuthCardProps>(
     ref
   ) => {
     const baseClasses = `
-      bg-white border border-border rounded-2xl shadow-xl p-8 w-full max-w-md
+      bg-white border border-border rounded-xl shadow-sm p-8 w-full max-w-md
       ${className}
     `;
 
@@ -31,7 +31,7 @@ export const AuthCard = forwardRef<HTMLDivElement, AuthCardProps>(
           ref={ref}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
           className={baseClasses}
           style={style as HTMLMotionProps<"div">["style"]}
           {...(props as HTMLMotionProps<"div">)}

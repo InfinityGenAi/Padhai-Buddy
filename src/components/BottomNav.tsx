@@ -11,18 +11,19 @@ import {
   DocumentTextIcon,
   CalendarIcon,
   ChartBarIcon,
-  ClockIcon,
+  Squares2X2Icon,
 } from "@heroicons/react/24/outline";
 import { motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAnalytics } from "@/hooks/useAnalytics";
 
 const navItems = [
-  { name: "Home", href: "/dashboard", icon: HomeIcon },
+  { name: "Dashboard", href: "/dashboard", icon: HomeIcon },
   { name: "Learn", href: "/dashboard/chat", icon: SparklesIcon },
   { name: "Practice", href: "/dashboard/quiz", icon: BookOpenIcon },
   { name: "Organize", href: "/dashboard/notes", icon: DocumentTextIcon },
   { name: "Track", href: "/dashboard/progress", icon: ChartBarIcon },
+  { name: "More", href: "/dashboard/more", icon: Squares2X2Icon },
 ];
 
 export default function BottomNav() {

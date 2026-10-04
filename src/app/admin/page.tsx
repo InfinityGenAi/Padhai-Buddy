@@ -92,7 +92,7 @@ export default function AdminDashboard() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-        <div className="p-8 bg-card border border-gray-200/50 dark:border-gray-700/50 rounded-2xl shadow-xl text-center">
+        <div className="p-8 bg-white border border-border rounded-xl shadow-xl text-center">
           <h1 className="text-3xl font-bold text-foreground">
             Loading Admin Dashboard
           </h1>
@@ -110,7 +110,7 @@ export default function AdminDashboard() {
             Admin Login
           </h1>
 
-          <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-xl max-w-md mx-auto">
+          <div className="bg-white border border-border p-6 shadow-xl max-w-md mx-auto">
             <h2 className="text-2xl font-bold text-foreground mb-6">Admin Authentication</h2>
 
             <form onSubmit={(e) => {
@@ -163,7 +163,7 @@ export default function AdminDashboard() {
 
   // User is authenticated as admin - show dashboard
   return (
-    <div className="min-h-screen bg-background text-primary font-poppins">
+    <div className="min-h-screen bg-background text-foreground font-poppins">
       <nav className="border-b border-border bg-background/80 backdrop-blur-sticky sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
@@ -192,7 +192,7 @@ export default function AdminDashboard() {
         </p>
 
         {/* Section Navigation */}
-        <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-6 mb-8 shadow-xl">
+        <div className="bg-white border border-border p-6 mb-8 shadow-xl">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
             <button
               onClick={() => setSelectedSection("overview")}
@@ -338,13 +338,9 @@ function OverviewSection() {
     return (
       <div className="min-h-screen bg-background">
         <div className="max-w-7xl mx-auto p-4 md:p-8">
-<h1 className="text-4xl font-bold text-foreground mb-8">
-Today&apos;s Analytics
-</h1>
-          <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-8 shadow-xl text-center">
-            <p className="text-foreground/60">
-              Loading analytics data from Firestore...
-            </p>
+          <h1 className="text-4xl font-bold text-foreground mb-8">Today&apos;s Analytics</h1>
+          <div className="bg-white border border-border p-8 shadow-xl text-center">
+            <p className="text-foreground/60">Loading analytics data from Firestore...</p>
           </div>
         </div>
       </div>
@@ -353,7 +349,7 @@ Today&apos;s Analytics
 
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-      <div className="bg-card border rounded-xl p-6 shadow-lg">
+      <div className="bg-white border rounded-xl p-6 shadow-lg">
         <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Today&apos;s Visitors</p>
         <p className="text-5xl font-bold text-foreground" style={{ color: percentageChanges.visitors >= 0 ? "green" : "red" }}>
           {stats.todayVisitors.toLocaleString()}
@@ -361,12 +357,12 @@ Today&apos;s Analytics
         <p className="text-xs text-foreground/60">±{Math.abs(Math.round(percentageChanges.visitors))}% {percentageChanges.visitors >= 0 ? "▲" : "▼"} vs yesterday</p>
       </div>
 
-      <div className="bg-card border rounded-xl p-6 shadow-lg">
+      <div className="bg-white border rounded-xl p-6 shadow-lg">
         <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Total Visitors</p>
         <p className="text-5xl font-bold text-foreground">{stats.totalVisitors.toLocaleString()}</p>
       </div>
 
-      <div className="bg-card border rounded-xl p-6 shadow-lg">
+      <div className="bg-white border rounded-xl p-6 shadow-lg">
         <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Today&apos;s Signups</p>
         <p className="text-5xl font-bold text-foreground" style={{ color: percentageChanges.signups >= 0 ? "green" : "red" }}>
           {stats.todaySignups.toLocaleString()}
@@ -374,12 +370,12 @@ Today&apos;s Analytics
         <p className="text-xs text-foreground/60">±{Math.abs(Math.round(percentageChanges.signups))}% {percentageChanges.signups >= 0 ? "▲" : "▼"} vs yesterday</p>
       </div>
 
-      <div className="bg-card border rounded-xl p-6 shadow-lg">
+      <div className="bg-white border rounded-xl p-6 shadow-lg">
         <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Total Signups</p>
         <p className="text-5xl font-bold text-foreground">{stats.totalSignups.toLocaleString()}</p>
       </div>
 
-      <div className="bg-card border rounded-xl p-6 shadow-lg">
+      <div className="bg-white border rounded-xl p-6 shadow-lg">
         <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Today&apos;s Downloads</p>
         <p className="text-5xl font-bold text-foreground" style={{ color: percentageChanges.downloads >= 0 ? "green" : "red" }}>
           {stats.todayDownloads.toLocaleString()}
@@ -387,7 +383,7 @@ Today&apos;s Analytics
         <p className="text-xs text-foreground/60">±{Math.abs(Math.round(percentageChanges.downloads))}% {percentageChanges.downloads >= 0 ? "▲" : "▼"} vs yesterday</p>
       </div>
 
-      <div className="bg-card border rounded-xl p-6 shadow-lg">
+      <div className="bg-white border rounded-xl p-6 shadow-lg">
         <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Today&apos;s Returning</p>
         <p className="text-5xl font-bold text-foreground" style={{ color: percentageChanges.returning >= 0 ? "green" : "red" }}>
           {stats.todayReturning.toLocaleString()}
@@ -395,12 +391,12 @@ Today&apos;s Analytics
         <p className="text-xs text-foreground/60">±{Math.abs(Math.round(percentageChanges.returning))}% {percentageChanges.returning >= 0 ? "▲" : "▼"} vs yesterday</p>
       </div>
 
-      <div className="bg-card border rounded-xl p-6 shadow-lg">
+      <div className="bg-white border rounded-xl p-6 shadow-lg">
         <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Active Users</p>
         <p className="text-5xl font-bold text-foreground">{stats.activeUsers.toLocaleString()}</p>
       </div>
 
-      <div className="bg-card border rounded-xl p-6 shadow-lg">
+      <div className="bg-white border rounded-xl p-6 shadow-lg">
         <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Total Registered</p>
         <p className="text-5xl font-bold text-foreground">{stats.totalRegistered.toLocaleString()}</p>
       </div>
@@ -457,7 +453,7 @@ function AnalyticsSection() {
     return (
       <div className="max-w-7xl mx-auto p-4 md:p-8">
         <h1 className="text-4xl font-bold text-foreground mb-8">Admin Analytics</h1>
-        <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-8 shadow-xl text-center">
+        <div className="bg-white border border-border p-8 shadow-xl text-center">
           <p className="text-foreground/60">Loading analytics data...</p>
         </div>
       </div>
@@ -471,7 +467,7 @@ function AnalyticsSection() {
       <div className="mb-8">
         <h2 className="text-2xl font-bold mb-4">Daily Active Users (Last 30 Days)</h2>
         {analytics.dailyActiveUsers.length > 0 ? (
-          <div className="bg-card border rounded-xl p-6 shadow-xl overflow-x-auto">
+          <div className="bg-white border rounded-xl p-6 shadow-xl overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
@@ -492,7 +488,7 @@ function AnalyticsSection() {
             </table>
           </div>
         ) : (
-          <div className="bg-card border rounded-xl p-8 shadow-xl text-center">
+          <div className="bg-white border rounded-xl p-8 shadow-xl text-center">
             <p className="text-foreground/60">No analytics data available yet.</p>
           </div>
         )}
@@ -501,7 +497,7 @@ function AnalyticsSection() {
       <div>
         <h2 className="text-2xl font-bold mb-4">Feature Usage</h2>
         {analytics.featureUsage.length > 0 ? (
-          <div className="bg-card border rounded-xl p-6 shadow-xl">
+          <div className="bg-white border rounded-xl p-6 shadow-xl">
             <div className="space-y-3">
               {analytics.featureUsage.map((feature) => (
                 <div key={feature.feature} className="flex items-center justify-between p-3 bg-foreground/5 rounded-lg">
@@ -512,7 +508,7 @@ function AnalyticsSection() {
             </div>
           </div>
         ) : (
-          <div className="bg-card border rounded-xl p-8 shadow-xl text-center">
+          <div className="bg-white border rounded-xl p-8 shadow-xl text-center">
             <p className="text-foreground/60">No feature usage data available yet.</p>
           </div>
         )}
@@ -562,7 +558,7 @@ function UsersSection() {
     return (
       <div className="max-w-7xl mx-auto p-4 md:p-8">
         <h1 className="text-4xl font-bold text-foreground mb-8">User Management</h1>
-        <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-8 shadow-xl text-center">
+        <div className="bg-white border border-border p-8 shadow-xl text-center">
           <p className="text-foreground/60">Loading users...</p>
         </div>
       </div>
@@ -576,7 +572,7 @@ function UsersSection() {
         <span className="text-sm text-foreground/60">{users.length} users</span>
       </div>
 
-      <div className="bg-card border rounded-xl shadow-xl overflow-hidden">
+      <div className="bg-white border rounded-xl shadow-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -657,7 +653,7 @@ function DownloadsSection() {
     return (
       <div className="max-w-7xl mx-auto p-4 md:p-8">
         <h1 className="text-4xl font-bold text-foreground mb-8">App Download Analytics</h1>
-        <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-8 shadow-xl text-center">
+        <div className="bg-white border border-border p-8 shadow-xl text-center">
           <p className="text-foreground/60">Loading download data...</p>
         </div>
       </div>
@@ -675,21 +671,21 @@ function DownloadsSection() {
       <h1 className="text-4xl font-bold text-foreground mb-8">App Download Analytics</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-card border rounded-xl p-6 shadow-lg">
+        <div className="bg-white border rounded-xl p-6 shadow-lg">
           <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Total Downloads</p>
           <p className="text-5xl font-bold text-foreground">{totalDownloads.toLocaleString()}</p>
         </div>
-        <div className="bg-card border rounded-xl p-6 shadow-lg">
+        <div className="bg-white border rounded-xl p-6 shadow-lg">
           <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Android (APK)</p>
           <p className="text-5xl font-bold text-foreground">{platformStats.android?.toLocaleString() || 0}</p>
         </div>
-        <div className="bg-card border rounded-xl p-6 shadow-lg">
+        <div className="bg-white border rounded-xl p-6 shadow-lg">
           <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Windows (PWA)</p>
           <p className="text-5xl font-bold text-foreground">{platformStats.windows?.toLocaleString() || 0}</p>
         </div>
       </div>
 
-      <div className="bg-card border rounded-xl shadow-xl overflow-hidden">
+      <div className="bg-white border rounded-xl shadow-xl overflow-hidden">
         <div className="p-6 border-b border-border">
           <h2 className="text-2xl font-bold">Recent Downloads</h2>
         </div>
@@ -782,7 +778,7 @@ function UpdateSection() {
     return (
       <div className="max-w-7xl mx-auto p-4 md:p-8">
         <h1 className="text-4xl font-bold text-foreground mb-8">App Update Management</h1>
-        <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-8 shadow-xl text-center">
+        <div className="bg-white border border-border p-8 shadow-xl text-center">
           <p className="text-foreground/60">Loading configuration...</p>
         </div>
       </div>
@@ -797,7 +793,7 @@ function UpdateSection() {
         This controls the in-app update prompt shown to users.
       </p>
 
-      <div className="bg-card border rounded-xl p-6 shadow-xl space-y-6">
+      <div className="bg-white border rounded-xl p-6 shadow-xl space-y-6">
         <div>
           <label className="block text-sm font-medium text-foreground/60 mb-1">Latest Version</label>
           <input
@@ -858,7 +854,7 @@ function UpdateSection() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-6 py-2.5 btn-primary rounded-xl text-sm font-medium disabled:opacity-50"
+            className="px-6 py-2.5 bg-primary text-white rounded-xl text-sm font-medium disabled:opacity-50 hover:bg-primary/90 transition-colors"
           >
             {saving ? "Saving..." : "Save Configuration"}
           </button>
@@ -879,7 +875,7 @@ function UpdateSection() {
       </div>
 
       {releaseConfig && (
-        <div className="mt-8 bg-card border rounded-xl p-6 shadow-xl">
+        <div className="mt-8 bg-white border rounded-xl p-6 shadow-xl">
           <h3 className="text-lg font-semibold mb-4">Current Live Configuration</h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between"><span className="text-foreground/60">Version:</span> <span className="font-mono font-bold">{releaseConfig.latestVersion}</span></div>

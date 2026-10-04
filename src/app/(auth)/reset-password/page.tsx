@@ -10,8 +10,8 @@ import {
   LockClosedIcon,
   CheckCircleIcon,
 } from "@heroicons/react/24/outline";
-import AnimatedBackground from "@/components/AnimatedBackground";
 import BrandLogo from "@/components/BrandLogo";
+import { AuthCard } from "@/components/ui/AuthCard";
 
 const staggerContainer = {
   hidden: { opacity: 0 },
@@ -109,46 +109,44 @@ export default function ResetPasswordPage() {
   if (isSuccess) {
     return (
       <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-        <AnimatedBackground animate={animationsEnabled} />
         <motion.div
           variants={animationsEnabled ? staggerContainer : undefined}
           initial={animationsEnabled ? "hidden" : false}
           animate={animationsEnabled ? "visible" : false}
           className="relative z-10 w-full max-w-md mx-auto p-6"
         >
-          <motion.div
-            variants={animationsEnabled ? staggerItem : undefined}
-            className="bg-card border border-border rounded-2xl p-6 text-center"
-          >
-            <motion.div
-              variants={animationsEnabled ? staggerItem : undefined}
-              className="flex justify-center mb-4"
-            >
-              <div className="success-check">
-                <CheckCircleIcon className="w-8 h-8 text-white" />
-              </div>
-            </motion.div>
-            <motion.h1
-              variants={animationsEnabled ? staggerItem : undefined}
-              className="text-2xl font-bold text-primary mb-2"
-            >
-              Password Updated
-            </motion.h1>
-            <motion.p
-              variants={animationsEnabled ? staggerItem : undefined}
-              className="text-sm text-foreground/60 mb-6"
-            >
-              Your password has been changed successfully. You can now log in with your new password.
-            </motion.p>
-            <motion.div variants={animationsEnabled ? staggerItem : undefined}>
-              <Link
-                href="/login"
-                className="block w-full bg-primary text-white py-3 rounded-full font-medium text-center shadow-sm shadow-primary/20 hover:shadow-md hover:shadow-primary/30 transition-all"
+          <AuthCard animate={animationsEnabled}>
+            <div className="text-center">
+              <motion.div
+                variants={animationsEnabled ? staggerItem : undefined}
+                className="flex justify-center mb-4"
               >
-                Back to Login
-              </Link>
-            </motion.div>
-          </motion.div>
+                <div className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center">
+                  <CheckCircleIcon className="w-8 h-8 text-white" />
+                </div>
+              </motion.div>
+              <motion.h1
+                variants={animationsEnabled ? staggerItem : undefined}
+                className="text-2xl font-bold text-primary mb-2"
+              >
+                Password Updated
+              </motion.h1>
+              <motion.p
+                variants={animationsEnabled ? staggerItem : undefined}
+                className="text-sm text-foreground/60 mb-6"
+              >
+                Your password has been changed successfully. You can now log in with your new password.
+              </motion.p>
+              <motion.div variants={animationsEnabled ? staggerItem : undefined}>
+                <Link
+                  href="/login"
+                  className="block w-full bg-primary text-white py-3 rounded-xl font-medium text-center shadow-sm shadow-primary/20 hover:shadow-md hover:shadow-primary/30 transition-all"
+                >
+                  Back to Login
+                </Link>
+              </motion.div>
+            </div>
+          </AuthCard>
         </motion.div>
       </div>
     );
@@ -156,17 +154,13 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      <AnimatedBackground animate={animationsEnabled} />
       <motion.div
         variants={animationsEnabled ? staggerContainer : undefined}
         initial={animationsEnabled ? "hidden" : false}
         animate={animationsEnabled ? "visible" : false}
         className="relative z-10 w-full max-w-md mx-auto p-6"
       >
-        <motion.div
-          variants={animationsEnabled ? staggerItem : undefined}
-          className="bg-card border border-border rounded-xl p-6"
-        >
+        <AuthCard animate={animationsEnabled}>
           <div className="text-center mb-6">
             <motion.div
               variants={animationsEnabled ? staggerItem : undefined}
@@ -176,7 +170,7 @@ export default function ResetPasswordPage() {
             </motion.div>
             <motion.h1
               variants={animationsEnabled ? staggerItem : undefined}
-              className="text-3xl font-bold text-primary mb-1"
+              className="text-2xl font-bold text-primary mb-1"
             >
               Reset your password
             </motion.h1>
@@ -210,7 +204,7 @@ export default function ResetPasswordPage() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Enter new password"
-                  className="w-full bg-white border border-border rounded-full px-11 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors pr-12"
+                  className="w-full bg-white border border-border rounded-xl px-11 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors pr-12"
                   required
                   minLength={6}
                   autoFocus
@@ -241,7 +235,7 @@ export default function ResetPasswordPage() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirm new password"
-                    className="w-full bg-white border border-border rounded-full px-11 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors pr-12"
+                    className="w-full bg-white border border-border rounded-xl px-11 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors pr-12"
                     required
                     minLength={6}
                   />
@@ -263,7 +257,7 @@ export default function ResetPasswordPage() {
             <motion.button
               type="submit"
               disabled={isSubmitting || !oobCode}
-              className="w-full bg-primary text-white rounded-full py-3 font-medium disabled:opacity-50 shadow-sm shadow-primary/20 hover:shadow-md hover:shadow-primary/30 transition-all"
+              className="w-full bg-primary text-white rounded-xl py-3 font-medium disabled:opacity-50 shadow-sm shadow-primary/20 hover:shadow-md hover:shadow-primary/30 transition-all"
               whileHover={animationsEnabled ? { scale: 1.02 } : undefined}
               whileTap={animationsEnabled ? { scale: 0.98 } : undefined}
               variants={animationsEnabled ? staggerItem : undefined}
@@ -283,7 +277,7 @@ export default function ResetPasswordPage() {
               </Link>
             </motion.p>
           </form>
-        </motion.div>
+        </AuthCard>
       </motion.div>
     </div>
   );
