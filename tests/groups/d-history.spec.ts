@@ -68,7 +68,7 @@ test.describe("D. History Tests", () => {
     await expect(
       page.locator("div.cursor-pointer", { hasText: "Persist me in history please" }).first(),
     ).toBeAttached({ timeout: 15000 });
-    await waitForPersistedMessages("Persist me in history please", 2);
+    await waitForPersistedMessages("Persist me in history please", 2, 30000);
 
     await page.goto("http://localhost:3000/dashboard/history/");
     await page.waitForLoadState("domcontentloaded");

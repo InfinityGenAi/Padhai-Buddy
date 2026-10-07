@@ -40,7 +40,7 @@ export default defineConfig({
     command: "node scripts/start-test-server.js",
     url: "http://localhost:3000",
     timeout: 600000,
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     env: {
       FIREBASE_AUTH_EMULATOR_HOST: "localhost:9099",
       FIRESTORE_EMULATOR_HOST: "localhost:8080",

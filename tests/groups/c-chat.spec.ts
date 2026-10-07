@@ -116,7 +116,7 @@ await expect(sidebarItem).toBeAttached({ timeout: 15000 });
 // Also wait until BOTH message docs (user + AI) are persisted via the Admin
 // SDK — the AI-save batch completes after the answer renders, and reloading
 // before it lands would leave the conversation without the answer.
-await waitForPersistedMessages("Persist me please", 2);
+await waitForPersistedMessages("Persist me please", 2, 30000);
 
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
