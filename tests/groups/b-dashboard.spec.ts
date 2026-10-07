@@ -10,8 +10,10 @@ test.describe("B. Dashboard Tests", () => {
   });
 
   test("stats cards are visible", async ({ page }) => {
-    await expect(page.locator("text=Doubts Solved").first()).toBeVisible();
-    await expect(page.locator("text=Study Time").first()).toBeVisible();
+    // Dashboard shows This Week Overview with Minutes, Sessions, Subjects
+    await expect(page.locator("text=Minutes").first()).toBeVisible();
+    await expect(page.locator("text=Sessions").first()).toBeVisible();
+    await expect(page.locator("text=Subjects").first()).toBeVisible();
   });
 
   test("this week overview is visible", async ({ page }) => {
@@ -53,10 +55,12 @@ test.describe("B. Dashboard Tests", () => {
   });
 
   test("today's plan section is visible", async ({ page }) => {
-    await expect(page.locator("text=Today's Plan")).toBeAttached();
+    // Dashboard shows "TODAY" header for primary focus section
+    await expect(page.locator("h2:has-text('TODAY')")).toBeAttached();
   });
 
   test("study insight is visible", async ({ page }) => {
-    await expect(page.locator("text=Study Insight")).toBeAttached();
+    // Dashboard shows "PRIORITY" section for weak topics needing review
+    await expect(page.locator("text=PRIORITY")).toBeAttached();
   });
 });

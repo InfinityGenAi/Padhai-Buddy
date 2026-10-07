@@ -233,7 +233,7 @@ export default function Home() {
                     <Button
                       size="lg"
                       variant="pill-secondary"
-                      onClick={() => navigateToAuth("/signup")}
+                      onClick={() => router.push("/dashboard/chat")}
                       leftIcon={<AcademicCapIcon className="w-5 h-5 text-primary" />}
                       className="bg-white border-border text-foreground hover:bg-background-tertiary"
                     >
@@ -379,7 +379,7 @@ export default function Home() {
                 <Button
                   size="lg"
                   variant="pill-primary"
-                  onClick={() => navigateToAuth("/signup")}
+                  onClick={() => router.push("/dashboard/chat")}
                   rightIcon={<ArrowRightIcon className="w-5 h-5" />}
                   className="shadow-primary-sm hover:shadow-primary-md"
                 >

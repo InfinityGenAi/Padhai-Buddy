@@ -95,7 +95,8 @@ test.describe("A. Public/Auth Tests", () => {
     await expect(profileBtn).toBeAttached();
     await profileBtn.click({ force: true });
     await page.locator("text=Logout").first().click();
-    await expect(page).toHaveURL("http://localhost:3000/", { timeout: 15000 });
+    // After logout, user is redirected to login page
+    await expect(page).toHaveURL(/login/, { timeout: 15000 });
   });
 
   test.describe("unauthenticated redirect", () => {
@@ -108,29 +109,29 @@ test.describe("A. Public/Auth Tests", () => {
       });
     });
 
-    test("dashboard redirects to landing", async ({ page }) => {
+    test("dashboard redirects to login", async ({ page }) => {
       await page.goto("http://localhost:3000/dashboard/");
-      await expect(page).toHaveURL("http://localhost:3000/", { timeout: 15000 });
+      await expect(page).toHaveURL(/login/, { timeout: 15000 });
     });
 
-    test("chat redirects to landing", async ({ page }) => {
+    test("chat redirects to login", async ({ page }) => {
       await page.goto("http://localhost:3000/dashboard/chat/");
-      await expect(page).toHaveURL("http://localhost:3000/", { timeout: 15000 });
+      await expect(page).toHaveURL(/login/, { timeout: 15000 });
     });
 
-    test("history redirects to landing", async ({ page }) => {
+    test("history redirects to login", async ({ page }) => {
       await page.goto("http://localhost:3000/dashboard/history/");
-      await expect(page).toHaveURL("http://localhost:3000/", { timeout: 15000 });
+      await expect(page).toHaveURL(/login/, { timeout: 15000 });
     });
 
-    test("profile redirects to landing", async ({ page }) => {
+    test("profile redirects to login", async ({ page }) => {
       await page.goto("http://localhost:3000/dashboard/profile/");
-      await expect(page).toHaveURL("http://localhost:3000/", { timeout: 15000 });
+      await expect(page).toHaveURL(/login/, { timeout: 15000 });
     });
 
-    test("settings modal redirects to landing", async ({ page }) => {
+    test("settings modal redirects to login", async ({ page }) => {
       await page.goto("http://localhost:3000/dashboard/");
-      await expect(page).toHaveURL("http://localhost:3000/", { timeout: 15000 });
+      await expect(page).toHaveURL(/login/, { timeout: 15000 });
     });
   });
 

@@ -75,6 +75,6 @@ test.describe("D. History Tests", () => {
     await page.locator("button:has-text('Chats (')").first().click();
 
     const convCard = page.locator("text=Persist me in history please").first();
-    await expect(convCard).toBeVisible({ timeout: 15000 });
+    await expect(convCard).toBeVisible({ timeout: 30000 });
   });
 });

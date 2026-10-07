@@ -2,6 +2,13 @@ const { spawn } = require("child_process");
 const path = require("path");
 const http = require("http");
 
+// Debug: Log environment variables at startup
+console.log("[test-server] Startup env vars:");
+console.log("[test-server] FIREBASE_AUTH_EMULATOR_HOST:", process.env.FIREBASE_AUTH_EMULATOR_HOST);
+console.log("[test-server] FIRESTORE_EMULATOR_HOST:", process.env.FIRESTORE_EMULATOR_HOST);
+console.log("[test-server] FIREBASE_ADMIN_PROJECT_ID:", process.env.FIREBASE_ADMIN_PROJECT_ID);
+console.log("[test-server] NEXT_PUBLIC_USE_EMULATORS:", process.env.NEXT_PUBLIC_USE_EMULATORS);
+
 const PROJECT_ID = process.env.FIREBASE_ADMIN_PROJECT_ID || "test-project";
 const AUTH_PORT = 9099;
 const FIRESTORE_PORT = 8080;
@@ -26,6 +33,35 @@ function waitForPort(port, timeoutMs = 60000) {
       });
       req.setTimeout(1000);
     }, 500);
+  });
+}
+
+function waitForNextJsReady(port, timeoutMs = 300000) {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const interval = setInterval(() => {
+      const req = http.get(`http://localhost:${port}/login`, (res) => {
+        let data = "";
+        res.on("data", (chunk) => { data += chunk; });
+        res.on("end", () => {
+          // Check if the server is responding with a valid HTML page (not an error)
+          // The page uses Suspense with a "Loading..." fallback, so the initial HTML
+          // will contain "Loading..." but the actual form is rendered client-side.
+          // We consider the server ready if it returns a 200 OK with HTML content.
+          if (res.statusCode === 200 && data.includes('<!DOCTYPE html>')) {
+            clearInterval(interval);
+            resolve();
+          }
+        });
+      });
+      req.on("error", () => {
+        if (Date.now() - start > timeoutMs) {
+          clearInterval(interval);
+          reject(new Error(`Timeout waiting for Next.js to be ready on port ${port}`));
+        }
+      });
+      req.setTimeout(5000);
+    }, 1000);
   });
 }
 
@@ -112,46 +148,59 @@ async function main() {
   } else {
     console.log("[test-server] Emulators already running, skipping");
   }
-
+  
   if (nextInUse) {
     console.log("[test-server] Next.js already running on port 3000, keeping alive...");
     setInterval(() => {}, 1000);
     return;
   }
-
-  console.log("[test-server] Starting Next.js dev server...");
-  const nextCmd = isWindows ? "npm.cmd" : "npm";
-  const next = spawn(nextCmd, ["run", "dev"], {
-    cwd: root,
-    stdio: "inherit",
-    shell: isWindows,
-    env: {
-      ...process.env,
-      NEXT_PUBLIC_USE_EMULATORS: "true",
-      NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST: `localhost:${AUTH_PORT}`,
-      NEXT_PUBLIC_FIREBASE_EMULATOR_HOST: `localhost:${FIRESTORE_PORT}`,
-      // Server-side Firebase Admin needs these for emulator initialization
-      FIRESTORE_EMULATOR_HOST: `localhost:${FIRESTORE_PORT}`,
-      FIREBASE_AUTH_EMULATOR_HOST: `localhost:${AUTH_PORT}`,
-      FIREBASE_ADMIN_PROJECT_ID: PROJECT_ID,
-      // Firebase client config must be available for the app to initialize
-      // Use test-project to match the emulator project ID
-      NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "test",
-      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "test.firebaseapp.com",
-      NEXT_PUBLIC_FIREBASE_PROJECT_ID: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "test-project",
-      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "test-project.appspot.com",
-      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "123456789",
-      NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:123456789:web:abcdef",
-      NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-XXXXXXXXXX",
-      // Groq API key for testing (can be fake since we might mock or skip AI calls)
-      GROQ_API_KEY: process.env.GROQ_API_KEY || "test-groq-key",
+  
+  console.log("[test-server] Starting Next.js dev server (webpack mode)...");
+  // Debug: log key environment variables
+  console.log("[test-server] FIREBASE_AUTH_EMULATOR_HOST:", process.env.FIREBASE_AUTH_EMULATOR_HOST);
+  console.log("[test-server] FIRESTORE_EMULATOR_HOST:", process.env.FIRESTORE_EMULATOR_HOST);
+  console.log("[test-server] FIREBASE_ADMIN_PROJECT_ID:", process.env.FIREBASE_ADMIN_PROJECT_ID);
+  console.log("[test-server] NEXT_PUBLIC_USE_EMULATORS:", process.env.NEXT_PUBLIC_USE_EMULATORS);
+  
+  // Pass all environment variables to the Next.js child process
+  // Playwright's webServer.env sets these on the start-test-server.js process
+  const next = spawn(
+    isWindows ? "cmd.exe" : "npm",
+    isWindows ? ["/c", "npm", "run", "dev", "--", "--webpack"] : ["run", "dev", "--", "--webpack"],
+    {
+      cwd: root,
+      stdio: "inherit",
+      shell: false,
+      env: {
+        ...process.env,
+        // Ensure emulator environment variables are passed through
+        FIREBASE_AUTH_EMULATOR_HOST: process.env.FIREBASE_AUTH_EMULATOR_HOST || "localhost:9099",
+        FIRESTORE_EMULATOR_HOST: process.env.FIRESTORE_EMULATOR_HOST || "localhost:8080",
+        FIREBASE_ADMIN_PROJECT_ID: process.env.FIREBASE_ADMIN_PROJECT_ID || "test-project",
+        NEXT_PUBLIC_USE_EMULATORS: process.env.NEXT_PUBLIC_USE_EMULATORS || "true",
+        NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST: process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST || "localhost:9099",
+        NEXT_PUBLIC_FIREBASE_EMULATOR_HOST: process.env.NEXT_PUBLIC_FIREBASE_EMULATOR_HOST || "localhost:8080",
+        NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "test",
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "test.firebaseapp.com",
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "test-project",
+        NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "test-project.appspot.com",
+        NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "123456789",
+        NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:123456789:web:abcdef",
+        NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-XXXXXXXXXX",
+        GROQ_API_KEY: process.env.GROQ_API_KEY || "test-groq-key",
+      },
     },
-  });
+  );
 
   next.on("error", (err) => {
     console.error("[test-server] Next.js error:", err);
     process.exit(1);
   });
+
+  // Wait for Next.js to be fully ready (compiled and serving pages)
+  console.log("[test-server] Waiting for Next.js to be ready...");
+  await waitForNextJsReady(NEXTJS_PORT);
+  console.log("[test-server] Next.js is ready!");
 
   const shutdown = () => {
     console.log("\n[test-server] Shutting down Next.js...");

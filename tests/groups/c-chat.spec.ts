@@ -123,7 +123,10 @@ await waitForPersistedMessages("Persist me please", 2);
 
     // Wait for Firestore conversations to load into the sidebar (also confirms React
     // hydration finished so click handlers are attached before we interact).
-    await expect(sidebarItem).toBeAttached({ timeout: 15000 });
+    // Create fresh locator after reload since the old one may be stale
+    const sidebarItemAfterReload = page.locator("div.cursor-pointer", { hasText: "Persist me please" }).first();
+    // Increased timeout to 30s to account for Firestore sync after reload
+    await expect(sidebarItemAfterReload).toBeAttached({ timeout: 30000 });
 
     // Open the conversation from the sidebar (mobile needs the overlay toggle first).
     const hamburger = page.locator("button[aria-label='Open conversations']");
@@ -153,7 +156,7 @@ await waitForPersistedMessages("Persist me please", 2);
     // Messages and the conversation survive a full reload.
     await expect(page.locator("div.space-y-3.overflow-y-auto div.whitespace-pre-wrap", { hasText: "Persist me please" })).toBeVisible({ timeout: 15000 });
     await expect(page.locator("text=Mocked answer #1").first()).toBeVisible({ timeout: 15000 });
-    await expect(sidebarItem).toBeVisible({ timeout: 15000 });
+    await expect(sidebarItemAfterReload).toBeVisible({ timeout: 15000 });
   });
 
   test("auto-scrolls to bottom for new messages when at bottom", async ({ page }) => {

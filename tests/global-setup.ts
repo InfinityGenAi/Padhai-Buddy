@@ -3,12 +3,20 @@ import { readFileSync, existsSync, unlinkSync, writeFileSync } from "fs";
 import { resolve } from "path";
 import http from "http";
 import net from "net";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth as getAdminAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
+// Set emulator environment variables BEFORE initializing Firebase Admin
+// These must be set before any Firebase Admin SDK initialization
+process.env.FIREBASE_AUTH_EMULATOR_HOST = "localhost:9099";
+process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
+// Use test-project for token audience verification (emulator issues tokens with this audience)
+process.env.FIREBASE_ADMIN_PROJECT_ID = "test-project";
+
 const TEST_EMAIL = "test@padhai-buddy.test";
 const TEST_PASSWORD = "TestPassword123!";
+// Use test-project for Admin SDK initialization (matches token audience from emulator)
 const PROJECT_ID = "test-project";
 
 // Initialize Firebase Admin for emulator

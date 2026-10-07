@@ -81,10 +81,10 @@ export default function LandingBackground({ enabled }: LandingBackgroundProps) {
       aria-hidden="true"
       suppressHydrationWarning
     >
-      {/* Base gradient background - dark only */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,#1a1a3a_0%,#0f0f1a_55%,#0f0f1a_100%)]" />
+      {/* Base gradient background - light theme */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,#fafaf0_0%,#f6f4ed_55%,#f0ede6_100%)]" />
 
-      {/* Paper texture - dark only */}
+      {/* Paper texture - light theme */}
       <motion.div
         data-pb="parallax"
         className="absolute inset-0"

@@ -215,8 +215,7 @@ export default function NotesPage() {
   const handleAskAI = (note: Note) => {
     // Navigate to chat with the note content as context
     const message = `Help me understand this note:\n\nTitle: ${note.title}\nSubject: ${note.subject}\nNote:\n${note.body}`;
-    const url = `/dashboard/chat?message=${encodeURIComponent(message)}`;
-    window.location.href = url;
+    router.push(`/dashboard/chat?message=${encodeURIComponent(message)}`);
   };
 
   const handleTagChange = (tag: string, checked: boolean) => {

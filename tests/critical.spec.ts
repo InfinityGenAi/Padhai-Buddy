@@ -43,8 +43,8 @@ test.describe("Critical UI/UX Tests", () => {
     await page.goto("http://localhost:3000/dashboard/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
-    await expect(page.locator("text=Doubts Solved").first()).toBeVisible();
-    await expect(page.locator("text=Study Time").first()).toBeVisible();
+    await expect(page.locator("text=Day Streak").first()).toBeVisible();
+    await expect(page.locator("text=This Week").first()).toBeVisible();
   });
 
   test("dashboard shows this week overview", async ({ page }) => {

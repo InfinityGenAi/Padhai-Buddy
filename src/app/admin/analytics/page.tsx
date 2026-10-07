@@ -151,7 +151,7 @@ export default function AdminAnalytics() {
   );
 
   const renderTrend = (data: number[], label: string, color: string) => (
-    <div className="bg-card border border-gray-200/50 dark:border-gray-700/50 p-6 shadow-xl">
+    <div className="bg-card border border-border/50 p-6 shadow-xl">
       <h2 className="text-2xl font-bold text-foreground mb-6">{label}</h2>
       <div className="space-y-4">
         {data.map((val, index) => (
@@ -190,7 +190,7 @@ export default function AdminAnalytics() {
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <div className="bg-white border border-border p-6 shadow-xl">
+              <div className="bg-card border border-border p-6 shadow-xl">
                 <h3 className="text-sm text-foreground/60 uppercase tracking-wider mb-4">Today&apos;s Visitors</h3>
                 <p className="text-5xl font-bold text-primary">{stats.todayVisitors}</p>
               </div>
@@ -225,14 +225,14 @@ export default function AdminAnalytics() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-              {renderTrend(trends.visitorTrend, "Visitor Trend (7 Days)", "#6366f1")}
-              {renderTrend(trends.downloadTrend, "Download Trend (7 Days)", "#10b981")}
-              {renderTrend(trends.signupTrend, "Signup Trend (7 Days)", "#3b82f6")}
-              {renderTrend(trends.returningTrend, "Returning User Trend (7 Days)", "#f59e0b")}
+              {renderTrend(trends.visitorTrend, "Visitor Trend (7 Days)", "var(--primary)")}
+              {renderTrend(trends.downloadTrend, "Download Trend (7 Days)", "var(--success)")}
+              {renderTrend(trends.signupTrend, "Signup Trend (7 Days)", "var(--physics)")}
+              {renderTrend(trends.returningTrend, "Returning User Trend (7 Days)", "var(--warning)")}
             </div>
 
             {sortedFeatures.length > 0 && (
-              <div className="bg-white border border-border p-6 shadow-xl">
+              <div className="bg-card border border-border p-6 shadow-xl">
                 <h2 className="text-2xl font-bold text-foreground mb-6">Feature Usage</h2>
                 <div className="space-y-3">
                   {sortedFeatures.map(([key, count], idx) => (
@@ -253,7 +253,7 @@ export default function AdminAnalytics() {
             )}
 
             {sortedFeatures.length === 0 && !dataLoading && (
-              <div className="bg-white border border-border p-8 shadow-xl text-center">
+              <div className="bg-card border border-border p-8 shadow-xl text-center">
                 <p className="text-foreground/60">No feature usage data collected yet. Data will appear as users interact with features.</p>
               </div>
             )}

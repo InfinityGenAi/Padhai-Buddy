@@ -339,7 +339,7 @@ function OverviewSection() {
       <div className="min-h-screen bg-background">
         <div className="max-w-7xl mx-auto p-4 md:p-8">
           <h1 className="text-4xl font-bold text-foreground mb-8">Today&apos;s Analytics</h1>
-          <div className="bg-white border border-border p-8 shadow-xl text-center">
+          <div className="bg-card border border-border p-8 shadow-xl text-center">
             <p className="text-foreground/60">Loading analytics data from Firestore...</p>
           </div>
         </div>
@@ -349,54 +349,54 @@ function OverviewSection() {
 
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-      <div className="bg-white border rounded-xl p-6 shadow-lg">
+      <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
         <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Today&apos;s Visitors</p>
-        <p className="text-5xl font-bold text-foreground" style={{ color: percentageChanges.visitors >= 0 ? "green" : "red" }}>
+        <p className="text-5xl font-bold text-foreground" style={{ color: percentageChanges.visitors >= 0 ? "var(--success)" : "var(--error)" }}>
           {stats.todayVisitors.toLocaleString()}
         </p>
         <p className="text-xs text-foreground/60">±{Math.abs(Math.round(percentageChanges.visitors))}% {percentageChanges.visitors >= 0 ? "▲" : "▼"} vs yesterday</p>
       </div>
 
-      <div className="bg-white border rounded-xl p-6 shadow-lg">
+      <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
         <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Total Visitors</p>
         <p className="text-5xl font-bold text-foreground">{stats.totalVisitors.toLocaleString()}</p>
       </div>
 
-      <div className="bg-white border rounded-xl p-6 shadow-lg">
+      <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
         <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Today&apos;s Signups</p>
-        <p className="text-5xl font-bold text-foreground" style={{ color: percentageChanges.signups >= 0 ? "green" : "red" }}>
+        <p className="text-5xl font-bold text-foreground" style={{ color: percentageChanges.signups >= 0 ? "var(--success)" : "var(--error)" }}>
           {stats.todaySignups.toLocaleString()}
         </p>
         <p className="text-xs text-foreground/60">±{Math.abs(Math.round(percentageChanges.signups))}% {percentageChanges.signups >= 0 ? "▲" : "▼"} vs yesterday</p>
       </div>
 
-      <div className="bg-white border rounded-xl p-6 shadow-lg">
+      <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
         <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Total Signups</p>
         <p className="text-5xl font-bold text-foreground">{stats.totalSignups.toLocaleString()}</p>
       </div>
 
-      <div className="bg-white border rounded-xl p-6 shadow-lg">
+      <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
         <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Today&apos;s Downloads</p>
-        <p className="text-5xl font-bold text-foreground" style={{ color: percentageChanges.downloads >= 0 ? "green" : "red" }}>
+        <p className="text-5xl font-bold text-foreground" style={{ color: percentageChanges.downloads >= 0 ? "var(--success)" : "var(--error)" }}>
           {stats.todayDownloads.toLocaleString()}
         </p>
         <p className="text-xs text-foreground/60">±{Math.abs(Math.round(percentageChanges.downloads))}% {percentageChanges.downloads >= 0 ? "▲" : "▼"} vs yesterday</p>
       </div>
 
-      <div className="bg-white border rounded-xl p-6 shadow-lg">
+      <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
         <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Today&apos;s Returning</p>
-        <p className="text-5xl font-bold text-foreground" style={{ color: percentageChanges.returning >= 0 ? "green" : "red" }}>
+        <p className="text-5xl font-bold text-foreground" style={{ color: percentageChanges.returning >= 0 ? "var(--success)" : "var(--error)" }}>
           {stats.todayReturning.toLocaleString()}
         </p>
         <p className="text-xs text-foreground/60">±{Math.abs(Math.round(percentageChanges.returning))}% {percentageChanges.returning >= 0 ? "▲" : "▼"} vs yesterday</p>
       </div>
 
-      <div className="bg-white border rounded-xl p-6 shadow-lg">
+      <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
         <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Active Users</p>
         <p className="text-5xl font-bold text-foreground">{stats.activeUsers.toLocaleString()}</p>
       </div>
 
-      <div className="bg-white border rounded-xl p-6 shadow-lg">
+      <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
         <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Total Registered</p>
         <p className="text-5xl font-bold text-foreground">{stats.totalRegistered.toLocaleString()}</p>
       </div>
