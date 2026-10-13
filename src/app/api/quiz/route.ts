@@ -4,7 +4,6 @@ import { getGroqClient, GROQ_TEXT_MODEL } from "@/lib/groq";
 import { checkRateLimit } from "@/lib/rate-limiter";
 import type { QuizAttempt, QuizQuestion } from "@/types";
 import { inferTopic } from "@/lib/curriculum";
-import fs from "fs";
 
 export async function GET(req: NextRequest) {
   try {
@@ -79,17 +78,6 @@ function validateQuestions(questions: unknown[]): QuizQuestion[] | null {
 
 export async function POST(req: NextRequest) {
   try {
-    // Debug: Log Firebase Admin SDK initialization status
-    const debugInfo = {
-      timestamp: new Date().toISOString(),
-      adminAuth: adminAuth ? "defined" : "undefined",
-      initializationError: initializationError,
-      FIREBASE_AUTH_EMULATOR_HOST: process.env.FIREBASE_AUTH_EMULATOR_HOST,
-      FIRESTORE_EMULATOR_HOST: process.env.FIRESTORE_EMULATOR_HOST,
-      FIREBASE_ADMIN_PROJECT_ID: process.env.FIREBASE_ADMIN_PROJECT_ID,
-    };
-    fs.appendFileSync('C:/Users/Aditya/Documents/Default Project/debug-quiz-api.log', JSON.stringify(debugInfo) + '\n');
-    
     if (!adminAuth || initializationError) {
       return NextResponse.json({ error: initializationError || "Server configuration error" }, { status: 500 });
     }
@@ -108,7 +96,7 @@ export async function POST(req: NextRequest) {
         stack: verifyError instanceof Error ? verifyError.stack : undefined,
         tokenPreview: token.substring(0, 20) + '...',
       };
-      fs.appendFileSync('C:/Users/Aditya/Documents/Default Project/debug-quiz-api.log', 'VERIFY_ERROR: ' + JSON.stringify(errorInfo) + '\n');
+      console.error("[QUIZ] verifyIdToken error:", errorInfo);
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
 
