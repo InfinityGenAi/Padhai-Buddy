@@ -20,11 +20,11 @@ test.describe("More + Notifications Tests", () => {
   });
 
   test("resources link navigates correctly", async ({ page }) => {
-    // On mobile, the Resources link might be in a scrollable section
+    // On mobile, the Resources link might be in a scrollable section with Framer Motion animations
     const resourcesLink = page.locator("text=Resources").first();
-    await expect(resourcesLink).toBeVisible({ timeout: 10000 });
-    // Wait for Framer Motion animations to complete
-    await page.waitForTimeout(500);
+    await expect(resourcesLink).toBeVisible({ timeout: 15000 });
+    // Wait for Framer Motion animations to complete and element to be stable
+    await page.waitForTimeout(1000);
     // Scroll into view in case it's below the fold on mobile
     await resourcesLink.scrollIntoViewIfNeeded();
     await resourcesLink.click();

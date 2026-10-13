@@ -20,7 +20,19 @@ function mockChatApi(page: Page, opts: { delayMs?: number; longAnswers?: boolean
         ? `Mocked answer #${requestCount}. This is a longer line of mock response text used to make the conversation tall enough to scroll. The explanation continues across several sentences.`
         : `Mocked answer #${requestCount}`;
 
-      // Mock SSE streaming response like the real API
+      // Mock SSE streaming response like the real API - proper chunked format
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          // Send the answer in one chunk (simulating a single stream chunk)
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: answer })}\n\n`));
+          // Small delay to simulate streaming
+          await new Promise((r) => setTimeout(r, 10));
+          // Send DONE signal
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        },
+      });
       await route.fulfill({
         status: 200,
         contentType: "text/event-stream",
@@ -28,7 +40,7 @@ function mockChatApi(page: Page, opts: { delayMs?: number; longAnswers?: boolean
           "Cache-Control": "no-cache",
           "Connection": "keep-alive",
         },
-        body: `data: ${JSON.stringify({ content: answer })}\n\ndata: [DONE]\n\n`,
+        body: stream,
       });
       return;
     }
