@@ -24,6 +24,8 @@ test.describe("N. Mobile Tests", () => {
     await mockSessionsRoute(page);
     await page.goto("http://localhost:3000/dashboard/");
     await page.waitForLoadState("domcontentloaded");
+    // Wait for any initial animations/transitions to complete
+    await page.waitForTimeout(500);
     await expect(page.locator("text=Hi,").first()).toBeAttached();
     const overflowX = await page.evaluate(() => {
       // Allow small tolerance for scrollbar width (typically 15-17px)

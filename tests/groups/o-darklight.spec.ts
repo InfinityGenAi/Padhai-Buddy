@@ -7,6 +7,9 @@ test.describe("O. Light Theme Consistency Tests", () => {
     await page.goto("http://localhost:3000/dashboard/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
+    // Wait for any navigation/transitions to complete before evaluating
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(500);
 
     await expect
       .poll(() =>
@@ -18,7 +21,10 @@ test.describe("O. Light Theme Consistency Tests", () => {
   test("landing page stays light-only", async ({ page }) => {
     await page.goto("http://localhost:3000/");
     await page.waitForLoadState("domcontentloaded");
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(500);
     await expect(page.locator("body")).toBeVisible();
+
     await expect
       .poll(() =>
         page.evaluate(() => document.documentElement.classList.contains("dark"))

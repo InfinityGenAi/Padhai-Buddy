@@ -120,7 +120,9 @@ await waitForPersistedMessages("Persist me please", 2, 60000);
 
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle");
+    // Do not wait for networkidle - Firebase maintains persistent WebChannel connections
+    // that prevent networkidle from ever resolving.
+    // Instead, wait for the sidebar conversation to appear as a readiness signal.
 
     // Wait for Firestore conversations to load into the sidebar (also confirms React
     // hydration finished so click handlers are attached before we interact).

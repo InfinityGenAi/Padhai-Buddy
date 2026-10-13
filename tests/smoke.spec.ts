@@ -49,12 +49,12 @@ test.describe("Quick Smoke Tests", () => {
 
     test("dashboard requires auth and redirects to login with redirectTo", async ({ page }) => {
       await page.goto("http://localhost:3000/dashboard/");
-      await expect(page).toHaveURL(/\/login\?redirectTo=/, { timeout: 15000 });
+      await expect(page).toHaveURL(/\/login\/\?redirectTo=/, { timeout: 15000 });
     });
 
     test("chat page requires auth and redirects to login with redirectTo", async ({ page }) => {
       await page.goto("http://localhost:3000/dashboard/chat/");
-      await expect(page).toHaveURL(/\/login\?redirectTo=/, { timeout: 15000 });
+      await expect(page).toHaveURL(/\/login\/\?redirectTo=/, { timeout: 15000 });
     });
   });
 });

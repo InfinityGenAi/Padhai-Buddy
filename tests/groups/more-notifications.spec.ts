@@ -23,6 +23,8 @@ test.describe("More + Notifications Tests", () => {
     // On mobile, the Resources link might be in a scrollable section
     const resourcesLink = page.locator("text=Resources").first();
     await expect(resourcesLink).toBeVisible({ timeout: 10000 });
+    // Scroll into view in case it's below the fold on mobile
+    await resourcesLink.scrollIntoViewIfNeeded();
     await resourcesLink.click();
     await page.waitForURL("http://localhost:3000/dashboard/resources/", { timeout: 15000 });
     await expect(page.locator("h1:has-text('Resources')").first()).toBeAttached({ timeout: 10000 });
