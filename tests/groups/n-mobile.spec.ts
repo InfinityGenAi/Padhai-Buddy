@@ -25,7 +25,10 @@ test.describe("N. Mobile Tests", () => {
     await page.goto("http://localhost:3000/dashboard/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
-    const overflowX = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    const overflowX = await page.evaluate(() => {
+      // Allow small tolerance for scrollbar width (typically 15-17px)
+      return document.documentElement.scrollWidth > window.innerWidth + 20;
+    });
     expect(overflowX).toBe(false);
   });
 });

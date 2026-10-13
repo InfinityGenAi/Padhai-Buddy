@@ -53,6 +53,8 @@ jobs:
           NEXT_PUBLIC_FIREBASE_APP_ID: 1:123456789:web:abcdef
           NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: G-XXXXXXXXXX
           GROQ_API_KEY: test-groq-key
+          FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
+          FIRESTORE_EMULATOR_HOST: localhost:8080
 
       - name: Start Firebase Emulators
         run: |
