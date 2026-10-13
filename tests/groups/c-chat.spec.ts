@@ -32,11 +32,8 @@ function mockChatApi(page: Page, opts: { delayMs?: number; longAnswers?: boolean
       });
       return;
     }
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ conversations: [] }),
-    });
+    // Let GET requests pass through to the real API (which reads from Firestore)
+    await route.continue();
   });
 }
 

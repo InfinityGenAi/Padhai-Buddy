@@ -7,8 +7,7 @@ test.describe("O. Light Theme Consistency Tests", () => {
     await page.goto("http://localhost:3000/dashboard/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("text=Hi,").first()).toBeAttached();
-    // Wait for any navigation/transitions to complete before evaluating
-    await page.waitForLoadState("networkidle");
+    // Wait for any pending animations to complete
     await page.waitForTimeout(500);
 
     await expect
