@@ -159,7 +159,8 @@ await waitForPersistedMessages("Persist me please", 2, 60000);
 
     // Messages and the conversation survive a full reload.
     await expect(page.locator("div.space-y-3.overflow-y-auto div.whitespace-pre-wrap", { hasText: "Persist me please" })).toBeVisible({ timeout: 30000 });
-    await expect(page.locator("text=Mocked answer #1").first()).toBeVisible({ timeout: 30000 });
+    // AI response may take longer to hydrate from Firestore after reload
+    await expect(page.locator("text=Mocked answer #1").first()).toBeVisible({ timeout: 60000 });
     await expect(sidebarItemAfterReload).toBeVisible({ timeout: 30000 });
   });
 

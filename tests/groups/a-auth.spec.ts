@@ -31,7 +31,7 @@ test.describe("A. Public/Auth Tests", () => {
       await page.addInitScript(() => {
         try { sessionStorage.setItem("pb-internal-nav", "1"); } catch {}
       });
-      await page.goto("http://localhost:3000/login/");
+      await page.goto("http://localhost:3000/login/?from=landing");
       await page.waitForLoadState("domcontentloaded");
       await expect(page.locator("text=Welcome back")).toBeAttached();
 

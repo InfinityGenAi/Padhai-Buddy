@@ -21,7 +21,6 @@ test.describe("O. Light Theme Consistency Tests", () => {
   test("landing page stays light-only", async ({ page }) => {
     await page.goto("http://localhost:3000/");
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle");
     await page.waitForTimeout(500);
     await expect(page.locator("body")).toBeVisible();
 
