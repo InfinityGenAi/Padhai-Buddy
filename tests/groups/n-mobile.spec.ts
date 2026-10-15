@@ -27,6 +27,8 @@ test.describe("N. Mobile Tests", () => {
     // Wait for any initial animations/transitions to complete
     await page.waitForTimeout(500);
     await expect(page.locator("text=Hi,").first()).toBeAttached();
+    // Wait a bit more to ensure page is fully stable
+    await page.waitForTimeout(1000);
     const overflowX = await page.evaluate(() => {
       // Allow small tolerance for scrollbar width (typically 15-17px)
       return document.documentElement.scrollWidth > window.innerWidth + 20;

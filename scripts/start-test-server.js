@@ -89,10 +89,10 @@ function startEmulators() {
     let args;
     if (isWindows) {
       cmd = `"${firebaseBin}.cmd"`;
-      args = ["emulators:start", "--only", `auth:${AUTH_PORT},firestore:${FIRESTORE_PORT}`];
+      args = ["emulators:start", "--only", `auth:${AUTH_PORT},firestore:${FIRESTORE_PORT}`, "--project", PROJECT_ID];
     } else {
       cmd = firebaseBin;
-      args = ["emulators:start", "--only", `auth:${AUTH_PORT},firestore:${FIRESTORE_PORT}`];
+      args = ["emulators:start", "--only", `auth:${AUTH_PORT},firestore:${FIRESTORE_PORT}`, "--project", PROJECT_ID];
     }
     const emulator = spawn(cmd, args, {
       cwd: root,

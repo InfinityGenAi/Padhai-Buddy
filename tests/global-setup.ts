@@ -1,9 +1,9 @@
-import { chromium } from "@playwright/test";
+// import { chromium } from "@playwright/test";
 import { readFileSync, existsSync, unlinkSync, writeFileSync } from "fs";
 import { resolve } from "path";
 import http from "http";
 import net from "net";
-import { initializeApp, getApps } from "firebase-admin/app";
+import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getAuth as getAdminAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
@@ -69,8 +69,8 @@ async function createTestUser(): Promise<{ uid: string; idToken: string }> {
   await waitForPort(authPort, "127.0.0.1", 120000);
 
   const signupBody = JSON.stringify({
-    email: TEST_EMAIL,
-    password: TEST_PASSWORD,
+    email: "test@padhai-buddy.test",
+    password: "TestPassword123!",
     displayName: "Test User",
     returnSecureToken: true,
   });
@@ -111,8 +111,8 @@ async function createTestUser(): Promise<{ uid: string; idToken: string }> {
   if (signupResult.error && signupResult.error.message === "EMAIL_EXISTS") {
     const signinResult = await new Promise<any>((resolve, reject) => {
       const signinBody = JSON.stringify({
-        email: TEST_EMAIL,
-        password: TEST_PASSWORD,
+        email: "test@padhai-buddy.test",
+        password: "TestPassword123!",
         returnSecureToken: true,
       });
       const options = {
@@ -189,7 +189,7 @@ async function ensureFirestoreUser(uid: string) {
   const userData = {
     uid,
     name: "Test User",
-    email: TEST_EMAIL,
+    email: "test@padhai-buddy.test",
     class: 10,
     board: "CBSE",
     createdAt: Date.now(),
@@ -207,6 +207,7 @@ async function ensureFirestoreUser(uid: string) {
   };
 
   try {
+    // Use Admin SDK which bypasses security rules
     await adminDb.collection("users").doc(uid).set(userData);
     console.log("[global-setup] Firestore user document created successfully");
 
@@ -215,7 +216,7 @@ async function ensureFirestoreUser(uid: string) {
     if (!docSnap.exists) {
       throw new Error("User document was not created");
     }
-    console.log("[global-setup] User document verified:", docSnap.data());
+    console.log("[global-setup] User document verified");
   } catch (error) {
     console.error("[global-setup] Failed to create Firestore user document:", error);
     throw error;
@@ -223,6 +224,9 @@ async function ensureFirestoreUser(uid: string) {
 }
 
 export default async function globalSetup() {
+  const { readFileSync, existsSync, unlinkSync, writeFileSync } = await import("fs");
+  const { resolve } = await import("path");
+
   const storageStatePath = resolve(__dirname, "../storageState.json");
 
   console.log("Global setup - ensuring test user exists...");
@@ -242,6 +246,7 @@ export default async function globalSetup() {
     throw error;
   }
 
+  const { chromium } = await import("@playwright/test");
   const browser = await chromium.launch();
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -289,22 +294,27 @@ export default async function globalSetup() {
     }
 
     console.log("Global setup - filling credentials...");
-    await emailInput.fill(TEST_EMAIL, { force: true });
-    await page.fill('input[type="password"]', TEST_PASSWORD, { force: true });
-    await page.click('button[type="submit"]', { force: true });
+    await emailInput.fill("test@padhai-buddy.test", { force: true });
+    await page.fill('input[type="password"]', "TestPassword123!", { force: true });
 
-    console.log("Global setup - waiting for dashboard...");
-    try {
-      await page.waitForURL(/\/dashboard/, { timeout: 120000 });
-      await page.waitForLoadState("domcontentloaded", { timeout: 60000 });
-    } catch (e) {
-      const finalUrl = page.url();
-      console.error("Global setup - failed to reach dashboard. Current URL:", finalUrl);
-      const finalBody = await page.locator("body").innerText();
-      console.error("Global setup - page content:", finalBody.substring(0, 500));
-      throw e;
-    }
+    // Listen for console errors
+    page.on("console", msg => {
+      if (msg.type() === "error") {
+        console.log(`[Browser Console ERROR] ${msg.text()}`);
+      }
+    });
+    page.on("pageerror", error => {
+      console.log(`[Browser Page Error] ${error.message}`);
+    });
 
+    console.log("Global setup - submitting login and waiting for navigation...");
+    await Promise.all([
+      page.waitForURL(/\/dashboard/, { timeout: 120000 }),
+      page.click('button[type="submit"]', { force: true }),
+    ]);
+    await page.waitForLoadState("domcontentloaded", { timeout: 60000 });
+
+    console.log("Global setup - dashboard loaded");
     const dashboardText = await page.locator("body").innerText();
     console.log("Global setup - dashboard loaded, first 200 chars:", dashboardText.substring(0, 200));
 

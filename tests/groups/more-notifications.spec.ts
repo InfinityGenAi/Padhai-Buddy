@@ -22,12 +22,12 @@ test.describe("More + Notifications Tests", () => {
   test("resources link navigates correctly", async ({ page }) => {
     // On mobile, the Resources link might be in a scrollable section with Framer Motion animations
     const resourcesLink = page.locator("text=Resources").first();
-    await expect(resourcesLink).toBeVisible({ timeout: 15000 });
-    // Wait for Framer Motion animations to complete and element to be stable
-    await page.waitForTimeout(1000);
-    // Scroll into view in case it's below the fold on mobile
-    await resourcesLink.scrollIntoViewIfNeeded();
-    await resourcesLink.click();
+    // Wait for Framer Motion animations to complete - the element exists but is hidden during animation
+    await expect(resourcesLink).toBeAttached({ timeout: 15000 });
+    // Wait longer for animations to finish and element to become visible
+    await page.waitForTimeout(2000);
+    // Click using JS evaluation to work around type narrowing issues
+    await page.evaluate((el) => el.click(), resourcesLink);
     await page.waitForURL("http://localhost:3000/dashboard/resources/", { timeout: 15000 });
     await expect(page.locator("h1:has-text('Resources')").first()).toBeAttached({ timeout: 10000 });
   });

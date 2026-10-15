@@ -10,11 +10,9 @@ test.describe("O. Light Theme Consistency Tests", () => {
     // Wait for any pending animations to complete
     await page.waitForTimeout(500);
 
-    await expect
-      .poll(() =>
-        page.evaluate(() => document.documentElement.classList.contains("dark"))
-      )
-      .toBe(false);
+    // Simple one-time check instead of polling to avoid navigation issues
+    const hasDark = await page.evaluate(() => document.documentElement.classList.contains("dark"));
+    expect(hasDark).toBe(false);
   });
 
   test("landing page stays light-only", async ({ page }) => {
@@ -23,10 +21,7 @@ test.describe("O. Light Theme Consistency Tests", () => {
     await page.waitForTimeout(500);
     await expect(page.locator("body")).toBeVisible();
 
-    await expect
-      .poll(() =>
-        page.evaluate(() => document.documentElement.classList.contains("dark"))
-      )
-      .toBe(false);
+    const hasDark = await page.evaluate(() => document.documentElement.classList.contains("dark"));
+    expect(hasDark).toBe(false);
   });
 });

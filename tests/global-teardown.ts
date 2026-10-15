@@ -5,10 +5,7 @@ import { getFirestore } from "firebase-admin/firestore";
 
 const PROJECT_ID = "test-project";
 
-const adminApp = getApps().length > 0 ? getApps()[0] : initializeApp({ projectId: PROJECT_ID });
-const adminDb = getFirestore(adminApp);
-
-async function getTestUserUid(): Promise<string | null> {
+async function getTestUid(): Promise<string | null> {
   const metaPath = resolve(__dirname, "../test-user-meta.json");
   if (existsSync(metaPath)) {
     try {
@@ -21,13 +18,16 @@ async function getTestUserUid(): Promise<string | null> {
   return null;
 }
 
-async function cleanupTestData() {
-  const uid = await getTestUserUid();
-  if (!uid) {
-    console.log("[global-teardown] Test user not found, nothing to clean");
-    return;
-  }
+function initializeFirebaseAdmin() {
+  if (getApps().length > 0) return getApps()[0];
+  return initializeApp({ projectId: PROJECT_ID });
+}
+
+async function cleanupTestData(uid: string) {
   console.log("[global-teardown] Found test user:", uid);
+
+  const adminApp = initializeFirebaseAdmin();
+  const adminDb = getFirestore(adminApp);
 
   const collectionsToClean = [
     "studyPlans",
@@ -42,19 +42,27 @@ async function cleanupTestData() {
 
   for (const collection of collectionsToClean) {
     try {
-      const snapshot = await adminDb.collection("users").doc(uid).collection(collection).get();
+      const collectionRef = adminDb.collection("users").doc(uid).collection(collection);
+      const snapshot = await collectionRef.get();
+
       const batch = adminDb.batch();
-      snapshot.docs.forEach((doc) => batch.delete(doc.ref));
-      await batch.commit();
-      console.log(`[global-teardown] Cleaned ${collection}`);
+      snapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+
+      if (snapshot.docs.length > 0) {
+        await batch.commit();
+      }
+      console.log(`[global-teardown] Cleaned ${collection} (${snapshot.docs.length} docs)`);
     } catch (err) {
       console.warn(`[global-teardown] Skipping ${collection}:`, err instanceof Error ? err.message : err);
     }
   }
 
+  // Reset test user preferences
   try {
-    const userDocRef = adminDb.collection("users").doc(uid);
-    await userDocRef.update({
+    const userRef = adminDb.collection("users").doc(uid);
+    await userRef.update({
       preferences: {
         soundEnabled: false,
         animationsEnabled: true,
@@ -76,7 +84,10 @@ async function cleanupTestData() {
 }
 
 export default async function globalTeardown() {
-  await cleanupTestData();
+  const uid = await getTestUid();
+  if (uid) {
+    await cleanupTestData(uid);
+  }
 
   const storageStatePath = resolve(__dirname, "../storageState.json");
   if (existsSync(storageStatePath)) {
