@@ -111,21 +111,6 @@ export async function decrementUserScore(
   await ref.set(updates, { merge: true });
 }
 
-interface UserScoreSnapshot {
-  uid: string;
-  name?: string;
-  username?: string;
-  score: number;
-  totalDoubts: number;
-  totalQuizzes: number;
-  totalFlashcards: number;
-  totalNotes: number;
-  totalStudySessions: number;
-  completedPlans: number;
-  totalActivity: number;
-  updatedAt: number;
-}
-
 export interface LeaderboardEntry {
   name: string;
   username?: string;

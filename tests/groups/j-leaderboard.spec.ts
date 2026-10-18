@@ -405,6 +405,15 @@ test.describe("Leaderboard API: empty data state", () => {
   test("returns empty users array when no ledger entries exist", async () => {
     const user = await createThrowawayUser("lb-empty-fresh");
     try {
+      // Ensure a clean ledger state so this test is isolated from prior tests
+      // that may have seeded userScores documents.
+      const snap = await adminDb.collection("userScores").get();
+      if (!snap.empty) {
+        const batch = adminDb.batch();
+        snap.docs.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+
       const res = await callLeaderboard(user.token);
       expect(res.status).toBe(200);
       const data = await res.json();

@@ -109,9 +109,12 @@ let lastCleanup = Date.now();
 async function cleanup(): Promise<void> {
   const now = Date.now();
   if (rateLimitStore instanceof InMemoryRateLimitStore) {
-    for (const [key, entry] of (rateLimitStore as unknown as Map<string, RateLimitEntry>).entries()) {
+    // InMemoryRateLimitStore keeps entries in a private `store` Map; iterate
+    // that map directly rather than pretending the store is a Map itself.
+    const store = (rateLimitStore as unknown as { store: Map<string, RateLimitEntry> }).store;
+    for (const [key, entry] of store.entries()) {
       if (entry.resetAt < now) {
-        await rateLimitStore.delete(key);
+        await store.delete(key);
       }
     }
   }

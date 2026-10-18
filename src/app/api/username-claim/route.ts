@@ -179,7 +179,6 @@ export async function POST(req: NextRequest) {
     }
   } catch (error: unknown) {
     console.error("[USERNAME_CLAIM] unexpected error:", error);
-    const message = error instanceof Error ? error.message : "An unexpected error occurred";
     return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 });
   }
 }
