@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
+import { incrementUserScore } from "@/lib/score-ledger";
 
 export async function GET(req: NextRequest) {
   try {
@@ -103,6 +104,12 @@ export async function POST(req: NextRequest) {
         updatedAt: Date.now() 
       };
       await noteRef.set(note);
+      // Credit the server-owned points ledger for this verified activity.
+      try {
+        await incrementUserScore(decoded.uid, "note");
+      } catch {
+        // Never block note creation on ledger updates.
+      }
       return NextResponse.json({ note: { id: noteRef.id, ...note } });
     }
 

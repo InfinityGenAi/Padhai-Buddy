@@ -116,9 +116,8 @@ jobs:
 
       - name: Start Firebase emulators
         run: |
-          # For local emulators, don't specify --project (requires auth and valid project)
-          # Local emulators run without a project ID
-          npx firebase emulators:start --only auth,firestore > emulator.log 2>&1 &
+          # Start emulators bound to the test project so client/Admin/test setup share one project ID
+          npx firebase emulators:start --only auth,firestore --project test-project > emulator.log 2>&1 &
           echo $! > emulator.pid
           # Wait for emulators to be ready (up to 180s)
           for i in {1..90}; do

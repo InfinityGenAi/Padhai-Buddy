@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
+import { incrementUserScore } from "@/lib/score-ledger";
 
 export async function POST(req: NextRequest) {
   try {
@@ -49,10 +50,22 @@ export async function POST(req: NextRequest) {
       const sessionRef = adminDb.collection("users").doc(decoded.uid).collection("studySessions").doc();
       const session = { mode: String(mode), durationSeconds: totalSeconds, durationMinutes: durationMinutesRounded, completed: completed === true, createdAt: Date.now() };
       await sessionRef.set(session);
+      // Credit the server-owned ledger for a completed study session.
+      if (session.completed) {
+        try {
+          await incrementUserScore(decoded.uid, "session");
+        } catch {
+          // Never block session creation on ledger updates.
+        }
+      }
       return NextResponse.json({ session: { id: sessionRef.id, ...session } });
     }
 
     if (action === "update" && sessionId) {
+      const sessionRef = adminDb.collection("users").doc(decoded.uid).collection("studySessions").doc(sessionId);
+      const sessionSnap = await sessionRef.get();
+      const oldCompleted = sessionSnap.exists ? sessionSnap.data()?.completed : undefined;
+
       const updates: Record<string, unknown> = {};
       if (completed !== undefined) {
         if (typeof completed !== "boolean") {
@@ -63,7 +76,17 @@ export async function POST(req: NextRequest) {
       if (Object.keys(updates).length === 0) {
         return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
       }
-      await adminDb.collection("users").doc(decoded.uid).collection("studySessions").doc(sessionId).update(updates);
+      await sessionRef.update(updates);
+
+      // Credit the server-owned ledger when a session is marked completed for the first time.
+      if (oldCompleted !== true && completed === true) {
+        try {
+          await incrementUserScore(decoded.uid, "session");
+        } catch {
+          // Never block session update on ledger updates.
+        }
+      }
+
       return NextResponse.json({ success: true });
     }
 

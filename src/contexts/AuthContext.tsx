@@ -13,8 +13,9 @@ import {
   sendPasswordResetEmail,
   confirmPasswordReset,
   sendEmailVerification,
+  getIdToken,
 } from "firebase/auth";
-import { doc, setDoc, getDoc, updateDoc, runTransaction } from "firebase/firestore";
+import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
 import { getFirebaseAuth, getFirestoreDb, waitForFirebaseInit } from "@/lib/firebase";
 import { deleteCurrentSession } from "@/lib/sessions";
 import type { UserProfile, UserBoard, UserClass, UserPreferences } from "@/types";
@@ -264,23 +265,42 @@ getDoc(doc(db, "users", fbUser.uid))
               createdAt: Date.now(),
               preferences: { ...DEFAULT_PREFERENCES },
             };
-            if (usernameToStore) {
-              updated.username = usernameToStore;
-            }
+            // Do not write the username field directly here - claim it atomically
+            // through the server-side /api/username-claim API below.
             await setDoc(doc(db, "users", cred.user.uid), updated, { merge: true });
             setUser(updated);
             setNeedsOnboarding(false);
-          }
-        }
 
-        // Also store username mapping in users collection
-        if (usernameToStore) {
-          const db = getFirestoreDb();
-          if (db) {
-            try {
-              await setDoc(doc(db, "users", cred.user.uid), { username: usernameToStore }, { merge: true });
-            } catch {}
+            // Route username claim through the server-side claim API (never write
+            // usernameMappings or the authoritative username field from the client).
+            if (usernameToStore) {
+              try {
+                const token = await getIdToken(cred.user, true);
+                const claimRes = await fetch("/api/username-claim", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({ username: usernameToStore }),
+                });
+                if (!claimRes.ok) {
+                  const data = await claimRes.json().catch(() => ({}));
+                  throw new Error(data.error || "Failed to claim username");
+                }
+                // Reload the profile so the locally held user reflects the claimed username.
+                const snap = await getDoc(doc(db, "users", cred.user.uid));
+                if (snap.exists()) {
+                  setUser(snap.data() as UserProfile);
+                }
+              } catch (claimErr) {
+                // Username claim failure must not block account creation.
+                console.error("[signUp] Username claim failed:", claimErr);
+              }
+            }
           }
+        } else {
+          setNeedsOnboarding(true);
         }
         return { emailVerificationSent };
       } catch (err) {
@@ -333,20 +353,29 @@ getDoc(doc(db, "users", fbUser.uid))
       preferences: { ...DEFAULT_PREFERENCES },
     };
 
-    if (usernameToStore) {
-      updated.username = usernameToStore;
-    }
-
+    // Do not write the username field or the usernameMappings document from the
+    // client. Claim the username atomically through the server-side claim API.
     await setDoc(doc(db, "users", auth.currentUser.uid), updated, { merge: true });
 
-    // Claim the username mapping
     if (usernameToStore) {
       try {
-        await setDoc(doc(db, "usernameMappings", usernameToStore.toLowerCase()), {
-          uid: auth.currentUser.uid,
-          claimedAt: Date.now(),
+        const token = await getIdToken(auth.currentUser, true);
+        const claimRes = await fetch("/api/username-claim", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ username: usernameToStore }),
         });
-      } catch {}
+        if (!claimRes.ok) {
+          const data = await claimRes.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to claim username");
+        }
+      } catch (claimErr) {
+        // Username claim failure must not block onboarding completion.
+        console.error("[completeOnboarding] Username claim failed:", claimErr);
+      }
     }
 
     setUser(updated);
@@ -383,8 +412,6 @@ getDoc(doc(db, "users", fbUser.uid))
     await waitForFirebaseInit();
     const auth = getFirebaseAuth();
     if (!auth || !auth.currentUser) throw new Error("Not authenticated");
-    const db = getFirestoreDb();
-    if (!db) throw new Error("Firestore not initialized");
 
     const normalizedUsername = username.toLowerCase().trim();
 
@@ -392,56 +419,23 @@ getDoc(doc(db, "users", fbUser.uid))
       throw new Error("Invalid username format");
     }
 
-    const uid = auth.currentUser.uid;
-    const usernameRef = doc(db, "usernameMappings", normalizedUsername);
-    const userRef = doc(db, "users", uid);
+    // Route the username change through the server-side claim API. The client never
+    // writes usernameMappings or the authoritative username field directly.
+    const token = await getIdToken(auth.currentUser, true);
+    if (!token) throw new Error("Unable to get auth token");
 
-    await runTransaction(db, async (transaction) => {
-      const usernameSnap = await transaction.get(usernameRef);
-      const userSnap = await transaction.get(userRef);
-
-      if (!userSnap.exists) {
-        throw new Error("User profile not found");
-      }
-
-      const userData = userSnap.data() as { username?: string } | undefined;
-
-      // If user already has this username, it's idempotent success
-      if (userData?.username === normalizedUsername) {
-        return;
-      }
-
-      // If username mapping exists and belongs to a different user, fail
-      if (usernameSnap.exists()) {
-        const existingData = usernameSnap.data() as { uid: string } | undefined;
-        if (existingData?.uid !== uid) {
-          throw new Error("USERNAME_TAKEN");
-        }
-      }
-
-      // Release old username mapping if exists
-      const oldUsername = userData?.username;
-      if (oldUsername && oldUsername !== normalizedUsername) {
-        const oldRef = doc(db, "usernameMappings", oldUsername.toLowerCase());
-        const oldSnap = await transaction.get(oldRef);
-        if (oldSnap.exists()) {
-          const oldData = oldSnap.data() as { uid: string } | undefined;
-          if (oldData?.uid === uid) {
-            transaction.delete(oldRef);
-          }
-        }
-      }
-
-      // Claim the new username
-      transaction.set(usernameRef, {
-        uid,
-        claimedAt: Date.now(),
-        updatedAt: Date.now(),
-      });
-
-      // Update user profile
-      transaction.update(userRef, { username: normalizedUsername });
+    const claimRes = await fetch("/api/username-claim", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ username: normalizedUsername }),
     });
+    const data = await claimRes.json().catch(() => ({}));
+    if (!claimRes.ok) {
+      throw new Error(data.error || "Failed to change username");
+    }
 
     // Reload profile to reflect changes
     reloadProfile();

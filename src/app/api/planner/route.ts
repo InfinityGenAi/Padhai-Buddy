@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
+import { incrementUserScore } from "@/lib/score-ledger";
 
 // Get today's date in YYYY-MM-DD format using local timezone
 function getTodayLocal(): string {
@@ -101,10 +102,22 @@ export async function POST(req: NextRequest) {
         updatedAt: Date.now(),
       };
       await planRef.set(plan);
+      // Credit the server-owned ledger for a completed plan.
+      if (plan.completed) {
+        try {
+          await incrementUserScore(decoded.uid, "plan");
+        } catch {
+          // Never block plan creation on ledger updates.
+        }
+      }
       return NextResponse.json({ plan: { id: planRef.id, ...plan } });
     }
 
     if (action === "update" && planId) {
+      const planRef = adminDb.collection("users").doc(decoded.uid).collection("studyPlans").doc(planId);
+      const planSnap = await planRef.get();
+      const oldCompleted = planSnap.exists ? planSnap.data()?.completed : undefined;
+
       const updates: Record<string, unknown> = { updatedAt: Date.now() };
       if (title !== undefined) {
         if (typeof title !== "string" || title.trim().length > 200) return NextResponse.json({ error: "Title must be a string of at most 200 characters" }, { status: 400 });
@@ -126,7 +139,17 @@ export async function POST(req: NextRequest) {
         if (!VALID_PRIORITIES.includes(String(priority))) return NextResponse.json({ error: "Invalid priority" }, { status: 400 });
         updates.priority = String(priority);
       }
-      await adminDb.collection("users").doc(decoded.uid).collection("studyPlans").doc(planId).update(updates);
+      await planRef.update(updates);
+
+      // Credit the server-owned ledger when a plan is marked completed for the first time.
+      if (oldCompleted !== true && completed === true) {
+        try {
+          await incrementUserScore(decoded.uid, "plan");
+        } catch {
+          // Never block plan update on ledger updates.
+        }
+      }
+
       return NextResponse.json({ success: true });
     }
 

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { getFirestoreDb } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 
 interface AnalyticsStats {
   todayVisitors: number;
@@ -15,6 +15,7 @@ interface AnalyticsStats {
   totalSignups: number;
   todayReturning: number;
   totalReturning: number;
+  todayPageViews: number;
 }
 
 interface TrendData {
@@ -22,6 +23,11 @@ interface TrendData {
   signupTrend: number[];
   downloadTrend: number[];
   returningTrend: number[];
+  pageViewTrend: number[];
+}
+
+function utcDateKey(d: Date): string {
+  return d.toISOString().split("T")[0];
 }
 
 function getLast7DaysLabels(): string[] {
@@ -29,9 +35,7 @@ function getLast7DaysLabels(): string[] {
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    labels.push(
-      d.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" })
-    );
+    labels.push(utcDateKey(d));
   }
   return labels;
 }
@@ -49,6 +53,7 @@ export default function AdminAnalytics() {
     totalSignups: 0,
     todayReturning: 0,
     totalReturning: 0,
+    todayPageViews: 0,
   });
 
   const [trends, setTrends] = useState<TrendData>({
@@ -56,6 +61,7 @@ export default function AdminAnalytics() {
     signupTrend: [0, 0, 0, 0, 0, 0, 0],
     downloadTrend: [0, 0, 0, 0, 0, 0, 0],
     returningTrend: [0, 0, 0, 0, 0, 0, 0],
+    pageViewTrend: [0, 0, 0, 0, 0, 0, 0],
   });
 
   const [featureStats, setFeatureStats] = useState<Record<string, number>>({});
@@ -77,37 +83,61 @@ export default function AdminAnalytics() {
       }
 
       try {
-        const dailyRef = doc(db, "dailyAnalytics", "current");
+        const todayStr = utcDateKey(new Date());
+
+        // Read today's date-keyed dailyAnalytics document (same schema as the tracker).
+        const dailyRef = doc(db, "dailyAnalytics", todayStr);
         const dailySnap = await getDoc(dailyRef);
         if (dailySnap.exists()) {
           const d = dailySnap.data();
           setStats({
-            todayVisitors: d.todayVisitors ?? 0,
+            todayVisitors: d.uniqueVisitors ?? 0,   // estimated unique visitors today
             totalVisitors: d.totalVisitors ?? 0,
             todayDownloads: d.todayDownloads ?? 0,
             totalDownloads: d.totalDownloads ?? 0,
-            todaySignups: d.todaySignups ?? 0,
-            totalSignups: d.totalSignups ?? 0,
+            todaySignups: d.signups ?? 0,
+            totalSignups: d.totalSignups ?? 0,      // cumulative total signups
             todayReturning: d.todayReturning ?? 0,
             totalReturning: d.totalReturning ?? 0,
-          });
-          setTrends({
-            visitorTrend: d.visitorTrend ?? [0, 0, 0, 0, 0, 0, 0],
-            signupTrend: d.signupTrend ?? [0, 0, 0, 0, 0, 0, 0],
-            downloadTrend: d.downloadTrend ?? [0, 0, 0, 0, 0, 0, 0],
-            returningTrend: d.returningTrend ?? [0, 0, 0, 0, 0, 0, 0],
+            todayPageViews: d.pageViews ?? 0,
           });
         }
 
-        const featureSnap = await getDocs(collection(db, "featureUsage"));
+        // Read the last 7 days of dailyAnalytics docs for trends (bounded reads).
+        const days = getLast7DaysLabels();
+        const trendDocs = await Promise.all(
+          days.map((date) => getDoc(doc(db, "dailyAnalytics", date))),
+        );
+        const visitorTrend: number[] = [];
+        const signupTrend: number[] = [];
+        const downloadTrend: number[] = [];
+        const returningTrend: number[] = [];
+        const pageViewTrend: number[] = [];
+        trendDocs.forEach((snap) => {
+          const data = snap.exists() ? (snap.data() || {}) : {};
+          visitorTrend.push(typeof data.uniqueVisitors === "number" ? data.uniqueVisitors : 0);
+          signupTrend.push(typeof data.signups === "number" ? data.signups : 0);
+          downloadTrend.push(typeof data.todayDownloads === "number" ? data.todayDownloads : 0);
+          returningTrend.push(typeof data.todayReturning === "number" ? data.todayReturning : 0);
+          pageViewTrend.push(typeof data.pageViews === "number" ? data.pageViews : 0);
+        });
+        setTrends({
+          visitorTrend,
+          signupTrend,
+          downloadTrend,
+          returningTrend,
+          pageViewTrend,
+        });
+
+        // Read feature usage using the `count` field (same structure as the tracker).
+        const featureSnap = await getDocs(
+          query(collection(db, "featureUsage"), orderBy("count", "desc"), limit(10)),
+        );
         const totals: Record<string, number> = {};
         featureSnap.forEach((docSnap) => {
           const data = docSnap.data();
-          if (data.total) {
-            Object.entries(data.total as Record<string, number>).forEach(([key, val]) => {
-              totals[key] = (totals[key] || 0) + (typeof val === "number" ? val : 0);
-            });
-          }
+          const featureName = data.feature || docSnap.id;
+          totals[featureName] = typeof data.count === "number" ? data.count : 0;
         });
         setFeatureStats(totals);
       } catch {
@@ -135,19 +165,26 @@ export default function AdminAnalytics() {
         <div className="p-8 bg-white border border-border rounded-xl shadow-xl text-center">
           <h1 className="text-xl text-foreground/60">Access Denied</h1>
           <p className="text-foreground/60 mt-4">You do not have permission to view analytics.</p>
-          <a href="/dashboard" className="mt-6 inline-block text-primary hover:underline">Go to Dashboard</a>
+          <a href="/dashboard" className="mt-6 inline-block text-primary hover:underline">
+            Go to Dashboard
+          </a>
         </div>
       </div>
     );
   }
 
-  const dayLabels = getLast7DaysLabels();
+  const dayLabels = getLast7DaysLabels().map((d) => {
+    const date = new Date(d + "T00:00:00Z");
+    return date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  });
+
   const maxTrendVal = Math.max(
     ...trends.visitorTrend,
     ...trends.signupTrend,
     ...trends.downloadTrend,
     ...trends.returningTrend,
-    1
+    ...trends.pageViewTrend,
+    1,
   );
 
   const renderTrend = (data: number[], label: string, color: string) => (
@@ -199,6 +236,10 @@ export default function AdminAnalytics() {
                 <p className="text-5xl font-bold text-primary">{stats.totalVisitors}</p>
               </div>
               <div className="bg-white border border-border p-6 shadow-xl">
+                <h3 className="text-sm text-foreground/60 uppercase tracking-wider mb-4">Today&apos;s Page Views</h3>
+                <p className="text-5xl font-bold text-primary">{stats.todayPageViews}</p>
+              </div>
+              <div className="bg-white border border-border p-6 shadow-xl">
                 <h3 className="text-sm text-foreground/60 uppercase tracking-wider mb-4">Today&apos;s Downloads</h3>
                 <p className="text-5xl font-bold text-primary">{stats.todayDownloads}</p>
               </div>
@@ -226,7 +267,8 @@ export default function AdminAnalytics() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
               {renderTrend(trends.visitorTrend, "Visitor Trend (7 Days)", "var(--primary)")}
-              {renderTrend(trends.downloadTrend, "Download Trend (7 Days)", "var(--success)")}
+              {renderTrend(trends.pageViewTrend, "Page View Trend (7 Days)", "var(--success)")}
+              {renderTrend(trends.downloadTrend, "Download Trend (7 Days)", "var(--physics)")}
               {renderTrend(trends.signupTrend, "Signup Trend (7 Days)", "var(--physics)")}
               {renderTrend(trends.returningTrend, "Returning User Trend (7 Days)", "var(--warning)")}
             </div>

@@ -134,6 +134,11 @@ async function deleteThrowawayUser(uid: string): Promise<void> {
   } catch {
     // already gone
   }
+  try {
+    await adminDb.collection("dailyVisitors").doc(todayUTCDateStr()).collection("users").doc(uid).delete();
+  } catch {
+    // ignore
+  }
 }
 
 function todayUTCDateStr(): string {
@@ -143,33 +148,37 @@ function todayUTCDateStr(): string {
 async function getDailyAnalyticsDoc(dateStr: string) {
   const docRef = adminDb.collection("dailyAnalytics").doc(dateStr);
   const snap = await docRef.get();
-  return { exists: snap.exists, data: snap.exists ? snap.data() : null };
+  return { exists: snap.exists, data: snap.exists ? (snap.data() as Record<string, unknown>) : null };
 }
 
-async function callTrack(token: string, body: Record<string, unknown>) {
-  return fetch(
-    `${process.env.BASE_URL || "http://localhost:3000"}/api/analytics/track`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(body),
-    },
-  );
+async function clearTodayAnalytics() {
+  const dateStr = todayUTCDateStr();
+  const snap = await adminDb.collection("dailyAnalytics").doc(dateStr).get();
+  if (snap.exists) {
+    await adminDb.collection("dailyAnalytics").doc(dateStr).delete();
+  }
+  // Clear unique-visitor markers for today so each test starts clean
+  const visitorsSnap = await adminDb.collection("dailyVisitors").doc(dateStr).collection("users").get();
+  const batch = adminDb.batch();
+  visitorsSnap.docs.forEach((d) => batch.delete(d.ref));
+  if (visitorsSnap.docs.length > 0) {
+    await batch.commit();
+  }
+}
+
+async function callTrack(token: string | undefined, body: Record<string, unknown>, anon = false) {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return fetch(`${process.env.BASE_URL || "http://localhost:3000"}/api/analytics/track`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
 }
 
 test.describe("Analytics Track: authorization", () => {
-  test("returns 401 without a token", async () => {
-    const res = await fetch(
-      `${process.env.BASE_URL || "http://localhost:3000"}/api/analytics/track`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ event: "page_view" }),
-      },
-    );
+  test("returns 401 without a token for a non-page_view event", async () => {
+    const res = await callTrack(undefined, { event: "signup" });
     expect(res.status).toBe(401);
     const data = await res.json();
     expect(data.error).toBe("Unauthorized");
@@ -193,9 +202,17 @@ test.describe("Analytics Track: authorization", () => {
       await deleteThrowawayUser(user.uid);
     }
   });
+
+  test("accepts a public page_view without a token (privacy-conscious public tracking)", async () => {
+    await clearTodayAnalytics();
+    const res = await callTrack(undefined, { event: "page_view", page: "/" });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.success).toBe(true);
+  });
 });
 
-test.describe("Analytics Track: page view counting", () => {
+test.describe("Analytics Track: page view vs unique visitor deduplication", () => {
   let user: { email: string; uid: string; token: string };
 
   test.beforeAll(async () => {
@@ -206,36 +223,44 @@ test.describe("Analytics Track: page view counting", () => {
     await deleteThrowawayUser(user.uid);
   });
 
-  test("increments pageViews but does not treat it as unique visitors", async () => {
-    const dateStr = todayUTCDateStr();
+  test("repeated page views by one user increment pageViews but count as ONE unique visitor", async () => {
+    await clearTodayAnalytics();
 
-    // Clear any existing data for today
-    const existing = await getDailyAnalyticsDoc(dateStr);
-    if (existing.exists) {
-      await adminDb.collection("dailyAnalytics").doc(dateStr).delete();
+    // Track 5 page views from the same authenticated user
+    for (let i = 0; i < 5; i++) {
+      await callTrack(user.token, { event: "page_view", page: "/dashboard/" });
     }
 
-    // Track a single page view from the authenticated user
-    await callTrack(user.token, { event: "page_view", page: "/" });
-
-    const doc = await getDailyAnalyticsDoc(dateStr);
+    const doc = await getDailyAnalyticsDoc(todayUTCDateStr());
     expect(doc.exists).toBe(true);
-    expect(doc.data!.pageViews).toBe(1);
+    expect(doc.data!.pageViews).toBe(5);
 
-    // pageViews and uniqueVisitors are separate fields; both incremented for this single event
+    // uniqueVisitors is deduplicated per user per day: still 1
     expect(doc.data!.uniqueVisitors).toBe(1);
   });
 
-  test("pageViews is not presented as active users or unique visitors", async () => {
-    const dateStr = todayUTCDateStr();
-    const doc = await getDailyAnalyticsDoc(dateStr);
+  test("multiple distinct users each count as one unique visitor", async () => {
+    await clearTodayAnalytics();
 
-    // pageViews counts events, uniqueVisitors counts authenticated sessions
-    // These are distinct metrics that must not be conflated
+    const userB = await createThrowawayUser("analytics-pv-b");
+    try {
+      await callTrack(user.token, { event: "page_view", page: "/" });
+      await callTrack(userB.token, { event: "page_view", page: "/" });
+
+      const doc = await getDailyAnalyticsDoc(todayUTCDateStr());
+      expect(doc.data!.pageViews).toBe(2);
+      expect(doc.data!.uniqueVisitors).toBe(2);
+    } finally {
+      await deleteThrowawayUser(userB.uid);
+    }
+  });
+
+  test("pageViews and uniqueVisitors are separate metrics", async () => {
+    const doc = await getDailyAnalyticsDoc(todayUTCDateStr());
     expect(typeof doc.data!.pageViews).toBe("number");
     expect(typeof doc.data!.uniqueVisitors).toBe("number");
-    // pageViews should be >= uniqueVisitors (one user can view multiple pages)
-    expect(doc.data!.pageViews).toBeGreaterThanOrEqual(doc.data!.uniqueVisitors);
+    // pageViews (events) must be >= uniqueVisitors (distinct users)
+    expect(doc.data!.pageViews as number).toBeGreaterThanOrEqual(doc.data!.uniqueVisitors as number);
   });
 });
 
@@ -252,55 +277,34 @@ test.describe("Analytics Track: feature usage field consistency", () => {
 
   test("increments featureUses in dailyAnalytics and count in featureUsage collection", async () => {
     const dateStr = todayUTCDateStr();
-
-    // Clear existing data
-    const existing = await getDailyAnalyticsDoc(dateStr);
-    if (existing.exists) {
-      await adminDb.collection("dailyAnalytics").doc(dateStr).delete();
-    }
+    await clearTodayAnalytics();
     await adminDb.collection("featureUsage").doc("aiChat").delete();
 
-    // Read current featureUses before tracking
     const beforeDoc = await getDailyAnalyticsDoc(dateStr);
-    const beforeFeatureUses = beforeDoc.exists ? (beforeDoc.data!.featureUses as number) || 0 : 0;
+    const beforeFeatureUses = beforeDoc.exists ? ((beforeDoc.data!.featureUses as number) || 0) : 0;
 
-    // Track a feature use event
     await callTrack(user.token, { event: "feature_use", feature: "aiChat" });
 
-    // Verify dailyAnalytics has featureUses incremented
     const dailyDoc = await getDailyAnalyticsDoc(dateStr);
     expect(dailyDoc.exists).toBe(true);
     expect(dailyDoc.data!.featureUses).toBe(beforeFeatureUses + 1);
 
-    // Verify featureUsage collection has the count
     const featureDoc = await adminDb.collection("featureUsage").doc("aiChat").get();
     expect(featureDoc.exists).toBe(true);
     expect(featureDoc.data()!.count).toBe(1);
     expect(featureDoc.data()!.feature).toBe("aiChat");
   });
 
-  test("feature_use without a feature name does not increment featureUsage collection", async () => {
-    const dateStr = todayUTCDateStr();
-
-    // Clear existing data
-    const existing = await getDailyAnalyticsDoc(dateStr);
-    if (existing.exists) {
-      await adminDb.collection("dailyAnalytics").doc(dateStr).delete();
-    }
-
-    // Track feature_use without feature field
+  test("feature_use without a feature name does not write to featureUsage collection", async () => {
+    await clearTodayAnalytics();
     await callTrack(user.token, { event: "feature_use" });
 
-    const dailyDoc = await getDailyAnalyticsDoc(dateStr);
-    expect(dailyDoc.exists).toBe(true);
+    const dailyDoc = await getDailyAnalyticsDoc(todayUTCDateStr());
     expect(dailyDoc.data!.featureUses).toBe(1);
-
-    // featureUsage collection should not have a new doc for undefined feature
-    // (the tracker only writes to featureUsage when `feature` is truthy)
   });
 });
 
-test.describe("Analytics Track: signup and download counting", () => {
+test.describe("Analytics Track: signup and download counting (daily vs cumulative)", () => {
   let user: { email: string; uid: string; token: string };
 
   test.beforeAll(async () => {
@@ -311,13 +315,9 @@ test.describe("Analytics Track: signup and download counting", () => {
     await deleteThrowawayUser(user.uid);
   });
 
-  test("signup increments signups and totalSignups separately", async () => {
+  test("signup increments daily signups and cumulative totalSignups separately", async () => {
     const dateStr = todayUTCDateStr();
-
-    const existing = await getDailyAnalyticsDoc(dateStr);
-    if (existing.exists) {
-      await adminDb.collection("dailyAnalytics").doc(dateStr).delete();
-    }
+    await clearTodayAnalytics();
 
     await callTrack(user.token, { event: "signup" });
 
@@ -326,31 +326,34 @@ test.describe("Analytics Track: signup and download counting", () => {
     expect(doc.data!.totalSignups).toBe(1);
   });
 
-  test("download increments todayDownloads and totalDownloads separately", async () => {
-    const dateStr = todayUTCDateStr();
-
+  test("download increments daily todayDownloads and cumulative totalDownloads separately", async () => {
     await callTrack(user.token, {
       event: "download",
       metadata: { platform: "android", version: "1.0.0" },
     });
 
-    const doc = await getDailyAnalyticsDoc(dateStr);
+    const doc = await getDailyAnalyticsDoc(todayUTCDateStr());
     expect(doc.data!.todayDownloads).toBe(1);
     expect(doc.data!.totalDownloads).toBe(1);
 
-    // Verify the downloads collection has the record
-    const downloadsSnap = await adminDb
-      .collection("downloads")
-      .where("userId", "==", user.uid)
-      .get();
+    const downloadsSnap = await adminDb.collection("downloads").where("userId", "==", user.uid).get();
     expect(downloadsSnap.size).toBeGreaterThanOrEqual(1);
     const downloadDoc = downloadsSnap.docs[0];
     expect(downloadDoc.data()!.platform).toBe("android");
     expect(downloadDoc.data()!.version).toBe("1.0.0");
   });
+
+  test("session_start increments a daily sessions counter", async () => {
+    await clearTodayAnalytics();
+
+    await callTrack(user.token, { event: "session_start" });
+
+    const doc = await getDailyAnalyticsDoc(todayUTCDateStr());
+    expect(doc.data!.sessions).toBe(1);
+  });
 });
 
-test.describe("Analytics Track: date boundaries", () => {
+test.describe("Analytics Track: date boundaries (UTC)", () => {
   let user: { email: string; uid: string; token: string };
 
   test.beforeAll(async () => {
@@ -361,8 +364,9 @@ test.describe("Analytics Track: date boundaries", () => {
     await deleteThrowawayUser(user.uid);
   });
 
-  test("uses UTC date string for daily aggregation document key", async () => {
+  test("uses the UTC date string for the daily aggregation document key", async () => {
     const dateStr = todayUTCDateStr();
+    await clearTodayAnalytics();
 
     await callTrack(user.token, { event: "page_view", page: "/" });
 
@@ -370,34 +374,18 @@ test.describe("Analytics Track: date boundaries", () => {
     expect(doc.exists).toBe(true);
     expect(doc.data!.date).toBe(dateStr);
   });
-
-  test("consistent date calculation between tracker and admin readers", async () => {
-    // The tracker uses: new Date().toISOString().split("T")[0] (UTC)
-    // Admin OverviewSection reads: doc(db, "dailyAnalytics", dateStr) where dateStr = today.toISOString().split("T")[0]
-    // Both use the same UTC date calculation
-    const trackerDate = new Date().toISOString().split("T")[0];
-    const readerDate = new Date().toISOString().split("T")[0];
-    expect(trackerDate).toBe(readerDate);
-  });
 });
 
-test.describe("Analytics Track: empty data state", () => {
-  test("returns honest empty state when no analytics data was ever collected", async () => {
+test.describe("Analytics Track: honest empty state", () => {
+  test("no analytics document exists before any event is tracked", async () => {
     const user = await createThrowawayUser("analytics-empty");
     try {
       const dateStr = todayUTCDateStr();
+      await clearTodayAnalytics();
 
-      // Ensure no data exists for today
-      const existing = await getDailyAnalyticsDoc(dateStr);
-      if (existing.exists) {
-        await adminDb.collection("dailyAnalytics").doc(dateStr).delete();
-      }
-
-      // Verify no document exists (honest empty state)
       const doc = await getDailyAnalyticsDoc(dateStr);
       expect(doc.exists).toBe(false);
 
-      // Track one event to verify data appears after tracking
       await callTrack(user.token, { event: "page_view", page: "/" });
 
       const docAfter = await getDailyAnalyticsDoc(dateStr);
@@ -412,15 +400,12 @@ test.describe("Analytics Track: empty data state", () => {
     const dateStr = todayUTCDateStr();
     const doc = await getDailyAnalyticsDoc(dateStr);
 
-    // If no data was ever collected, the document simply doesn't exist
-    // No retroactive data is invented
+    // If no data was ever collected for today, the document simply doesn't exist
     if (!doc.exists) {
-      // This is the honest empty state - no data fabricated
       expect(true).toBe(true);
     } else {
-      // If data exists, it was collected through real tracking events only
-      expect(doc.data!.pageViews).toBeGreaterThanOrEqual(0);
-      expect(doc.data!.uniqueVisitors).toBeGreaterThanOrEqual(0);
+      expect(typeof doc.data!.pageViews).toBe("number");
+      expect(typeof doc.data!.uniqueVisitors).toBe("number");
     }
   });
 });

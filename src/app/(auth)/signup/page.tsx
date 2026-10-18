@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { sendEmailVerification, reload } from "firebase/auth";
 import { motion, useReducedMotion } from "framer-motion";
 import { playSignup, playEmailSent } from "@/lib/sounds";
+import { useAnalytics } from "@/hooks/useAnalytics";
 import {
   EyeIcon,
   EyeSlashIcon,
@@ -64,6 +65,7 @@ export default function SignupPage() {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const { signUp, signInWithGoogle, firebaseUser, user, loading, preferences, reloadProfile } = useAuth();
+  const { trackSignup } = useAnalytics();
   const router = useRouter();
   const emailInputRef = useRef<HTMLInputElement>(null);
 
@@ -147,6 +149,7 @@ export default function SignupPage() {
     try {
       const result = await signUp(name, email, password, selectedClass, selectedBoard, username.trim());
       playSignup();
+      trackSignup();
       setVerificationSent(true);
       if (!result.emailVerificationSent) {
         setVerificationError(

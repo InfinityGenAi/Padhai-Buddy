@@ -41,7 +41,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
   const sessionRegisteredRef = useRef(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const { trackPageView, trackFeatureUse, trackSessionStart } = useAnalytics();
+  const { trackSessionStart } = useAnalytics();
 
   useEffect(() => {
     if (!user?.uid || sessionRegisteredRef.current) return;
@@ -61,12 +61,6 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
       clearInterval(interval);
     };
   }, [user?.uid, trackSessionStart]);
-
-  // Track page views
-  useEffect(() => {
-    if (!user?.uid) return;
-    trackPageView(pathname);
-  }, [pathname, trackPageView, user?.uid]);
 
   // Notifications listener
   useEffect(() => {

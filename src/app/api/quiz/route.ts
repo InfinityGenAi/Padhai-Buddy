@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { getGroqClient, GROQ_TEXT_MODEL } from "@/lib/groq";
 import { checkRateLimit } from "@/lib/rate-limiter";
+import { incrementUserScore } from "@/lib/score-ledger";
 import type { QuizAttempt, QuizQuestion } from "@/types";
 import { inferTopic } from "@/lib/curriculum";
 
@@ -342,6 +343,13 @@ export async function POST(req: NextRequest) {
         score,
         completedAt,
       });
+
+      // Credit the server-owned points ledger for this completed, verified quiz.
+      try {
+        await incrementUserScore(decoded.uid, "quiz");
+      } catch {
+        // Never block quiz submission on ledger updates.
+      }
 
       return NextResponse.json({
         attempt: {

@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
+import { AnalyticsTracker } from "@/components/AnalyticsTracker";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -67,7 +68,10 @@ export default function RootLayout({
         className={`${inter.variable} min-h-screen h-full m-0 bg-background text-foreground antialiased`}
       >
         <ServiceWorkerRegistration />
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <AnalyticsTracker />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

@@ -6,6 +6,15 @@ service cloud.firestore {
         && request.auth.token.admin == true;
     }
 
+    // usernameMappings is the authoritative username uniqueness index.
+    // Clients may read it but MUST NOT create/update/delete it: all mutations go
+    // through the server-side /api/username-claim API (Admin SDK bypasses rules).
+    // This prevents clients from bypassing username uniqueness by writing mappings directly.
+    match /usernameMappings/{username} {
+      allow read: if request.auth != null && request.auth.uid != null;
+      allow create, update, delete: if false;
+    }
+
     match /dailyAnalytics/{docId} {
       allow read, write: if request.auth != null && request.auth.uid != null
         && request.auth.token.admin == true;
@@ -28,7 +37,10 @@ service cloud.firestore {
         && request.resource.data.class is int
         && request.resource.data.board in ["CBSE", "ICSE", "State Board"]
         && request.resource.data.createdAt is int
-        && request.resource.data.preferences is map;
+        && request.resource.data.preferences is map
+        // The authoritative username field is owned by the server (/api/username-claim).
+        // Clients must not set it at profile creation.
+        && !("username" in request.resource.data);
       allow update: if request.auth != null && request.auth.uid == userId
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.createdAt == resource.data.createdAt
@@ -37,7 +49,10 @@ service cloud.firestore {
         && (!("email" in request.resource.data) || request.resource.data.email is string)
         && (!("class" in request.resource.data) || request.resource.data.class is int)
         && (!("board" in request.resource.data) || request.resource.data.board in ["CBSE", "ICSE", "State Board"])
-        && (!("preferences" in request.resource.data) || request.resource.data.preferences is map);
+        && (!("preferences" in request.resource.data) || request.resource.data.preferences is map)
+        // The authoritative username field is owned by the server (/api/username-claim).
+        // Clients must not change it directly; use /api/username-claim instead.
+        && (!("username" in request.resource.data) || request.resource.data.username == resource.data.username);
       allow delete: if false;
 
       match /doubts/{doubtId} {

@@ -117,8 +117,23 @@ export async function POST(req: NextRequest) {
 
         const userData = userSnap.data() as { username?: string } | undefined;
 
-        // If user already has this username, it's idempotent success
+        // If user already has this username, it's idempotent success.
+        // However, the mapping may be missing (e.g. created by an older client path).
+        // Validate ownership and repair/create the mapping atomically rather than returning early.
         if (userData?.username === normalizedUsername) {
+          if (!usernameSnap.exists) {
+            // Mapping missing: create it atomically for this owning user.
+            transaction.set(usernameRef, {
+              uid,
+              claimedAt: Date.now(),
+              updatedAt: Date.now(),
+            });
+          } else {
+            const existingData = usernameSnap.data() as { uid: string } | undefined;
+            if (existingData?.uid && existingData?.uid !== uid) {
+              throw new Error("USERNAME_TAKEN");
+            }
+          }
           return;
         }
 

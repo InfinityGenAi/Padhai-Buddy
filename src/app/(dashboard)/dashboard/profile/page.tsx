@@ -38,20 +38,18 @@ export default function ProfilePage() {
       };
       if (photoURL.trim()) updates.photoURL = photoURL.trim();
 
-      // Handle username change
+      // Handle username change through the server-side claim API only.
+      // Username removal is not allowed here (it would bypass the required-onboarding
+      // username rule); users can only change to another valid, non-empty username.
       const currentUsername = user?.username || "";
       const newUsername = username.trim();
       if (newUsername !== currentUsername) {
         if (newUsername !== "") {
           await changeUsername(newUsername);
         } else {
-          // Clear username - send empty string to remove
-          const result = await safeFetch("/api/profile", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ ...updates, username: "" }),
-          });
-          if (!result.success) throw new Error(result.error || "Failed to clear username");
+          setNotification({ type: "error", text: "Username is required and cannot be removed." });
+          setSaving(false);
+          return;
         }
       }
 

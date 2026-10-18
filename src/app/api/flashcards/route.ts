@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { getGroqClient, GROQ_TEXT_MODEL } from "@/lib/groq";
+import { incrementUserScore } from "@/lib/score-ledger";
 import type { Firestore } from "firebase-admin/firestore";
 
 interface FlashcardItem {
@@ -134,6 +135,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Deck not found" }, { status: 404 });
       }
 
+      const cardRef = deckRef.collection("cards").doc(cardId);
+      const cardSnap = await cardRef.get();
+      const oldStatus = cardSnap.exists ? (cardSnap.data() as { status?: string }).status : undefined;
+
       const updates: Record<string, unknown> = { updatedAt: Date.now() };
       if (front !== undefined) {
         if (typeof front !== "string" || front.trim().length > 500) return NextResponse.json({ error: "Front must be a string of at most 500 characters" }, { status: 400 });
@@ -147,8 +152,19 @@ export async function POST(req: NextRequest) {
         if (!VALID_CARD_STATUSES.includes(String(status))) return NextResponse.json({ error: "Invalid card status" }, { status: 400 });
         updates.status = String(status);
       }
-      await deckRef.collection("cards").doc(cardId).update(updates);
+      await cardRef.update(updates);
       await deckRef.update({ updatedAt: Date.now() });
+
+      // Credit the server-owned ledger when a card is reviewed for the first time.
+      const newStatus = status !== undefined ? String(status) : oldStatus;
+      if (oldStatus !== "reviewed" && newStatus === "reviewed") {
+        try {
+          await incrementUserScore(decoded.uid, "flashcard");
+        } catch {
+          // Never block card update on ledger updates.
+        }
+      }
+
       return NextResponse.json({ success: true });
     }
 

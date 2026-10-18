@@ -26,8 +26,8 @@ test.describe("More + Notifications Tests", () => {
     await expect(resourcesLink).toBeAttached({ timeout: 15000 });
     // Wait longer for animations to finish and element to become visible
     await page.waitForTimeout(2000);
-    // Click using JS evaluation to work around type narrowing issues
-    await page.evaluate((el) => el.click(), resourcesLink);
+    // Click the Playwright Locator directly
+    await resourcesLink.click();
     await page.waitForURL("http://localhost:3000/dashboard/resources/", { timeout: 15000 });
     await expect(page.locator("h1:has-text('Resources')").first()).toBeAttached({ timeout: 10000 });
   });

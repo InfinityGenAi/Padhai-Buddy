@@ -107,28 +107,57 @@ Baseline audit complete. All source files read and issues classified.
 ---
 
 ## Playwright Test Results (observed)
-- 47 tests across 19 test groups
-- **2 tests pass consistently**: homepage loads, login page loads (no critical errors)
-- Firebase emulator startup works in this Windows environment; emulators start on ports 9099 (auth) and 8080 (firestore)
-- **New focused test results (actually executed)**:
-  - `tests/groups/j-leaderboard.spec.ts` — **11/11 passed** (authorization, ranking order, top-10 limit, privacy, score tampering, empty data, tie-break)
-  - `tests/groups/k-analytics.spec.ts` — **13/13 passed** (authorization, page-view counting vs unique visitors, feature-usage field consistency, signup/download counting, date boundaries, empty data state)
-- **Total new tests passed: 24/24** ✅
-- Remaining baseline tests blocked by emulator instability (intermittent `ETIMEDOUT`, `ENOTFOUND` during global setup)
-- The core Playwright failures from baseline (domcontentloaded wait, token audience mismatch) have been fixed
-- Tests that run successfully confirm the application functional workflows work correctly
+- 47 tests across 19 test groups (baseline)
+- Firebase emulator startup is UNSTABLE in this Windows/PowerShell environment; the emulator process would not stay bound to ports 9099/8080 across shell invocations, so the Playwright suite (including the new `username.spec.ts`, `j-leaderboard.spec.ts`, `k-analytics.spec.ts`, and E2E groups) COULD NOT be executed here.
+- All new and updated test files compile cleanly under `npx tsc --noEmit` (0 errors) and pass ESLint (0 new warnings).
+- Tests were written to run against the Firebase emulators (auth:9099, firestore:8080) and the Next.js server at localhost:3000, using `test-project` as the shared project ID.
+
+## Deep Audit Remediation (this session)
+All five priorities were addressed in source. Verification that IS possible in this environment:
+- **TypeScript: 0 errors** ✅ (`npx tsc --noEmit` — includes `src/`, `tests/`, new `score-ledger.ts`/`AnalyticsTracker.tsx`)
+- **ESLint: 0 errors** ✅ (`npm run lint` — no new warnings introduced; only pre-existing warnings remain)
+- **Production build: ✅ succeeds** — all 58 routes generated, including `/api/leaderboard`, `/api/username-claim`, `/api/analytics/track`, `/dashboard/leaderboard`
+- The Firebase Admin "missing env vars" message at build time is expected (no `.env.local` service-account credentials here) and does not prevent build completion.
+
+### Priority 1 — CI test configuration
+- `.github/workflows/ci.yml` & `.github/workflows/playwright.yml`: Firebase emulators now start with `--project test-project` so client/Admin/test share one project ID. Production Firebase config untouched.
+- `tests/groups/more-notifications.spec.ts`: `page.evaluate((el) => el.click(), resourcesLink)` replaced with `resourcesLink.click()` (Locator clicked directly).
+- `tests/groups/g-notes.spec.ts`, `f-flashcards.spec.ts`, `k-resources.spec.ts`: retained as emulator-backed integration tests hitting the real API routes (`mockSessionsRoute` still covers sessions + analytics).
+
+### Priority 2 — Username claim atomic and server-owned
+- `signup`, `completeOnboarding` (Google/legacy onboarding), and `changeUsername` now route through the server-side `/api/username-claim` API (`AuthContext.tsx`).
+- Client no longer writes `usernameMappings` or the authoritative `username` field directly.
+- `firestore.rules`: `usernameMappings` is read-only for clients (create/update/delete denied); `users` create/update deny client-setting/changing `username`.
+- `username-claim` idempotency fixed: if a profile already owns the username but the mapping is missing, ownership is validated and the mapping is repaired/created atomically instead of returning early.
+- Profile username removal blocked (prevents bypassing the required-onboarding username rule).
+- New `tests/groups/username.spec.ts`: signup/onboarding claims, duplicate claims, concurrent races, username changes, reserved names, invalid format, idempotent re-claim, missing-mapping repair, 401 without token.
+
+### Priority 3 — Leaderboard correctness, privacy, anti-abuse
+- Leaderboard reads from a new server-owned `userScores` points ledger (not client-writable activity docs).
+- Uses profile `name`/`username` (not `displayName`). Never returns `email` or `uid` in the public response.
+- Bounded top-10 query (`orderBy score desc, limit 10`); rate-limited per user. No unbounded full-user scans.
+- Counts only reviewed flashcards (`status === "reviewed"`); completed quizzes/sessions/plans only. Forged client activity does not affect the score.
+- Admin `POST /api/leaderboard?action=recalculate` rebuilds the ledger from validated activity; errors on flashcard reads don't silently zero out activity.
+- Activity routes (notes, flashcards, quiz, planner, timer) increment the ledger on verified activity.
+- New/updated tests in `tests/groups/j-leaderboard.spec.ts`: authorization, ranking, top-10, name-based profiles, privacy (no email/uid), forged-activity rejection, empty state, tie-break, large-user performance.
+
+### Priority 4 — Analytics semantics
+- Track endpoint: `page_view` → `pageViews` (every view) + `uniqueVisitors` deduplicated per authenticated user per UTC day (via `dailyVisitors` markers). Repeated views by one user → pageViews=N, uniqueVisitors=1.
+- `signup`/`download` separate daily counters from cumulative totals (`totalSignups`/`totalDownloads`). `session_start` tracked.
+- Public page views tracked via `AnalyticsTracker` (mounted in root layout inside `AuthProvider`), privacy-conscious (unauthenticated page_view allowed, rate-limited by IP, no PII recorded); not reliant on the dashboard hook alone.
+- `signup` and `session_start` events wired (`signup` page calls `trackSignup`; dashboard retains `trackSessionStart`).
+- `src/app/admin/analytics/page.tsx` fixed to read the same date-keyed `dailyAnalytics/YYYY-MM-DD` schema and `featureUsage.count` structure as the tracker; bounded 7-day trend reads.
+- New/updated tests in `tests/groups/k-analytics.spec.ts`: authorization, public page_view without token, repeated-page-view dedup, multiple distinct users, pageViews>=uniqueVisitors, feature-usage `count` consistency, signup/download daily+cumulative, session_start, UTC date boundaries, honest empty state.
+
+### Priority 5 — Standardize and verify builds
+- `next/font/google` (Inter) builds successfully; Next.js self-hosts Google Fonts at build time, so no external font dependency at runtime.
+- Verified with `npm run build` (Turbopack): 58 routes generated.
+- Android artifact: not built in this environment (Android SDK not configured); the CI `android-build` job builds `assembleDebug` APK and, only when a keystore is provided, `bundleRelease` AAB — a signed Play Store release is only claimed if the release AAB artifact is actually produced.
+
+## Known blockers
+- Firebase emulators could not be kept running in this Windows/PowerShell shell, so the Playwright suite (desktop + mobile) and the API integration tests could NOT be executed here. They must be run in CI or an environment where `firebase emulators:start --project test-project` stays up on ports 9099/8080 and `next dev` serves localhost:3000.
 
 ---
-
-## Final Build Status
-- **TypeScript: 0 errors** ✅ (verified with `npx tsc --noEmit`)
-- **Lint: 0 errors** ✅ (101 pre-existing warnings, no new warnings introduced)
-- **Production build: ✅ succeeds** — all 58 routes generated correctly including `/api/leaderboard` and `/dashboard/leaderboard`
-- Firebase Admin initialization errors at build time are expected (no `.env.local` with service account credentials in this environment) but do not prevent build completion
-
----
-
-## Files Modified (key changes)
 - `src/contexts/AuthContext.tsx` — Full username lifecycle (signUp, completeOnboarding with username, changeUsername, needsOnboarding flag)
 - `src/types/index.ts` — `UserProfile.username?: string`
 - `src/app/api/username-check/route.ts` — Public GET endpoint for username availability (rate-limited, no auth during signup)
