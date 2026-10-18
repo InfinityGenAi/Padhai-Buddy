@@ -14,10 +14,12 @@ import {
   confirmPasswordReset,
   sendEmailVerification,
 } from "firebase/auth";
-import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, updateDoc, runTransaction } from "firebase/firestore";
 import { getFirebaseAuth, getFirestoreDb, waitForFirebaseInit } from "@/lib/firebase";
 import { deleteCurrentSession } from "@/lib/sessions";
 import type { UserProfile, UserBoard, UserClass, UserPreferences } from "@/types";
+
+const USERNAME_REGEX = /^[a-z0-9._]{3,20}$/;
 
 const DEFAULT_PREFERENCES: UserPreferences = {
   soundEnabled: false,
@@ -73,10 +75,12 @@ interface AuthContextType {
     password: string,
     cls?: UserClass,
     board?: UserBoard,
+    username?: string,
   ) => Promise<{ emailVerificationSent: boolean }>;
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
-  completeOnboarding: (cls: UserClass, board: UserBoard) => Promise<void>;
+  completeOnboarding: (cls: UserClass, board: UserBoard, username?: string) => Promise<void>;
+  changeUsername: (username: string) => Promise<void>;
   preferences: UserPreferences;
   updatePreferences: (prefs: Partial<UserPreferences>) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
@@ -135,7 +139,12 @@ getDoc(doc(db, "users", fbUser.uid))
           if (snap.exists()) {
             const data = snap.data() as UserProfile;
             setUser(data);
-            setNeedsOnboarding(false);
+            // Require onboarding if class/board or username is missing
+            if (!data.class || !data.board || !data.username) {
+              setNeedsOnboarding(true);
+            } else {
+              setNeedsOnboarding(false);
+            }
             const remotePrefs = data.preferences;
             const localPrefs = loadLocalPreferences();
             const merged: UserPreferences = {
@@ -161,7 +170,6 @@ getDoc(doc(db, "users", fbUser.uid))
         })
         .catch((err) => {
           const errorMessage = err instanceof Error ? err.message : String(err);
-          console.error("[AuthContext] Failed to load profile:", err);
           if (errorMessage.includes("permission") || errorMessage.includes("PERMISSION_DENIED")) {
             setAuthError("Permission denied loading your profile. Please sign out and sign back in.");
           } else {
@@ -224,6 +232,7 @@ getDoc(doc(db, "users", fbUser.uid))
       password: string,
       cls?: UserClass,
       board?: UserBoard,
+      username?: string,
     ): Promise<{ emailVerificationSent: boolean }> => {
       await waitForFirebaseInit();
       const auth = getFirebaseAuth();
@@ -233,6 +242,7 @@ getDoc(doc(db, "users", fbUser.uid))
       try {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(cred.user, { displayName: name });
+        const usernameToStore = username?.trim() || undefined;
 
         let emailVerificationSent = false;
         try {
@@ -254,12 +264,24 @@ getDoc(doc(db, "users", fbUser.uid))
               createdAt: Date.now(),
               preferences: { ...DEFAULT_PREFERENCES },
             };
+            if (usernameToStore) {
+              updated.username = usernameToStore;
+            }
             await setDoc(doc(db, "users", cred.user.uid), updated, { merge: true });
             setUser(updated);
             setNeedsOnboarding(false);
           }
         }
 
+        // Also store username mapping in users collection
+        if (usernameToStore) {
+          const db = getFirestoreDb();
+          if (db) {
+            try {
+              await setDoc(doc(db, "users", cred.user.uid), { username: usernameToStore }, { merge: true });
+            } catch {}
+          }
+        }
         return { emailVerificationSent };
       } catch (err) {
         if (auth.currentUser) {
@@ -292,12 +314,14 @@ getDoc(doc(db, "users", fbUser.uid))
     await signInWithPopup(auth, provider);
   }, []);
 
-  const completeOnboarding = useCallback(async (cls: UserClass, board: UserBoard) => {
+  const completeOnboarding = useCallback(async (cls: UserClass, board: UserBoard, username?: string) => {
     await waitForFirebaseInit();
     const auth = getFirebaseAuth();
     if (!auth || !auth.currentUser) throw new Error("Not authenticated");
     const db = getFirestoreDb();
     if (!db) throw new Error("Firestore not initialized");
+
+    const usernameToStore = username?.trim() || undefined;
 
     const updated: UserProfile = {
       uid: auth.currentUser.uid,
@@ -309,7 +333,22 @@ getDoc(doc(db, "users", fbUser.uid))
       preferences: { ...DEFAULT_PREFERENCES },
     };
 
+    if (usernameToStore) {
+      updated.username = usernameToStore;
+    }
+
     await setDoc(doc(db, "users", auth.currentUser.uid), updated, { merge: true });
+
+    // Claim the username mapping
+    if (usernameToStore) {
+      try {
+        await setDoc(doc(db, "usernameMappings", usernameToStore.toLowerCase()), {
+          uid: auth.currentUser.uid,
+          claimedAt: Date.now(),
+        });
+      } catch {}
+    }
+
     setUser(updated);
     setNeedsOnboarding(false);
   }, [user, firebaseUser]);
@@ -339,6 +378,74 @@ getDoc(doc(db, "users", fbUser.uid))
       }
     }
   }, [preferences]);
+
+  const changeUsername = useCallback(async (username: string) => {
+    await waitForFirebaseInit();
+    const auth = getFirebaseAuth();
+    if (!auth || !auth.currentUser) throw new Error("Not authenticated");
+    const db = getFirestoreDb();
+    if (!db) throw new Error("Firestore not initialized");
+
+    const normalizedUsername = username.toLowerCase().trim();
+
+    if (!USERNAME_REGEX.test(normalizedUsername)) {
+      throw new Error("Invalid username format");
+    }
+
+    const uid = auth.currentUser.uid;
+    const usernameRef = doc(db, "usernameMappings", normalizedUsername);
+    const userRef = doc(db, "users", uid);
+
+    await runTransaction(db, async (transaction) => {
+      const usernameSnap = await transaction.get(usernameRef);
+      const userSnap = await transaction.get(userRef);
+
+      if (!userSnap.exists) {
+        throw new Error("User profile not found");
+      }
+
+      const userData = userSnap.data() as { username?: string } | undefined;
+
+      // If user already has this username, it's idempotent success
+      if (userData?.username === normalizedUsername) {
+        return;
+      }
+
+      // If username mapping exists and belongs to a different user, fail
+      if (usernameSnap.exists()) {
+        const existingData = usernameSnap.data() as { uid: string } | undefined;
+        if (existingData?.uid !== uid) {
+          throw new Error("USERNAME_TAKEN");
+        }
+      }
+
+      // Release old username mapping if exists
+      const oldUsername = userData?.username;
+      if (oldUsername && oldUsername !== normalizedUsername) {
+        const oldRef = doc(db, "usernameMappings", oldUsername.toLowerCase());
+        const oldSnap = await transaction.get(oldRef);
+        if (oldSnap.exists()) {
+          const oldData = oldSnap.data() as { uid: string } | undefined;
+          if (oldData?.uid === uid) {
+            transaction.delete(oldRef);
+          }
+        }
+      }
+
+      // Claim the new username
+      transaction.set(usernameRef, {
+        uid,
+        claimedAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+
+      // Update user profile
+      transaction.update(userRef, { username: normalizedUsername });
+    });
+
+    // Reload profile to reflect changes
+    reloadProfile();
+  }, [reloadProfile]);
 
   const logout = useCallback(async () => {
     await waitForFirebaseInit();
@@ -398,6 +505,7 @@ getDoc(doc(db, "users", fbUser.uid))
         signInWithGoogle,
         logout,
         completeOnboarding,
+        changeUsername,
         preferences,
         updatePreferences,
         sendPasswordReset,

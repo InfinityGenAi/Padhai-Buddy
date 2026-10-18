@@ -192,6 +192,7 @@ async function ensureFirestoreUser(uid: string) {
     email: "test@padhai-buddy.test",
     class: 10,
     board: "CBSE",
+    username: "testuser",
     createdAt: Date.now(),
     preferences: {
       soundEnabled: false,

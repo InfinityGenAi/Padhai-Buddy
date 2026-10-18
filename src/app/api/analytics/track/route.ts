@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     const now = Date.now();
     const userDate = new Date();
-    const dateStr = userDate.toISOString().split("T")[0]; // UTC date for daily aggregates
+    const dateStr = userDate.toISOString().split("T")[0]; // UTC date for daily aggregates, consistent with admin readers
 
     const batch = adminDb.batch();
 
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     // and avoid storing large activeUserIds arrays (Firestore doc limit: 1MB)
     const dailyRef = adminDb.collection("dailyAnalytics").doc(dateStr);
     
-    // Prepare update data with atomic increments
+    // Prepare update data with atomic increments - only increment the event that occurred
     const dailyUpdate: Record<string, unknown> = {
       date: dateStr,
       updatedAt: now,
@@ -78,15 +78,25 @@ export async function POST(req: NextRequest) {
     // Use FieldValue.increment for atomic counter updates
     if (event === "page_view") {
       dailyUpdate.pageViews = FieldValue.increment(1);
+      // Estimated unique visitor increment - only for authenticated sessions
+      if (decoded?.uid) {
+        dailyUpdate.uniqueVisitors = FieldValue.increment(1);
+      }
     }
     if (event === "feature_use") {
       dailyUpdate.featureUses = FieldValue.increment(1);
     }
     if (event === "signup") {
       dailyUpdate.signups = FieldValue.increment(1);
+      // Initialize/update cumulative total signups
+      dailyUpdate.totalSignups = FieldValue.increment(1);
     }
-    // Note: activeUsers tracking removed to avoid large array growth
-    // Use a separate dailyActiveUsers collection if needed for exact counts
+    if (event === "download") {
+      dailyUpdate.todayDownloads = FieldValue.increment(1);
+      dailyUpdate.totalDownloads = FieldValue.increment(1);
+    }
+    // Note: activeUsers tracking - use a separate dailyActiveUsers collection for exact counts
+    // returningUsers are tracked via session persistence on the client side
 
     batch.set(dailyRef, dailyUpdate, { merge: true });
 

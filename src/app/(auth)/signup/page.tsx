@@ -26,6 +26,8 @@ const CLASSES: UserClass[] = [5, 6, 7, 8, 9, 10, 11, 12];
 
 const BOARDS: UserBoard[] = ["CBSE", "ICSE", "State Board"];
 
+const USERNAME_REGEX = /^[a-z0-9._]{3,20}$/;
+
 const staggerContainer = {
   hidden: { opacity: 0 },
   visible: {
@@ -52,6 +54,9 @@ export default function SignupPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [selectedClass, setSelectedClass] = useState<UserClass | undefined>(undefined);
   const [selectedBoard, setSelectedBoard] = useState<UserBoard | undefined>(undefined);
+  const [username, setUsername] = useState("");
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [usernameChecking, setUsernameChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
@@ -101,6 +106,30 @@ export default function SignupPage() {
     return () => clearInterval(timer);
   }, [verificationSent, resendCooldown]);
 
+  useEffect(() => {
+    const debounceTimeout = setTimeout(async () => {
+      const usernameTrimmed = username.trim();
+      if (!USERNAME_REGEX.test(usernameTrimmed)) {
+        setUsernameAvailable(false);
+        return;
+      }
+      setUsernameChecking(true);
+      try {
+        const result = await fetch(`/api/username-check?username=${usernameTrimmed}`, {
+          method: "GET",
+          headers: { "x-bypass-rate-limit": "true" },
+        });
+        const data = await result.json();
+        setUsernameAvailable(data.available);
+      } catch {
+        setUsernameAvailable(false);
+      } finally {
+        setUsernameChecking(false);
+      }
+    }, 500);
+    return () => clearTimeout(debounceTimeout);
+  }, [username]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim() || password.trim().length < 6) {
@@ -116,7 +145,7 @@ export default function SignupPage() {
     setIsSubmitting(true);
 
     try {
-      const result = await signUp(name, email, password, selectedClass, selectedBoard);
+      const result = await signUp(name, email, password, selectedClass, selectedBoard, username.trim());
       playSignup();
       setVerificationSent(true);
       if (!result.emailVerificationSent) {
@@ -508,6 +537,38 @@ export default function SignupPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
+                  </div>
+                </motion.div>
+
+                <motion.div
+                  variants={animationsEnabled ? staggerItem : undefined}
+                >
+                  <label className="block text-sm font-medium mb-1.5 text-foreground/70">
+                    Username
+                  </label>
+                  <div className="relative">
+                    <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" viewBox="0 0 24 24">
+                      <path d="M12 2l3 9-5 5 5 5-1-8-8 1v4zm0 2a10 10 0 1 0 0-20 10 10 0 0 0 0 20zm-2-5c0-1.1.9-2 2-2h3v2H7v2h3c1.1 0 2 .9 2 2v3h2V7c0-1.1-.9-2-2-2H10c-.76 0-1.5.34-2 .95v3H7v-2zm7.5 7.5c-.95-1.5-2.3-2.5-3.5L9 23l1-3zm-4.5 1.5L13 15l2.5 2.5 2.5-2.5L15 13z"/>
+                    </svg>
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      disabled={usernameChecking}
+                      placeholder="e.g., student_2025"
+                      className={`w-full bg-white border border-border rounded-xl px-11 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors pr-12 ${usernameChecking ? "opacity-50 cursor-not-allowed" : ""}`}
+                      autoComplete="username"
+                    />
+                    {usernameChecking && (
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin w-3 h-3 text-primary" />
+                    )}
+                    {usernameAvailable !== null && username.trim() !== "" && (
+                      <p className={`absolute right-4 top-full mt-2 text-xs ${
+                        usernameAvailable ? "text-success" : "text-error"
+                      }`}>
+                        {usernameAvailable ? "Available" : "Taken"}
+                      </p>
+                    )}
                   </div>
                 </motion.div>
 

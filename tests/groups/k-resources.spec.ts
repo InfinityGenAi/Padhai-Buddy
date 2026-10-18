@@ -8,57 +8,6 @@ test.describe("K. Resources Tests", () => {
     await mockSessionsRoute(page);
     createdResources.length = 0;
 
-    await page.route("/api/resources", async (route) => {
-      const method = route.request().method();
-
-      if (method === "GET") {
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({ resources: [...createdResources] }),
-        });
-        return;
-      }
-
-      const postData = await route.request().postData();
-      const body = JSON.parse(postData || "{}");
-
-      if (body.action === "create" || body.action === "update") {
-        const resource = {
-          id: body.resourceId || "res-" + Date.now(),
-          title: body.title,
-          subject: body.subject,
-          type: body.type || "link",
-          description: body.description || "",
-          url: body.url || "",
-        };
-        createdResources.push(resource);
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({ resource }),
-        });
-        return;
-      }
-
-      if (body.action === "delete") {
-        const idx = createdResources.findIndex((r) => r.id === body.resourceId);
-        if (idx >= 0) createdResources.splice(idx, 1);
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({ success: true }),
-        });
-        return;
-      }
-
-      await route.fulfill({
-        status: 404,
-        contentType: "application/json",
-        body: JSON.stringify({ error: "Not found" }),
-      });
-    });
-
     await page.goto("http://localhost:3000/dashboard/resources/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("h1:has-text('Resources')").first()).toBeAttached();

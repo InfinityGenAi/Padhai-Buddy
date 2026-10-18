@@ -1,11 +1,11 @@
 import { test, expect } from "@playwright/test";
-import { mockSessionsRoute, waitForPersistedMessages } from "../utils/test-helpers";
+import { mockSessionsRoute, waitForPageReady, waitForPersistedMessages } from "../utils/test-helpers";
 
 test.describe("D. History Tests", () => {
   test.beforeEach(async ({ page }) => {
     await mockSessionsRoute(page);
     await page.goto("http://localhost:3000/dashboard/history/");
-    await page.waitForLoadState("domcontentloaded");
+    await waitForPageReady(page, "History");
   });
 
   test("history page loads", async ({ page }) => {
@@ -42,7 +42,7 @@ test.describe("D. History Tests", () => {
     });
 
     await page.goto("http://localhost:3000/dashboard/chat/");
-    await page.waitForLoadState("domcontentloaded");
+    await waitForPageReady(page, "Chat");
 
     const input = page.locator("textarea, input[type='text']").first();
     await expect(input).toBeAttached();
@@ -71,7 +71,7 @@ test.describe("D. History Tests", () => {
     await waitForPersistedMessages("Persist me in history please", 2, 60000);
 
     await page.goto("http://localhost:3000/dashboard/history/");
-    await page.waitForLoadState("domcontentloaded");
+    await waitForPageReady(page, "History");
     await page.locator("button:has-text('Chats (')").first().click();
 
     const convCard = page.locator("text=Persist me in history please").first();

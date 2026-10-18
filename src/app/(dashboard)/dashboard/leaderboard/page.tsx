@@ -5,12 +5,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   TrophyIcon,
-  ChatBubbleLeftEllipsisIcon,
-  BookOpenIcon,
-  ClockIcon,
-  DocumentTextIcon,
-  SparklesIcon,
-  CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 
 export default function LeaderboardPage() {
@@ -18,114 +12,176 @@ export default function LeaderboardPage() {
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
 
-  const [stats, setStats] = useState({
-    doubts: 0,
-    quizzes: 0,
-    avgScore: 0,
-    sessions: 0,
-    flashcards: 0,
-    notes: 0,
-    plansCompleted: 0,
-  });
+  const [leaderboard, setLeaderboard] = useState<Array<{
+    rank: number;
+    displayName: string;
+    score: number;
+    tier: string;
+    totalDoubts: number;
+    totalQuizzes: number;
+    totalFlashcards: number;
+    totalNotes: number;
+    totalStudySessions: number;
+    completedPlans: number;
+    badgeClass: string;
+  }>>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user?.uid) return;
     (async () => {
       try {
         const token = await (await import("@/lib/auth-utils")).getFirebaseIdToken();
-        const res = await fetch("/api/progress", { headers: { Authorization: `Bearer ${token}` } });
+        const res = await fetch("/api/leaderboard", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         const data = await res.json();
-        if (res.ok && data.stats) {
-          setStats({
-            doubts: data.stats.totalDoubts || 0,
-            quizzes: data.stats.totalQuizzes || 0,
-            avgScore: data.stats.avgQuizScore || 0,
-            sessions: data.stats.totalStudySessions || 0,
-            flashcards: data.stats.totalFlashcards || 0,
-            notes: data.stats.totalNotes || 0,
-            plansCompleted: data.stats.plansCompleted || 0,
+        if (res.ok && data.users) {
+          const users = data.users.map((user: { displayName?: string; score: number; totalDoubts?: number; totalQuizzes?: number; totalFlashcards?: number; totalNotes?: number; totalStudySessions?: number; completedPlans?: number }, index: number) => {
+            const tier =
+              user.score >= 500
+                ? "Gold"
+                : user.score >= 200
+                ? "Silver"
+                : user.score >= 50
+                ? "Bronze"
+                : "Beginner";
+            let badgeClass: string;
+            if (tier === "Gold") {
+              badgeClass = "bg-primary/20 text-primary";
+            } else if (tier === "Silver") {
+              badgeClass = "bg-secondary/20 text-secondary";
+            } else if (tier === "Bronze") {
+              badgeClass = "bg-foreground/10 text-foreground/60";
+            } else {
+              badgeClass = "bg-foreground/5 text-foreground/40";
+            }
+            return {
+              rank: index + 1,
+              displayName: user.displayName || `User ${index + 1}`,
+              score: user.score || 0,
+              tier: tier,
+              totalDoubts: user.totalDoubts || 0,
+              totalQuizzes: user.totalQuizzes || 0,
+              totalFlashcards: user.totalFlashcards || 0,
+              totalNotes: user.totalNotes || 0,
+              totalStudySessions: user.totalStudySessions || 0,
+              completedPlans: user.completedPlans || 0,
+              badgeClass: badgeClass,
+            };
           });
+          setLeaderboard(users);
         }
-      } catch {
-        // ignore
+      } catch (error) {
+        console.error("Leaderboard fetch error:", error);
       } finally {
         setLoading(false);
       }
     })();
   }, [user?.uid]);
 
-  const totalScore = stats.doubts * 10 + stats.quizzes * 20 + stats.sessions * 5 + stats.flashcards * 5 + stats.notes * 5 + stats.plansCompleted * 15;
-
-  const tier = totalScore >= 500 ? "Gold" : totalScore >= 200 ? "Silver" : totalScore >= 50 ? "Bronze" : "Beginner";
-
-  const activities = [
-    { label: "Doubts Solved", value: stats.doubts, icon: ChatBubbleLeftEllipsisIcon, points: 10 },
-    { label: "Quizzes Taken", value: stats.quizzes, icon: BookOpenIcon, points: 20 },
-    { label: "Study Sessions", value: stats.sessions, icon: ClockIcon, points: 5 },
-    { label: "Flashcards Reviewed", value: stats.flashcards, icon: SparklesIcon, points: 5 },
-    { label: "Notes Created", value: stats.notes, icon: DocumentTextIcon, points: 5 },
-    { label: "Plans Completed", value: stats.plansCompleted, icon: CheckCircleIcon, points: 15 },
-  ];
+  if (loading) {
+    return (
+      <motion.div
+        initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined}
+        animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined}
+        className="min-h-screen flex items-center justify-center p-4"
+      >
+        <div className="text-center">
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary/90 flex items-center justify-center text-primary text-2xl font-bold mx-auto mb-3">
+            <TrophyIcon className="w-6 h-6" />
+          </div>
+          <h1 className="text-2xl font-bold text-foreground">Loading Leaderboard</h1>
+          <p className="text-foreground/60 mt-2">Fetching top users...</p>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
-    <motion.div initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined} animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined} className="space-y-6 w-full">
+    <motion.div
+      initial={animationsEnabled ? { opacity: 0, y: 10 } : undefined}
+      animate={animationsEnabled ? { opacity: 1, y: 0 } : undefined}
+      className="space-y-6 w-full"
+    >
       <div className="flex items-center gap-2">
         <TrophyIcon className="w-6 h-6 text-primary" />
-        <h1 className="text-xl font-semibold">Study Progress</h1>
+        <h1 className="text-xl font-semibold">Top 10 Leaderboard</h1>
       </div>
 
-      <div className="subtle-card rounded-xl p-6 text-center">
-        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-2xl font-bold mx-auto mb-3">
-          {tier === "Gold" ? (
-            <TrophyIcon className="w-10 h-10" />
-          ) : tier === "Silver" ? (
-            <TrophyIcon className="w-10 h-10" />
-          ) : tier === "Bronze" ? (
-            <TrophyIcon className="w-10 h-10" />
-          ) : (
-            <span className="text-3xl">🌱</span>
-          )}
+      <p className="text-foreground/60 mb-4">
+        Server-verified scores based on real activity records. Never trust client-submitted scores.
+      </p>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border bg-foreground/5">
+              <th className="text-left py-3 px-4 font-medium text-foreground/60">Rank</th>
+              <th className="text-left py-3 px-4 font-medium text-foreground/60">User</th>
+              <th className="text-right py-3 px-4 font-medium text-foreground/60">Score</th>
+              <th className="text-left py-3 px-4 font-medium text-foreground/60">Tier</th>
+              <th className="text-left py-3 px-4 font-medium text-foreground/60">Activity</th>
+            </tr>
+          </thead>
+          <tbody>
+            {leaderboard.length > 0 ? (
+              leaderboard.map((user) => (
+                <tr
+                  key={user.rank}
+                  className={user.rank <= 3 ? "bg-primary/5" : ""}
+                >
+                  <td className="py-3 px-4 font-medium text-primary">
+                    {user.rank}
+                  </td>
+                  <td className="py-3 px-4 font-medium text-foreground/70">
+                    {user.displayName}
+                  </td>
+                  <td className="py-3 px-4 text-right font-bold text-primary">
+                    {user.score.toLocaleString()}
+                  </td>
+                  <td className="py-3 px-4">
+                    <span className={user.badgeClass}>
+                      {user.tier}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 text-foreground/50 text-xs">
+                    {user.totalDoubts}d·{user.totalQuizzes}q·{user.totalNotes}n·{user.totalStudySessions}s·{user.completedPlans}p
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={5} className="py-8 text-center text-foreground/50">
+                  No leaderboard data available yet. Be the first to earn points!
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Summary section below the table */}
+      {leaderboard.length > 0 && (
+        <div className="bg-white border border-border rounded-xl p-6 shadow-xl mt-6">
+          <h3 className="text-lg font-semibold mb-4">How Scoring Works</h3>
+          <dl className="space-y-1 text-sm text-foreground/70">
+            <div className="flex justify-between"><dt>Doubts Solved</dt><dd>10 pts each</dd></div>
+            <div className="flex justify-between"><dt>Quizzes Taken</dt><dd>20 pts each</dd></div>
+            <div className="flex justify-between"><dt>Study Sessions</dt><dd>5 pts each</dd></div>
+            <div className="flex justify-between"><dt>Flashcards Reviewed</dt><dd>5 pts each</dd></div>
+            <div className="flex justify-between"><dt>Notes Created</dt><dd>5 pts each</dd></div>
+            <div className="flex justify-between"><dt>Plans Completed</dt><dd>15 pts each</dd></div>
+          </dl>
+          <p className="text-foreground/50 mt-3">Scores are server-verified from real activity records only.</p>
         </div>
-        <h2 className="text-lg font-bold">{tier} Tier</h2>
-        <p className="text-sm text-foreground/60 mt-1">Your personal study score: <span className="font-semibold text-primary">{totalScore}</span></p>
-        <p className="text-xs text-foreground/50 mt-2">This is your personal progress tracker, not a global leaderboard.</p>
-      </div>
+      )}
 
-      <div className="subtle-card rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-foreground/75 mb-4">Your Activity Breakdown</h3>
-        {loading ? (
-          <div className="space-y-3">{[1, 2, 3, 4, 5, 6].map((i) => <div key={i} className="h-8 bg-foreground/5 rounded-lg animate-pulse" />)}</div>
-        ) : (
-          <div className="space-y-3">
-            {activities.map((activity) => (
-              <div key={activity.label} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <activity.icon className="w-4 h-4 text-foreground/50" />
-                  <span className="text-sm text-foreground/70">{activity.label}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-sm font-semibold">{activity.value}</span>
-                  <span className="text-xs text-foreground/40 ml-1">+{activity.value * activity.points} pts</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="subtle-card rounded-xl p-5 bg-primary/5 border-primary/20">
-        <h3 className="text-sm font-semibold text-foreground/75 mb-2">How Scoring Works</h3>
-        <dl className="space-y-1 text-sm text-foreground/70">
-          <div className="flex justify-between"><dt>Doubts Solved</dt><dd>10 pts each</dd></div>
-          <div className="flex justify-between"><dt>Quizzes Taken</dt><dd>20 pts each</dd></div>
-          <div className="flex justify-between"><dt>Study Sessions</dt><dd>5 pts each</dd></div>
-          <div className="flex justify-between"><dt>Flashcards Reviewed</dt><dd>5 pts each</dd></div>
-          <div className="flex justify-between"><dt>Notes Created</dt><dd>5 pts each</dd></div>
-          <div className="flex justify-between"><dt>Plans Completed</dt><dd>15 pts each</dd></div>
-        </dl>
-        <p className="text-xs text-foreground/50 mt-3">Scores are personal and not compared with other users.</p>
-      </div>
+      {/* Bottom note - protect privacy */}
+      <p className="text-foreground/50 text-center text-sm mt-4">
+        {leaderboard.length > 0
+          ? `Top ${leaderboard.length} users shown out of eligible users`
+          : "No users have earned scores yet. Complete activities to appear on the leaderboard!"}
+      </p>
     </motion.div>
   );
 }

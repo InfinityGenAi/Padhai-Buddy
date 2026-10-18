@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -348,6 +349,23 @@ export default function Home() {
         {/* AI Tutor Showcase */}
         <Section id="ai-tutor" className="py-16 lg:py-24" animate={animationsEnabled}>
           <Container size="xl">
+            {/* Study photo */}
+            <motion.div
+              initial={animationsEnabled ? { opacity: 0, y: 20 } : false}
+              animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
+              transition={{ duration: 0.6, ease: "easeOut" }}
+              className="mb-16 text-center"
+            >
+              <Image
+                src="/images/hero-study.jpg"
+                alt="Boy studying with laptop and notebooks at a desk"
+                fill
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                className="w-80 h-auto mx-auto mb-6 rounded-xl object-cover"
+                priority
+              />
+            </motion.div>
+
             <AnimatedContainer variant="slide-up" delay={0.1} animate={animationsEnabled} className="text-center mb-16">
               <h2 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-foreground mb-4 tracking-tight">
                 AI Tutor — Your Personal Study Companion
@@ -402,6 +420,17 @@ export default function Home() {
               </p>
             </AnimatedContainer>
 
+            <div className="text-center mb-12">
+              <Image
+                src="/images/study-notebooks.jpg"
+                alt="Student with notebooks studying at a desk"
+                fill
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                className="w-64 h-auto mx-auto mb-4 rounded-xl object-cover"
+                priority
+              />
+            </div>
+
             <StaggeredReveal staggerDelay={0.08} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {features.map((feature) => (
                 <Card
@@ -442,6 +471,17 @@ export default function Home() {
                 A continuous learning cycle that adapts to your progress and helps you improve every day.
               </p>
             </AnimatedContainer>
+
+            <div className="text-center mb-12">
+              <Image
+                src="/images/study-library.jpg"
+                alt="Student studying in library with books"
+                fill
+                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                className="w-64 h-auto mx-auto mb-4 rounded-xl object-cover"
+                priority
+              />
+            </div>
 
             <div className="relative">
               {/* Connecting line for desktop */}

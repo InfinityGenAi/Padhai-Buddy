@@ -8,56 +8,6 @@ test.describe("G. Notes Tests", () => {
     await mockSessionsRoute(page);
     createdNotes.length = 0;
 
-    await page.route("/api/notes", async (route) => {
-      const method = route.request().method();
-
-      if (method === "GET") {
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({ notes: [...createdNotes] }),
-        });
-        return;
-      }
-
-      const postData = await route.request().postData();
-      const body = JSON.parse(postData || "{}");
-
-      if (body.action === "create" || body.action === "update") {
-        const note = {
-          id: body.noteId || "note-" + Date.now(),
-          title: body.title,
-          subject: body.subject,
-          body: body.body || "",
-          updatedAt: Date.now(),
-        };
-        createdNotes.push(note);
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({ note }),
-        });
-        return;
-      }
-
-      if (body.action === "delete") {
-        const idx = createdNotes.findIndex((n) => n.id === body.noteId);
-        if (idx >= 0) createdNotes.splice(idx, 1);
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({ success: true }),
-        });
-        return;
-      }
-
-      await route.fulfill({
-        status: 404,
-        contentType: "application/json",
-        body: JSON.stringify({ error: "Not found" }),
-      });
-    });
-
     await page.goto("http://localhost:3000/dashboard/notes/");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.locator("h1:has-text('Notes')").first()).toBeAttached();
@@ -98,7 +48,6 @@ test.describe("G. Notes Tests", () => {
     await deleteBtn.click();
     await expect(page.locator("text=Delete Note").first()).toBeAttached();
     await page.click("button:has-text('Delete')");
-
     await expect(page.locator("text=Note to Delete")).not.toBeVisible();
   });
 });

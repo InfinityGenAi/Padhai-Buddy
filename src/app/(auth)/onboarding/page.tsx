@@ -18,6 +18,7 @@ export default function OnboardingPage() {
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [selectedClass, setSelectedClass] = useState<UserClass | undefined>(undefined);
   const [selectedBoard, setSelectedBoard] = useState<UserBoard | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,7 +56,7 @@ export default function OnboardingPage() {
     setIsSubmitting(true);
 
     try {
-      await completeOnboarding(selectedClass, selectedBoard);
+      await completeOnboarding(selectedClass, selectedBoard, username.trim());
       router.replace("/dashboard");
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
@@ -158,6 +159,24 @@ export default function OnboardingPage() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1.5">
+                Username
+              </label>
+              <div className="relative">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/40" viewBox="0 0 24 24">
+                  <path d="M12 2l3 9-5 5 5 5-1-8-8 1v4zm0 2a10 10 0 1 0 0-20 10 10 0 0 0 0 20zm-2-5c0-1.1.9-2 2-2h3v2H7v2h3c1.1 0 2 .9 2 2v3h2V7c0-1.1-.9-2-2-2H10c-.76 0-1.5.34-2 .95v3H7v-2zm7.5 7.5c-.95-1.5-2.3-2.5-3.5L9 23l1-3zm-4.5 1.5L13 15l2.5 2.5 2.5-2.5L15 13z"/>
+                </svg>
+                <input
+                  type="text"
+                  value={username ?? ""}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Enter username (optional)"
+                  className="pl-32 w-full bg-input-bg border border-input-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary appearance-none"
+                />
+              </div>
             </div>
 
             <button

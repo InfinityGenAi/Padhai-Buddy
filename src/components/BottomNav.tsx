@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import BrandLogo from "@/components/BrandLogo";
 import {
   HomeIcon,
   SparklesIcon,
@@ -37,6 +38,7 @@ export default function BottomNav() {
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-card/90 border-t border-border z-40 backdrop-blur-xl">
       <div className="flex py-1">
+        <BrandLogo size={24} className="flex-shrink-0" />
         {navItems.map((item) => {
           const active = isActive(item.href);
           const Icon = item.icon;

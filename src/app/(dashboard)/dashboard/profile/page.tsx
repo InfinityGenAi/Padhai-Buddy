@@ -11,7 +11,7 @@ import type { UserBoard, UserClass } from "@/types";
 import { safeFetch } from "@/lib/api-client";
 
 export default function ProfilePage() {
-  const { user, preferences, reloadProfile } = useAuth();
+  const { user, preferences, reloadProfile, changeUsername } = useAuth();
   const router = useRouter();
   const reducedMotion = useReducedMotion();
   const animationsEnabled = preferences.animationsEnabled && !reducedMotion;
@@ -20,6 +20,7 @@ export default function ProfilePage() {
   const [selectedClass, setSelectedClass] = useState<UserClass>(() => user?.class || 10);
   const [selectedBoard, setSelectedBoard] = useState<UserBoard>(() => user?.board || "CBSE");
   const [photoURL, setPhotoURL] = useState(() => user?.photoURL || "");
+  const [username, setUsername] = useState(() => user?.username || "");
   const [saving, setSaving] = useState(false);
   const [notification, setNotification] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -36,6 +37,23 @@ export default function ProfilePage() {
         board: selectedBoard,
       };
       if (photoURL.trim()) updates.photoURL = photoURL.trim();
+
+      // Handle username change
+      const currentUsername = user?.username || "";
+      const newUsername = username.trim();
+      if (newUsername !== currentUsername) {
+        if (newUsername !== "") {
+          await changeUsername(newUsername);
+        } else {
+          // Clear username - send empty string to remove
+          const result = await safeFetch("/api/profile", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ ...updates, username: "" }),
+          });
+          if (!result.success) throw new Error(result.error || "Failed to clear username");
+        }
+      }
 
       const result = await safeFetch("/api/profile", {
         method: "POST",
@@ -79,7 +97,12 @@ export default function ProfilePage() {
           </div>
           <div className="text-center">
             <h2 className="text-lg font-bold text-foreground">{name || "Student"}</h2>
-            <p className="text-sm text-foreground/50">Class {selectedClass} - {selectedBoard}</p>
+            {username ? (
+              <p className="text-sm text-foreground/50">@{username}</p>
+            ) : (
+              <p className="text-sm text-foreground/50">No username set</p>
+            )}
+            <p className="text-xs text-foreground/40">Class {selectedClass} - {selectedBoard}</p>
           </div>
         </div>
 
@@ -133,6 +156,23 @@ export default function ProfilePage() {
             <option value="ICSE">ICSE</option>
             <option value="State Board">State Board</option>
           </select>
+        </div>
+
+        <div>
+          <label className="text-xs text-foreground/60 mb-1 block">Username</label>
+          <div className="relative">
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="e.g., student_2025"
+              className="w-full bg-background border border-border rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+              maxLength={20}
+            />
+          </div>
+          <p className="text-xs text-foreground/40 mt-1">
+            3-20 characters, lowercase letters, numbers, underscores and periods only
+          </p>
         </div>
 
         <div className="flex gap-2 justify-end pt-2">

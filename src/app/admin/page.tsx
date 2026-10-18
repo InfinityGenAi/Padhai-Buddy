@@ -274,7 +274,6 @@ function OverviewSection() {
     totalDownloads: 0,
     todayReturning: 0,
     totalReturning: 0,
-    activeUsers: 0,
     totalRegistered: 0,
   });
   const [percentageChanges, setPercentageChanges] = useState({
@@ -290,22 +289,26 @@ function OverviewSection() {
         return;
       }
 
-      const dailyRef = doc(db, "dailyAnalytics", "current");
+      const today = new Date();
+      const dateStr = today.toISOString().split("T")[0];
+
+      // Read from today's date-keyed document (matching the tracking endpoint)
+      const dailyRef = doc(db, "dailyAnalytics", dateStr);
       const snap = await getDoc(dailyRef);
 
       if (snap.exists()) {
         const data = snap.data();
+        // Map fields: pageViews = total page-view events, uniqueVisitors = estimated unique visitors
         setStats({
-          todayVisitors: data.todayVisitors ?? 0,
-          totalVisitors: data.totalVisitors ?? 0,
-          todaySignups: data.todaySignups ?? 0,
-          totalSignups: data.totalSignups ?? 0,
-          todayDownloads: data.todayDownloads ?? 0,
-          totalDownloads: data.totalDownloads ?? 0,
-          todayReturning: data.todayReturning ?? 0,
-          totalReturning: data.totalReturning ?? 0,
-          activeUsers: data.activeUsers ?? 0,
-          totalRegistered: data.totalRegistered ?? 0,
+          todayVisitors: data.uniqueVisitors ?? 0,        // estimated unique visitors (NOT pageViews)
+          totalVisitors: data.totalVisitors ?? 0,         // cumulative total visitors (stored separately)
+          todaySignups: data.signups ?? 0,                // total signups
+          totalSignups: data.totalSignups ?? 0,           // cumulative total signups
+          todayDownloads: data.todayDownloads ?? 0,       // today's downloads
+          totalDownloads: data.totalDownloads ?? 0,        // cumulative total downloads
+          todayReturning: data.todayReturning ?? 0,       // today's returning users
+          totalReturning: data.totalReturning ?? 0,       // cumulative total returning
+          totalRegistered: data.totalRegistered ?? 0,      // total registered users
         });
 
         const calculatePct = (current: number, previous: number) => {
@@ -314,17 +317,18 @@ function OverviewSection() {
           return ((current - previous) / previous) * 100;
         };
 
+        // Use stored delta values if available, otherwise calculate from current vs previous day
         setPercentageChanges({
-          visitors: calculatePct((data.todayVisitors ?? 0), (data.prevVisitors ?? 0)),
-          signups: calculatePct((data.todaySignups ?? 0), (data.prevSignups ?? 0)),
-          downloads: calculatePct((data.todayDownloads ?? 0), (data.prevDownloads ?? 0)),
-          returning: calculatePct((data.todayReturning ?? 0), (data.prevReturning ?? 0)),
+          visitors: calculatePct((data.todayVisitors ?? 0), (data._prevTodayVisitors ?? 0)),
+          signups: calculatePct((data.todaySignups ?? 0), (data._prevTodaySignups ?? 0)),
+          downloads: calculatePct((data.todayDownloads ?? 0), (data._prevTodayDownloads ?? 0)),
+          returning: calculatePct((data.todayReturning ?? 0), (data._prevTodayReturning ?? 0)),
         });
       } else {
         setStats({
           todayVisitors: 0, totalVisitors: 0, todaySignups: 0, totalSignups: 0,
           todayDownloads: 0, totalDownloads: 0, todayReturning: 0, totalReturning: 0,
-          activeUsers: 0, totalRegistered: 0,
+          totalRegistered: 0,
         });
         setPercentageChanges({ visitors: 0, signups: 0, downloads: 0, returning: 0 });
       }
@@ -392,11 +396,6 @@ function OverviewSection() {
       </div>
 
       <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
-        <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Active Users</p>
-        <p className="text-5xl font-bold text-foreground">{stats.activeUsers.toLocaleString()}</p>
-      </div>
-
-      <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
         <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Total Registered</p>
         <p className="text-5xl font-bold text-foreground">{stats.totalRegistered.toLocaleString()}</p>
       </div>
@@ -407,12 +406,12 @@ function OverviewSection() {
 /* --- Analytics Section --- */
 function AnalyticsSection() {
   const [analytics, setAnalytics] = useState<{
-    dailyActiveUsers: { date: string; activeUsers?: number; signups?: number }[];
+    dailyUniqueVisitors: { date: string; uniqueVisitors?: number; signups?: number }[];
     weeklySignups: { date: string; count: number }[];
     featureUsage: { feature: string; count: number }[];
     loading: boolean;
   }>({
-    dailyActiveUsers: [],
+    dailyUniqueVisitors: [],
     weeklySignups: [],
     featureUsage: [],
     loading: true,
@@ -424,10 +423,19 @@ function AnalyticsSection() {
         const db = getFirestoreDb();
         if (!db) return;
 
-        // Fetch daily active users from dailyAnalytics collection
+        // Fetch daily unique visitors from dailyAnalytics collection.
+        // NOTE: uniqueVisitors is an estimate derived from page_view events with
+        // authenticated sessions. It is NOT independently measured active users.
         const analyticsRef = collection(db, "dailyAnalytics");
         const analyticsSnap = await getDocs(query(analyticsRef, orderBy("date", "desc"), limit(30)));
-        const dailyData = analyticsSnap.docs.map(d => ({ date: d.id, ...d.data() })) as { date: string; activeUsers?: number; signups?: number }[];
+        const dailyData = analyticsSnap.docs.map(d => {
+          const data = d.data();
+          return {
+            date: d.id,
+            uniqueVisitors: data.uniqueVisitors ?? 0,   // estimated unique visitors (NOT active users)
+            signups: data.signups ?? 0,
+          };
+        }) as { date: string; uniqueVisitors: number; signups: number }[];
 
         // Fetch feature usage
         const featureRef = collection(db, "featureUsage");
@@ -435,7 +443,7 @@ function AnalyticsSection() {
         const featureData = featureSnap.docs.map(d => ({ feature: d.id, ...d.data() })) as { feature: string; count: number }[];
 
         setAnalytics({
-          dailyActiveUsers: dailyData,
+          dailyUniqueVisitors: dailyData,
           weeklySignups: [],
           featureUsage: featureData,
           loading: false,
@@ -465,22 +473,22 @@ function AnalyticsSection() {
       <h1 className="text-4xl font-bold text-foreground mb-8">Admin Analytics</h1>
 
       <div className="mb-8">
-        <h2 className="text-2xl font-bold mb-4">Daily Active Users (Last 30 Days)</h2>
-        {analytics.dailyActiveUsers.length > 0 ? (
+        <h2 className="text-2xl font-bold mb-4">Daily Estimated Unique Visitors (Last 30 Days)</h2>
+        {analytics.dailyUniqueVisitors.length > 0 ? (
           <div className="bg-white border rounded-xl p-6 shadow-xl overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
                   <th className="text-left py-2 px-4 font-medium text-foreground/60">Date</th>
-                  <th className="text-right py-2 px-4 font-medium text-foreground/60">Active Users</th>
+                  <th className="text-right py-2 px-4 font-medium text-foreground/60">Estimated Unique Visitors</th>
                   <th className="text-right py-2 px-4 font-medium text-foreground/60">Signups</th>
                 </tr>
               </thead>
               <tbody>
-                {analytics.dailyActiveUsers.map((day, i) => (
+                {analytics.dailyUniqueVisitors.map((day, i) => (
                   <tr key={day.date} className={`border-b border-border/50 ${i % 2 === 0 ? "bg-foreground/5" : ""}`}>
                     <td className="py-2 px-4 font-mono">{day.date}</td>
-                    <td className="py-2 px-4 text-right font-medium">{day.activeUsers ?? 0}</td>
+                    <td className="py-2 px-4 text-right font-medium">{day.uniqueVisitors ?? 0}</td>
                     <td className="py-2 px-4 text-right">{day.signups ?? 0}</td>
                   </tr>
                 ))}

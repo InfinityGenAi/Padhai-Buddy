@@ -27,6 +27,7 @@ export interface UserProfile {
   board: UserBoard;
   createdAt: number;
   photoURL?: string;
+  username?: string;
   preferences?: UserPreferences;
 }
 
