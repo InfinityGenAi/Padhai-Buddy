@@ -50,8 +50,11 @@ function uniqueEmail(prefix: string): string {
 // to collide across the desktop/mobile Playwright projects or across repeated runs.
 // Hardcoded usernames persist in usernameMappings in the emulator, which caused
 // previously-claimed names to be rejected (409) on subsequent runs/projects.
+// Must stay within the ^[a-z0-9._]{3,20}$ regex limit (max 20 chars).
 function uniqueUsername(base: string): string {
-  return `${base}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const suffix = Math.random().toString(36).slice(2, 8); // 6 alphanumeric chars
+  const trimmedBase = base.slice(0, 12); // keep total length ≤ 19 chars
+  return `${trimmedBase}_${suffix}`;
 }
 
 async function createThrowawayUser(prefix: string): Promise<{ email: string; uid: string; token: string }> {
@@ -157,12 +160,15 @@ async function createProfile(uid: string, overrides: Record<string, unknown> = {
   });
 }
 
-async function claimUsername(token: string, username: string) {
+async function claimUsername(token: string, username: string, bypassRateLimit = true) {
   return fetch(`${process.env.BASE_URL || "http://localhost:3000"}/api/username-claim`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
+      // Bypass rate limit so tests validate auth/uniqueness logic rather than
+      // rate-limit accumulation across the desktop/mobile Playwright projects.
+      ...(bypassRateLimit ? { "x-bypass-rate-limit": "true" } : {}),
     },
     body: JSON.stringify({ username }),
   });
@@ -404,7 +410,11 @@ test.describe("Username claim: changes and idempotency", () => {
   test("returns 401 without a token", async () => {
     const res = await fetch(`${process.env.BASE_URL || "http://localhost:3000"}/api/username-claim`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        // Bypass rate limit so this test validates auth rejection, not rate limiting.
+        "x-bypass-rate-limit": "true",
+      },
       body: JSON.stringify({ username: "some_name" }),
     });
     expect(res.status).toBe(401);

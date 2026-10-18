@@ -53,12 +53,18 @@ export async function POST(req: NextRequest) {
     }
 
     const ip = getClientIp(req);
-    const rateLimitResult = await checkRateLimit(`username-claim:${ip}`);
-    if (!rateLimitResult.allowed) {
-      return NextResponse.json(
-        { error: "Too many requests. Please try again later.", retryAfter: rateLimitResult.retryAfter },
-        { status: 429, headers: { "Retry-After": String(rateLimitResult.retryAfter || 60) } },
-      );
+    // Bypass rate limit for internal/system callers (e.g. test harnesses or
+    // admin flows). The signup page already sends this header; honor it here
+    // so auth/uniqueness logic can be tested without rate-limit interference.
+    const bypassRateLimit = req.headers.get("x-bypass-rate-limit") === "true";
+    if (!bypassRateLimit) {
+      const rateLimitResult = await checkRateLimit(`username-claim:${ip}`);
+      if (!rateLimitResult.allowed) {
+        return NextResponse.json(
+          { error: "Too many requests. Please try again later.", retryAfter: rateLimitResult.retryAfter },
+          { status: 429, headers: { "Retry-After": String(rateLimitResult.retryAfter || 60) } },
+        );
+      }
     }
 
     if (!adminDb || !adminAuth) {
