@@ -53,10 +53,11 @@ export async function POST(req: NextRequest) {
     }
 
     const ip = getClientIp(req);
-    // Bypass rate limit for internal/system callers (e.g. test harnesses or
-    // admin flows). The signup page already sends this header; honor it here
-    // so auth/uniqueness logic can be tested without rate-limit interference.
-    const bypassRateLimit = req.headers.get("x-bypass-rate-limit") === "true";
+    // Allow a test-only bypass in non-production environments. Never trust a
+    // client-controlled header to disable production abuse protections.
+    const bypassRateLimit =
+      process.env.NODE_ENV !== "production" &&
+      req.headers.get("x-bypass-rate-limit") === "true";
     if (!bypassRateLimit) {
       const rateLimitResult = await checkRateLimit(`username-claim:${ip}`);
       if (!rateLimitResult.allowed) {
