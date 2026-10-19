@@ -130,7 +130,7 @@ export default function OnboardingPage() {
               <select
                 value={selectedClass ?? ""}
                 onChange={(e) => setSelectedClass(e.target.value ? Number(e.target.value) as UserClass : undefined)}
-                className="w-full bg-input-bg border border-input-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors appearance-none pr-10"
+                className="w-full bg-input-bg border border-input-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                 required
               >
                 <option value="">Select class</option>
@@ -149,7 +149,7 @@ export default function OnboardingPage() {
               <select
                 value={selectedBoard ?? ""}
                 onChange={(e) => setSelectedBoard(e.target.value ? e.target.value as UserBoard : undefined)}
-                className="w-full bg-input-bg border border-input-border rounded-xl px-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors appearance-none pr-10"
+                className="w-full bg-input-bg border border-input-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                 required
               >
                 <option value="">Select board</option>
