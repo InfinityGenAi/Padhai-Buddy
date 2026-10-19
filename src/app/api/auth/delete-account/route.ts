@@ -98,8 +98,8 @@ export async function POST(req: NextRequest) {
       await deleteNestedCollection(adminDb, `users/${uid}/flashcardDecks`, "cards");
 
       // Remove global documents/records owned by this UID.
-      await adminDb.collection("userScores").doc(uid).delete().catch(() => undefined);
-      await adminDb.collection("featureUsage").doc(uid).delete().catch(() => undefined);
+      await adminDb.collection("userScores").doc(uid).delete();
+      await adminDb.collection("featureUsage").doc(uid).delete();
 
       // Downloads store a userId on a global event collection; delete only
       // records belonging to this user and preserve aggregate analytics totals.
