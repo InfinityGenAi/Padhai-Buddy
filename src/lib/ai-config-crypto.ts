@@ -64,7 +64,8 @@ export function decryptAiConfig(
     const iv = Buffer.from(parts[0], "hex");
     const authTag = Buffer.from(parts[1], "hex");
     const encrypted = Buffer.from(parts[2], "hex");
-    if (iv.length !== 12 || authTag.length !== 16) return "";
+    // Legacy ciphertext used a 16-byte IV; current writes use 12 bytes.
+    if ((iv.length !== 12 && iv.length !== 16) || authTag.length !== 16) return "";
 
     for (const key of getEncryptionKeyCandidates(configuredKey, environment)) {
       try {
