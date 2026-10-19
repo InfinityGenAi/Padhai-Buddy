@@ -132,7 +132,14 @@ export async function POST(req: NextRequest) {
             date: dateStr,
             firstSeenAt: now,
           });
-          dailyUpdate.uniqueVisitors = FieldValue.increment(1);
+          // Read current uniqueVisitors and increment atomically
+          const dailySnap = await dailyRef.get();
+          const dailyData = dailySnap.data();
+          const currentUniqueVisitors =
+            typeof dailyData?.uniqueVisitors === "number"
+              ? dailyData.uniqueVisitors
+              : 0;
+          dailyUpdate.uniqueVisitors = currentUniqueVisitors + 1;
         }
       }
 
