@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 
 export async function GET() {
   const checks = {
@@ -16,12 +17,9 @@ export async function GET() {
   ];
   checks.firebaseClient = requiredClientEnvVars.every((key) => process.env[key]);
 
-  const requiredAdminEnvVars = [
-    "FIREBASE_ADMIN_PROJECT_ID",
-    "FIREBASE_ADMIN_CLIENT_EMAIL",
-    "FIREBASE_ADMIN_PRIVATE_KEY",
-  ];
-  checks.firebaseAdmin = requiredAdminEnvVars.every((key) => process.env[key]);
+  // Reflect whether the server-side SDK actually initialized, not just
+  // whether strings exist in the deployment environment.
+  checks.firebaseAdmin = Boolean(adminAuth && adminDb && !initializationError);
 
   checks.groqApi = !!process.env.GROQ_API_KEY;
 
