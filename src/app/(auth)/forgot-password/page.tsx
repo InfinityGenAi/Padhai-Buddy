@@ -116,7 +116,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <PublicAuthGuard blockDirectUrlEntry={false}>
-      <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
+      <div className="min-h-screen flex items-center justify-center relative overflow-x-hidden overflow-y-auto p-4 py-6 sm:py-8">
         <motion.div
           variants={animationsEnabled ? staggerContainer : undefined}
           initial={animationsEnabled ? "hidden" : false}
