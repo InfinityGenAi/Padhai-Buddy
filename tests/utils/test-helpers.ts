@@ -56,7 +56,6 @@ export function filterCriticalErrors(errors: string[]): string[] {
     if (lower.includes("404")) return false;
     if (lower.includes("static server")) return false;
     if (lower.includes("quota exceeded")) return false;
-    if (lower.includes("failed to load resource") && lower.includes("500")) return false;
     return true;
   });
 }
@@ -138,7 +137,7 @@ export async function mockSessionsRoute(page: Page) {
   });
 
   // Mock analytics endpoint to prevent 401 errors during tests
-  await page.route("/api/analytics/track", async (route) => {
+  await page.route(/\/api\/analytics\/track\/?$/, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
