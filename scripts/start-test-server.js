@@ -161,9 +161,38 @@ async function main() {
     const emulator = await startEmulators();
     console.log("[test-server] Emulators started");
     
+    // Verify emulator ports are actually reachable before starting Next.js.
+    // The "All emulators ready" message in stdout may fire before the emulator
+    // is actually accepting connections, especially under CI load.
+    console.log("[test-server] Verifying emulator ports are reachable...");
+    const emuWaitTimeout = 60000;
+    const emuStartTime = Date.now();
+    let emuReady = false;
+    while (Date.now() - emuStartTime < emuWaitTimeout) {
+      const a = await isPortInUse(AUTH_PORT);
+      const f = await isPortInUse(FIRESTORE_PORT);
+      if (a && f) {
+        emuReady = true;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    if (!emuReady) {
+      console.error("[test-server] ERROR: Emulator ports not reachable after startup");
+      process.exit(1);
+    }
+    console.log("[test-server] Emulator ports are reachable");
+    
     process.on("exit", () => emulator.kill("SIGTERM"));
   } else {
     console.log("[test-server] Emulators already running, skipping");
+    // Verify existing emulators are reachable
+    const a = await isPortInUse(AUTH_PORT);
+    const f = await isPortInUse(FIRESTORE_PORT);
+    if (!a || !f) {
+      console.error("[test-server] ERROR: Emulator ports not reachable despite being reported as in use");
+      process.exit(1);
+    }
   }
   
   if (nextInUse) {
