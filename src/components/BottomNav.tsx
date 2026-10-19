@@ -37,8 +37,14 @@ export default function BottomNav() {
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-card/90 border-t border-border z-40 backdrop-blur-xl">
-      <div className="flex py-1">
-        <BrandLogo size={24} className="flex-shrink-0" />
+      <div className="flex items-center py-1">
+        <Link
+          href="/dashboard"
+          aria-label="Padhai Buddy home"
+          className="flex h-14 w-12 flex-shrink-0 items-center justify-center"
+        >
+          <BrandLogo size={24} />
+        </Link>
         {navItems.map((item) => {
           const active = isActive(item.href);
           const Icon = item.icon;
