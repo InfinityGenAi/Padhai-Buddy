@@ -20,16 +20,13 @@ test.describe("More + Notifications Tests", () => {
   });
 
   test("resources link navigates correctly", async ({ page }) => {
-    // On mobile, the Resources link might be in a scrollable section with Framer Motion animations
-    const resourcesLink = page.locator("text=Resources").first();
-    // Wait for Framer Motion animations to complete - the element exists but is hidden during animation
-    await expect(resourcesLink).toBeAttached({ timeout: 15000 });
-    // Wait longer for animations to finish and element to become visible
-    await page.waitForTimeout(2000);
-    // Click the Playwright Locator directly
+    // The desktop sidebar is hidden on mobile. Scope to the page content so
+    // this always targets the visible Resources link in the More section.
+    const resourcesLink = page.locator("main").getByRole("link", { name: /Resources/ });
+    await expect(resourcesLink).toBeVisible({ timeout: 15000 });
     await resourcesLink.click();
     await page.waitForURL("http://localhost:3000/dashboard/resources/", { timeout: 15000 });
-    await expect(page.locator("h1:has-text('Resources')").first()).toBeAttached({ timeout: 10000 });
+    await expect(page.locator("h1:has-text('Resources')").first()).toBeVisible({ timeout: 10000 });
   });
 
   test("notifications empty state has no red dot", async ({ page }) => {
