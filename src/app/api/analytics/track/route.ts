@@ -102,23 +102,15 @@ export async function POST(req: NextRequest) {
     const dailyRef = db.collection("dailyAnalytics").doc(dateStr);
 
     if (event === "page_view") {
-      // Page views (authenticated or public) use atomic increments so that
-      // concurrent page views never contend on a shared document transaction.
-      const batch = db.batch();
+      // A page view is always counted with an atomic increment. For authenticated
+      // users' first view of the UTC day, create the visitor marker and increment
+      // uniqueVisitors in the SAME batch so they cannot get out of sync.
       const dailyUpdate: Record<string, unknown> = {
         date: dateStr,
         updatedAt: now,
         pageViews: FieldValue.increment(1),
       };
-      batch.set(dailyRef, dailyUpdate, { merge: true });
 
-      // Deduplicate unique visitors per authenticated user per UTC day using a
-      // per-user marker document. If the marker did not already exist, this is
-      // the user's first view today, so increment the unique-visitor counter.
-      // Crash-consistency trade-off: if the process crashes between creating
-      // the marker and incrementing uniqueVisitors, we may under-count unique
-      // visitors by at most one per crash. Over-counting is impossible because
-      // the marker doc ID is the user ID.
       if (decoded?.uid) {
         const visitorRef = db
           .collection("dailyVisitors")
@@ -126,24 +118,54 @@ export async function POST(req: NextRequest) {
           .collection("users")
           .doc(decoded.uid);
         const visitorSnap = await visitorRef.get();
+
         if (!visitorSnap.exists) {
-          await visitorRef.set({
+          const firstVisitBatch = db.batch();
+          firstVisitBatch.create(visitorRef, {
             uid: decoded.uid,
             date: dateStr,
             firstSeenAt: now,
           });
-          // Read current uniqueVisitors and increment atomically
-          const dailySnap = await dailyRef.get();
-          const dailyData = dailySnap.data();
-          const currentUniqueVisitors =
-            typeof dailyData?.uniqueVisitors === "number"
-              ? dailyData.uniqueVisitors
-              : 0;
-          dailyUpdate.uniqueVisitors = currentUniqueVisitors + 1;
+          firstVisitBatch.set(
+            dailyRef,
+            {
+              ...dailyUpdate,
+              // Firestore atomically treats increment on a missing field as 1.
+              // Do not read-modify-write this shared counter: concurrent new
+              // visitors would overwrite each other's increments.
+              uniqueVisitors: FieldValue.increment(1),
+            },
+            { merge: true },
+          );
+
+          try {
+            await firstVisitBatch.commit();
+            return NextResponse.json({ success: true });
+          } catch (error: unknown) {
+            // Multiple simultaneous requests by the SAME user can both read a
+            // missing marker. Exactly one create wins; the losing atomic batch
+            // is rejected in full and must retry only the page-view increment.
+            const code =
+              error && typeof error === "object" && "code" in error
+                ? (error as { code?: unknown }).code
+                : undefined;
+            const message = error instanceof Error ? error.message : "";
+            const alreadyExists =
+              code === 6 ||
+              code === "6" ||
+              code === "already-exists" ||
+              code === "ALREADY_EXISTS" ||
+              /already exists/i.test(message);
+            if (!alreadyExists) throw error;
+          }
         }
       }
 
-      await batch.commit();
+      // Anonymous views and repeat views by a user with an existing marker only
+      // update pageViews. No identity is stored for anonymous users.
+      const pageViewBatch = db.batch();
+      pageViewBatch.set(dailyRef, dailyUpdate, { merge: true });
+      await pageViewBatch.commit();
       return NextResponse.json({ success: true });
     }
 
