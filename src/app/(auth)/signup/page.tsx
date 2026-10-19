@@ -11,6 +11,7 @@ import { useAnalytics } from "@/hooks/useAnalytics";
 import {
   EyeIcon,
   EyeSlashIcon,
+  AtSymbolIcon,
   UserIcon,
   LockClosedIcon,
   EnvelopeIcon,
@@ -550,9 +551,10 @@ export default function SignupPage() {
                     Username
                   </label>
                   <div className="relative">
-                    <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40" viewBox="0 0 24 24">
-                      <path d="M12 2l3 9-5 5 5 5-1-8-8 1v4zm0 2a10 10 0 1 0 0-20 10 10 0 0 0 0 20zm-2-5c0-1.1.9-2 2-2h3v2H7v2h3c1.1 0 2 .9 2 2v3h2V7c0-1.1-.9-2-2-2H10c-.76 0-1.5.34-2 .95v3H7v-2zm7.5 7.5c-.95-1.5-2.3-2.5-3.5L9 23l1-3zm-4.5 1.5L13 15l2.5 2.5 2.5-2.5L15 13z"/>
-                    </svg>
+                    <AtSymbolIcon
+                      className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/40"
+                      aria-hidden="true"
+                    />
                     <input
                       type="text"
                       value={username}
