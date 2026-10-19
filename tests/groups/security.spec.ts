@@ -331,14 +331,21 @@ test.describe("Security: quiz score integrity", () => {
 test.describe("Security: delete account", () => {
   async function seedUserData(uid: string): Promise<number> {
     const userRef = adminDb.collection("users").doc(uid);
+    const username = `del_${uid.slice(-10).toLowerCase()}`;
     await userRef.set({
       uid,
       name: "Delete Audit",
       email: uniqueEmail("delete-audit"),
       class: 10,
       board: "CBSE",
+      username,
       createdAt: Date.now(),
       preferences: {},
+    });
+    await adminDb.collection("usernameMappings").doc(username).set({
+      uid,
+      claimedAt: Date.now(),
+      updatedAt: Date.now(),
     });
 
     let docs = 1;
@@ -409,8 +416,27 @@ test.describe("Security: delete account", () => {
       userRef.collection("studySessions").add({ mode: "stopwatch", durationMinutes: 30, completed: true, createdAt: Date.now() }),
       userRef.collection("resources").add({ title: "r", subject: "s", type: "link", description: "d", createdAt: Date.now(), updatedAt: Date.now() }),
       userRef.collection("sessions").add({ device: "test", userAgent: "test", lastActive: Date.now(), current: true, createdAt: Date.now() }),
+      userRef.collection("savedItems").add({ content: "saved answer", type: "explanation", sourceMessageId: "message-1", conversationId: "conversation-1", createdAt: Date.now() }),
+      userRef.collection("notifications").add({ title: "Personal notification", read: false, createdAt: Date.now() }),
+      userRef.collection("topicMastery").add({ subject: "Maths", topic: "Fractions", mastery: 50, totalQuestions: 3, correctAnswers: 1, lastPracticed: Date.now(), updatedAt: Date.now() }),
+      userRef.collection("mistakeBank").add({ source: "quiz", sourceId: "quiz-1", subject: "Maths", topic: "Fractions", question: "q", userAnswer: "a", correctAnswer: "b", explanation: "fix", createdAt: Date.now() }),
+      userRef.collection("settings").doc("aiConfig").set({ encryptedConfig: "test-only-ciphertext", updatedAt: Date.now() }),
     ]);
-    docs += 6;
+    docs += 11;
+
+    // Account-linked global records and markers must be removed as well.
+    await Promise.all([
+      adminDb.collection("userScores").doc(uid).set({ uid, score: 60, totalActivity: 2 }),
+      adminDb.collection("featureUsage").doc(uid).set({ total: { aiChat: 1 }, today: { aiChat: 1 }, weekly: {}, monthly: {}, lastUsage: {} }),
+      adminDb.collection("downloads").add({ userId: uid, platform: "android", version: "test", timestamp: Date.now() }),
+    ]);
+    const today = new Date().toISOString().slice(0, 10);
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await Promise.all([today, yesterday].map((date) =>
+      adminDb.collection("dailyVisitors").doc(date).collection("users").doc(uid)
+        .set({ uid, date, firstSeenAt: Date.now() }),
+    ));
+    docs += 5;
 
     return docs;
   }
@@ -452,6 +478,32 @@ test.describe("Security: delete account", () => {
     expect(decksSnap.empty).toBe(true);
     const convSnap = await adminDb.collection("users").doc(user.uid).collection("conversations").get();
     expect(convSnap.empty).toBe(true);
+
+    for (const collectionName of [
+      "savedItems",
+      "notifications",
+      "topicMastery",
+      "mistakeBank",
+      "settings",
+      "doubts",
+      "notes",
+      "studyPlans",
+      "studySessions",
+      "resources",
+      "sessions",
+    ]) {
+      const snapshot = await adminDb.collection("users").doc(user.uid).collection(collectionName).get();
+      expect(snapshot.empty, `private collection ${collectionName} should be empty`).toBe(true);
+    }
+
+    const username = `del_${user.uid.slice(-10).toLowerCase()}`;
+    expect((await adminDb.collection("usernameMappings").doc(username).get()).exists).toBe(false);
+    expect((await adminDb.collection("userScores").doc(user.uid).get()).exists).toBe(false);
+    expect((await adminDb.collection("featureUsage").doc(user.uid).get()).exists).toBe(false);
+    expect((await adminDb.collection("downloads").where("userId", "==", user.uid).get()).empty).toBe(true);
+
+    const visitorMarkers = await adminDb.collectionGroup("users").where("uid", "==", user.uid).get();
+    expect(visitorMarkers.docs.filter((d) => d.ref.path.startsWith("dailyVisitors/"))).toHaveLength(0);
   });
 
   test("handles an already-deleted auth user idempotently", async () => {
