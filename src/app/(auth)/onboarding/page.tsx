@@ -71,7 +71,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center relative overflow-x-hidden overflow-y-auto px-4 py-6 sm:py-8">
       <AnimatedBackground animate={animationsEnabled} />
       <motion.div
         initial={animationsEnabled ? { opacity: 0, y: 20 } : false}
