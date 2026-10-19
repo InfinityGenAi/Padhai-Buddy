@@ -2,53 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { checkRateLimit } from "@/lib/rate-limiter";
 import { validateProviderConfig, getAllProviders, getProviderConfig, AIProviderId, UserAIConfig } from "@/lib/ai-providers";
-import * as crypto from "crypto";
-
-const ENCRYPTION_KEY = process.env.AI_CONFIG_ENCRYPTION_KEY;
-
-function getEffectiveEncryptionKey(): string {
-  if (!ENCRYPTION_KEY) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("AI_CONFIG_ENCRYPTION_KEY must be set in production environment. Generate with: openssl rand -hex 32");
-    }
-    if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
-      console.warn("[AI-CONFIG] AI_CONFIG_ENCRYPTION_KEY not set. Using ephemeral development key. User AI configs will not persist across restarts.");
-      return "ephemeral-dev-key-do-not-use-in-production";
-    }
-    throw new Error("AI_CONFIG_ENCRYPTION_KEY must be set. Generate with: openssl rand -hex 32");
-  }
-  return ENCRYPTION_KEY;
-}
-
-function encrypt(text: string): string {
-  const key = getEffectiveEncryptionKey();
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv("aes-256-gcm", Buffer.from(key.padEnd(32).slice(0, 32)), iv);
-  const encrypted = Buffer.concat([cipher.update(text, "utf8"), cipher.final()]);
-  const authTag = cipher.getAuthTag();
-  return iv.toString("hex") + ":" + authTag.toString("hex") + ":" + encrypted.toString("hex");
-}
-
-function decrypt(encryptedText: string): string {
-  try {
-    const key = getEffectiveEncryptionKey();
-    const parts = encryptedText.split(":");
-    if (parts.length !== 3) return "";
-    const iv = Buffer.from(parts[0], "hex");
-    const authTag = Buffer.from(parts[1], "hex");
-    const encrypted = Buffer.from(parts[2], "hex");
-    const decipher = crypto.createDecipheriv(
-      "aes-256-gcm",
-      Buffer.from(key.padEnd(32).slice(0, 32)),
-      iv
-    );
-    decipher.setAuthTag(authTag);
-    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
-    return decrypted.toString("utf8");
-  } catch {
-    return "";
-  }
-}
+import { encryptAiConfig, decryptAiConfig } from "@/lib/ai-config-crypto";
 
 async function getUserConfig(uid: string): Promise<UserAIConfig | null> {
   if (!adminDb) return null;
@@ -58,7 +12,7 @@ const data = doc.data();
     if (!data) return null;
     if (!data.encryptedConfig) return null;
   try {
-    const decrypted = decrypt(data.encryptedConfig);
+    const decrypted = decryptAiConfig(data.encryptedConfig);
     return JSON.parse(decrypted);
   } catch {
     return null;
@@ -67,7 +21,7 @@ const data = doc.data();
 
 async function saveUserConfig(uid: string, config: UserAIConfig): Promise<void> {
   if (!adminDb) throw new Error("Database not initialized");
-  const encrypted = encrypt(JSON.stringify(config));
+  const encrypted = encryptAiConfig(JSON.stringify(config));
   await adminDb.collection("users").doc(uid).collection("settings").doc("aiConfig").set({
     encryptedConfig: encrypted,
     updatedAt: Date.now(),
