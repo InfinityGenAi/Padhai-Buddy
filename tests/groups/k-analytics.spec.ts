@@ -227,9 +227,11 @@ test.describe("Analytics Track: page view vs unique visitor deduplication", () =
     await clearTodayAnalytics();
 
     // Track 5 page views from the same authenticated user
+    const responses = [];
     for (let i = 0; i < 5; i++) {
-      await callTrack(user.token, { event: "page_view", page: "/dashboard/" });
+      responses.push(await callTrack(user.token, { event: "page_view", page: "/dashboard/" }));
     }
+    expect(responses.map((response) => response.status)).toEqual([200, 200, 200, 200, 200]);
 
     const doc = await getDailyAnalyticsDoc(todayUTCDateStr());
     expect(doc.exists).toBe(true);
@@ -239,13 +241,31 @@ test.describe("Analytics Track: page view vs unique visitor deduplication", () =
     expect(doc.data!.uniqueVisitors).toBe(1);
   });
 
+  test("concurrent page views by one user are counted once as a unique visitor", async () => {
+    await clearTodayAnalytics();
+
+    const responses = await Promise.all(
+      Array.from({ length: 10 }, () =>
+        callTrack(user.token, { event: "page_view", page: "/dashboard/" }),
+      ),
+    );
+    expect(responses.map((response) => response.status)).toEqual(Array(10).fill(200));
+
+    const doc = await getDailyAnalyticsDoc(todayUTCDateStr());
+    expect(doc.data!.pageViews).toBe(10);
+    expect(doc.data!.uniqueVisitors).toBe(1);
+  });
+
   test("multiple distinct users each count as one unique visitor", async () => {
     await clearTodayAnalytics();
 
     const userB = await createThrowawayUser("analytics-pv-b");
     try {
-      await callTrack(user.token, { event: "page_view", page: "/" });
-      await callTrack(userB.token, { event: "page_view", page: "/" });
+      const responses = await Promise.all([
+        callTrack(user.token, { event: "page_view", page: "/" }),
+        callTrack(userB.token, { event: "page_view", page: "/" }),
+      ]);
+      expect(responses.map((response) => response.status)).toEqual([200, 200]);
 
       const doc = await getDailyAnalyticsDoc(todayUTCDateStr());
       expect(doc.data!.pageViews).toBe(2);
