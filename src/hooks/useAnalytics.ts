@@ -72,14 +72,15 @@ export function useAnalytics() {
     }
   }, []);
 
-  const trackEvent = useCallback(async (event: AnalyticsEvent) => {
-    // Page views are sent immediately (public + authenticated) - no auth gate.
-    if (event.event === "page_view") {
-      await sendEvent(event);
-      return;
-    }
+  // Page views are sent immediately (public + authenticated) - no auth gate,
+  // no userReady gate. The callback is stable (depends only on sendEvent) so
+  // it does not cause re-tracking on auth-state changes.
+  const trackPageView = useCallback((page: string) => {
+    sendEvent({ event: "page_view", page });
+  }, [sendEvent]);
 
-    // All other events require an authenticated, ready user.
+  const trackEvent = useCallback(async (event: AnalyticsEvent) => {
+    // All non-page_view events require an authenticated, ready user.
     if (!userReady) {
       pendingEventsRef.current.push(event);
       return;
@@ -100,10 +101,6 @@ export function useAnalytics() {
       events.forEach((event) => trackEvent(event));
     }
   }, [userReady, trackEvent]);
-
-  const trackPageView = useCallback((page: string) => {
-    trackEvent({ event: "page_view", page });
-  }, [trackEvent]);
 
   const trackFeatureUse = useCallback((feature: string, metadata?: Record<string, unknown>) => {
     trackEvent({ event: "feature_use", feature, metadata });

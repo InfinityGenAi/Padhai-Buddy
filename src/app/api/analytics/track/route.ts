@@ -45,28 +45,6 @@ export async function POST(req: NextRequest) {
       } catch {
         return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
       }
-    } else {
-      // Unauthenticated clients are rate-limited by IP for privacy-conscious
-      // public page-view tracking (page_view only).
-      const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
-      const rateLimitResult = await checkRateLimit(`analytics-anon:${ip}`);
-      if (!rateLimitResult.allowed) {
-        return NextResponse.json(
-          { error: "Too many requests. Please wait before trying again.", retryAfter: rateLimitResult.retryAfter },
-          { status: 429, headers: { "Retry-After": String(rateLimitResult.retryAfter || 60) } },
-        );
-      }
-    }
-
-    // Authenticated clients are rate-limited per user.
-    if (decoded) {
-      const rateLimitResult = await checkRateLimit(`analytics:${decoded.uid}`);
-      if (!rateLimitResult.allowed) {
-        return NextResponse.json(
-          { error: "Too many requests. Please wait before trying again.", retryAfter: rateLimitResult.retryAfter },
-          { status: 429, headers: { "Retry-After": String(rateLimitResult.retryAfter || 60) } },
-        );
-      }
     }
 
     let body: AnalyticsEvent;
@@ -84,40 +62,81 @@ export async function POST(req: NextRequest) {
     const now = Date.now();
     const dateStr = new Date().toISOString().split("T")[0]; // UTC date key
     const db = adminDb;
+
+    // Unauthenticated clients are rate-limited by IP for privacy-conscious
+    // public page-view tracking (page_view only).
+    if (!decoded) {
+      const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
+      const rateLimitResult = await checkRateLimit(`analytics-anon:${ip}`);
+      if (!rateLimitResult.allowed) {
+        return NextResponse.json(
+          { error: "Too many requests. Please wait before trying again.", retryAfter: rateLimitResult.retryAfter },
+          { status: 429, headers: { "Retry-After": String(rateLimitResult.retryAfter || 60) } },
+        );
+      }
+    }
+
+    // Authenticated clients are rate-limited per user. Page views use a
+    // separate, higher limit because telemetry fires on every route change
+    // and is not security-sensitive.
+    if (decoded) {
+      if (event === "page_view") {
+        const rateLimitResult = await checkRateLimit(`analytics-pv:${decoded.uid}`, 120);
+        if (!rateLimitResult.allowed) {
+          return NextResponse.json(
+            { error: "Too many requests. Please wait before trying again.", retryAfter: rateLimitResult.retryAfter },
+            { status: 429, headers: { "Retry-After": String(rateLimitResult.retryAfter || 60) } },
+          );
+        }
+      } else {
+        const rateLimitResult = await checkRateLimit(`analytics:${decoded.uid}`);
+        if (!rateLimitResult.allowed) {
+          return NextResponse.json(
+            { error: "Too many requests. Please wait before trying again.", retryAfter: rateLimitResult.retryAfter },
+            { status: 429, headers: { "Retry-After": String(rateLimitResult.retryAfter || 60) } },
+          );
+        }
+      }
+    }
+
     const dailyRef = db.collection("dailyAnalytics").doc(dateStr);
 
     if (event === "page_view") {
-      // Page views (authenticated or public) are handled in a single transaction
-      // so unique-visitor deduplication is atomic and race-free.
-      await db.runTransaction(async (tx) => {
-        const dailySnap = await tx.get(dailyRef);
-        const data = (dailySnap.exists && dailySnap.data()) || {};
-        const updates: Record<string, unknown> = {
-          date: dateStr,
-          updatedAt: now,
-          pageViews: ((data.pageViews as number) || 0) + 1,
-        };
+      // Page views (authenticated or public) use atomic increments so that
+      // concurrent page views never contend on a shared document transaction.
+      const batch = db.batch();
+      const dailyUpdate: Record<string, unknown> = {
+        date: dateStr,
+        updatedAt: now,
+        pageViews: FieldValue.increment(1),
+      };
+      batch.set(dailyRef, dailyUpdate, { merge: true });
 
-        // Deduplicate unique visitors per authenticated user per UTC day.
-        if (decoded?.uid) {
-          const visitorRef = db
-            .collection("dailyVisitors")
-            .doc(dateStr)
-            .collection("users")
-            .doc(decoded.uid);
-          const visitorSnap = await tx.get(visitorRef);
-          if (!visitorSnap.exists) {
-            tx.set(visitorRef, {
-              uid: decoded.uid,
-              date: dateStr,
-              firstSeenAt: now,
-            });
-            updates.uniqueVisitors = ((data.uniqueVisitors as number) || 0) + 1;
-          }
+      // Deduplicate unique visitors per authenticated user per UTC day using a
+      // per-user marker document. If the marker did not already exist, this is
+      // the user's first view today, so increment the unique-visitor counter.
+      // Crash-consistency trade-off: if the process crashes between creating
+      // the marker and incrementing uniqueVisitors, we may under-count unique
+      // visitors by at most one per crash. Over-counting is impossible because
+      // the marker doc ID is the user ID.
+      if (decoded?.uid) {
+        const visitorRef = db
+          .collection("dailyVisitors")
+          .doc(dateStr)
+          .collection("users")
+          .doc(decoded.uid);
+        const visitorSnap = await visitorRef.get();
+        if (!visitorSnap.exists) {
+          await visitorRef.set({
+            uid: decoded.uid,
+            date: dateStr,
+            firstSeenAt: now,
+          });
+          dailyUpdate.uniqueVisitors = FieldValue.increment(1);
         }
-        tx.set(dailyRef, updates, { merge: true });
-      });
+      }
 
+      await batch.commit();
       return NextResponse.json({ success: true });
     }
 

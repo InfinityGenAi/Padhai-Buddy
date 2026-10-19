@@ -120,8 +120,9 @@ async function cleanup(): Promise<void> {
   }
 }
 
-export async function checkRateLimit(identifier: string): Promise<RateLimitResult> {
+export async function checkRateLimit(identifier: string, maxRequests?: number): Promise<RateLimitResult> {
   const now = Date.now();
+  const maxReq = maxRequests ?? RATE_LIMIT_MAX_REQUESTS;
 
   if (now - lastCleanup > RATE_LIMIT_CLEANUP_MS) {
     await cleanup();
@@ -155,12 +156,12 @@ export async function checkRateLimit(identifier: string): Promise<RateLimitResul
     }
     return {
       allowed: true,
-      remaining: RATE_LIMIT_MAX_REQUESTS - 1,
+      remaining: maxReq - 1,
       resetAt,
     };
   }
 
-  if (existing.count >= RATE_LIMIT_MAX_REQUESTS) {
+  if (existing.count >= maxReq) {
     const retryAfter = Math.ceil((existing.resetAt - now) / 1000);
     return {
       allowed: false,
@@ -178,7 +179,7 @@ export async function checkRateLimit(identifier: string): Promise<RateLimitResul
   }
   return {
     allowed: true,
-    remaining: RATE_LIMIT_MAX_REQUESTS - existing.count,
+    remaining: maxReq - existing.count,
     resetAt: existing.resetAt,
   };
 }
