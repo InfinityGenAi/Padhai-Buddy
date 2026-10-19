@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, useReducedMotion } from "framer-motion";
@@ -21,6 +21,21 @@ export default function ProfilePage() {
   const [selectedBoard, setSelectedBoard] = useState<UserBoard>(() => user?.board || "CBSE");
   const [photoURL, setPhotoURL] = useState(() => user?.photoURL || "");
   const [username, setUsername] = useState(() => user?.username || "");
+  const initializedUid = useRef<string | null>(null);
+
+  // Auth can resolve before the Firestore profile finishes loading. Hydrate
+  // this form once per account so slower devices don't keep empty initial values.
+  useEffect(() => {
+    if (!user?.uid || initializedUid.current === user.uid) return;
+
+    initializedUid.current = user.uid;
+    setName(user.name || "");
+    setSelectedClass(user.class || 10);
+    setSelectedBoard(user.board || "CBSE");
+    setPhotoURL(user.photoURL || "");
+    setUsername(user.username || "");
+  }, [user]);
+
   const [saving, setSaving] = useState(false);
   const [notification, setNotification] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
