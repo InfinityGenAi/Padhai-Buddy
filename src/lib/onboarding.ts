@@ -5,7 +5,7 @@ import type { UserProfile } from "@/types";
  * A username is intentionally optional and must never cause an onboarding loop.
  */
 export function profileNeedsOnboarding(
-  profile: Pick<UserProfile, "class" | "board"> | null | undefined,
+  profile: Partial<Pick<UserProfile, "class" | "board">> | null | undefined,
 ): boolean {
   return !profile?.class || !profile?.board;
 }
