@@ -17,15 +17,17 @@ const STATIC_ASSETS = [
   '/apple-icon.png',
 ];
 
-// Paths that should never be cached
+// Paths that should never be cached. Exclude every authenticated/student
+// route—not only the pages that existed when this list was first written—so
+// a newly-added dashboard page cannot accidentally inherit public-page caching.
 const NEVER_CACHE_PATHS = [
   '/api/',
-  '/dashboard/chat',
-  '/dashboard/photo-doubt',
-  '/dashboard/quiz',
-  '/dashboard/profile',
-  '/dashboard/settings',
-  '/dashboard/notifications',
+  '/dashboard',
+  '/onboarding',
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/reset-password',
   '/admin',
   '/_next/data/', // Next.js data fetching
   '/__nextjs_original_response', // Next.js internal
