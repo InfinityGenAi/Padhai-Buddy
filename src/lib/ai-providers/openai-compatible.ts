@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import type { ChatCompletionChunk } from "openai/resources/chat/completions";
 import { AIProvider, AIProviderId, UserAIConfig, AIMessage, AIProviderResponse, AIProviderStreamChunk } from "./types";
+import { assertSafeProviderBaseUrl, safeProviderFetch } from "./safe-url";
 
 export class OpenAICompatibleProvider implements AIProvider {
   id: AIProviderId = "openai-compatible";
@@ -14,9 +15,11 @@ export class OpenAICompatibleProvider implements AIProvider {
       throw new Error("Base URL is required for OpenAI-compatible providers");
     }
 
+    await assertSafeProviderBaseUrl(config.baseUrl);
     const client = new OpenAI({
       apiKey: config.apiKey,
       baseURL: config.baseUrl,
+      fetch: safeProviderFetch,
     });
 
     if (stream) {
@@ -69,9 +72,11 @@ export class OpenAICompatibleProvider implements AIProvider {
       return { valid: false, error: "Base URL is required" };
     }
     try {
+      await assertSafeProviderBaseUrl(config.baseUrl);
       const client = new OpenAI({
         apiKey: config.apiKey,
         baseURL: config.baseUrl,
+        fetch: safeProviderFetch,
       });
       await client.models.list();
       return { valid: true };
@@ -84,7 +89,8 @@ export class OpenAICompatibleProvider implements AIProvider {
   async getModels(apiKey: string, baseUrl?: string): Promise<string[]> {
     if (!baseUrl) return [];
     try {
-      const client = new OpenAI({ apiKey, baseURL: baseUrl });
+      await assertSafeProviderBaseUrl(baseUrl);
+      const client = new OpenAI({ apiKey, baseURL: baseUrl, fetch: safeProviderFetch });
       const models = await client.models.list();
       return models.data.map((m: { id: string }) => m.id);
     } catch {
