@@ -68,48 +68,106 @@ export async function POST(req: NextRequest) {
     }
 
     const uid = decoded.uid;
+    const profileRef = adminDb.collection("users").doc(uid);
+    const profileSnap = await profileRef.get();
+    const username = String(profileSnap.data()?.username || "").trim().toLowerCase();
 
-    // Delete the Auth account FIRST. If it fails, nothing has been changed and
-    // the request is safe to retry. If it succeeds, the account can never be
-    // left half-deleted (e.g. account still active but all data gone) even if
-    // the Firestore cleanup below is interrupted.
+    // Clean up personal Firestore data before deleting the Auth identity. If a
+    // cleanup step fails, the account can still sign in/re-authenticate and
+    // retry; deleting Auth first could leave orphaned private data with no
+    // account able to retry the cleanup.
     try {
-      await adminAuth.deleteUser(uid);
-    } catch (err) {
-      const code = (err as { code?: string })?.code;
-      if (code !== "auth/user-not-found") {
-        console.error("Auth delete error:", err);
-        return NextResponse.json(
-          {
-            error: "Failed to delete user account. No data was changed; please try again.",
-            code: "auth-delete-failed",
-          },
-          { status: 500 },
-        );
+      const userCollections = [
+        "studyPlans",
+        "doubts",
+        "sessions",
+        "quizAttempts",
+        "notes",
+        "studySessions",
+        "resources",
+        "savedItems",
+        "notifications",
+        "topicMastery",
+        "mistakeBank",
+        "settings",
+      ];
+      for (const collectionName of userCollections) {
+        await deleteCollection(adminDb, `users/${uid}/${collectionName}`);
       }
-    }
-
-    try {
-      await deleteCollection(adminDb, `users/${uid}/studyPlans`);
-      await deleteCollection(adminDb, `users/${uid}/doubts`);
-      await deleteCollection(adminDb, `users/${uid}/sessions`);
       await deleteNestedCollection(adminDb, `users/${uid}/conversations`, "messages");
-      await deleteCollection(adminDb, `users/${uid}/quizAttempts`);
       await deleteNestedCollection(adminDb, `users/${uid}/flashcardDecks`, "cards");
-      await deleteCollection(adminDb, `users/${uid}/notes`);
-      await deleteCollection(adminDb, `users/${uid}/studySessions`);
-      await deleteCollection(adminDb, `users/${uid}/resources`);
-      await adminDb.collection("users").doc(uid).delete();
+
+      // Remove global documents/records owned by this UID.
+      await adminDb.collection("userScores").doc(uid).delete().catch(() => undefined);
+      await adminDb.collection("featureUsage").doc(uid).delete().catch(() => undefined);
+
+      // Downloads store a userId on a global event collection; delete only
+      // records belonging to this user and preserve aggregate analytics totals.
+      for (;;) {
+        const downloads = await adminDb.collection("downloads")
+          .where("userId", "==", uid)
+          .limit(BATCH_SIZE)
+          .get();
+        if (downloads.empty) break;
+        const batch = adminDb.batch();
+        downloads.docs.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+
+      // Visitor markers contain a UID under dailyVisitors/{date}/users/{uid}.
+      // Delete all dates' markers, but leave date-level aggregate counters intact.
+      for (;;) {
+        const markers = await adminDb.collectionGroup("users")
+          .where("uid", "==", uid)
+          .limit(BATCH_SIZE)
+          .get();
+        const visitorMarkers = markers.docs.filter((d) => d.ref.path.startsWith("dailyVisitors/"));
+        if (visitorMarkers.length === 0) break;
+        for (let i = 0; i < visitorMarkers.length; i += BATCH_SIZE) {
+          const batch = adminDb.batch();
+          visitorMarkers.slice(i, i + BATCH_SIZE).forEach((d) => batch.delete(d.ref));
+          await batch.commit();
+        }
+      }
+
+      // Release the username only if its mapping still belongs to this UID;
+      // never delete a username that has since been claimed by another user.
+      if (username) {
+        const usernameRef = adminDb.collection("usernameMappings").doc(username);
+        const mapping = await usernameRef.get();
+        if (mapping.exists && mapping.data()?.uid === uid) {
+          await usernameRef.delete();
+        }
+      }
+
+      await profileRef.delete();
     } catch (err) {
       console.error("Firestore cleanup error:", err);
       return NextResponse.json(
         {
           error:
-            "Your account was deleted but some data could not be cleaned up. Please contact support if needed.",
+            "We couldn't finish deleting your data. Your sign-in account has not been removed; please retry or contact support.",
           code: "cleanup-failed",
         },
         { status: 500 },
       );
+    }
+
+    // Delete the Auth identity last so failed data cleanup remains retryable.
+    try {
+      await adminAuth.deleteUser(uid);
+    } catch (err) {
+      const code = (err as { code?: string })?.code;
+      if (code !== "auth/user-not-found") {
+        console.error("Auth delete error after data cleanup:", err);
+        return NextResponse.json(
+          {
+            error: "Your personal data was removed, but we couldn't remove the sign-in account. Please contact support.",
+            code: "auth-delete-failed",
+          },
+          { status: 500 },
+        );
+      }
     }
 
     return NextResponse.json({ success: true });
