@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 
 export async function GET() {
+  const isProduction = process.env.NODE_ENV === "production";
   const checks = {
     firebaseClient: false,
     firebaseAdmin: false,
     groqApi: false,
+    aiConfigEncryption: false,
+    distributedRateLimiting: false,
   };
 
   const requiredClientEnvVars = [
@@ -22,6 +25,13 @@ export async function GET() {
   checks.firebaseAdmin = Boolean(adminAuth && adminDb && !initializationError);
 
   checks.groqApi = !!process.env.GROQ_API_KEY;
+  checks.aiConfigEncryption =
+    !isProduction || Boolean(process.env.AI_CONFIG_ENCRYPTION_KEY);
+  // The in-memory limiter is process-local and does not protect a multi-instance
+  // serverless deployment. Production readiness requires the configured Redis store.
+  checks.distributedRateLimiting =
+    !isProduction ||
+    Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
 
   const allHealthy = Object.values(checks).every(Boolean);
 
