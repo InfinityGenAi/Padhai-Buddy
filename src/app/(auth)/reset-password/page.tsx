@@ -108,7 +108,7 @@ export default function ResetPasswordPage() {
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+      <div className="min-h-screen flex items-center justify-center relative overflow-x-hidden overflow-y-auto p-4 py-6 sm:py-8">
         <motion.div
           variants={animationsEnabled ? staggerContainer : undefined}
           initial={animationsEnabled ? "hidden" : false}
@@ -153,7 +153,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center relative overflow-x-hidden overflow-y-auto p-4 py-6 sm:py-8">
       <motion.div
         variants={animationsEnabled ? staggerContainer : undefined}
         initial={animationsEnabled ? "hidden" : false}
