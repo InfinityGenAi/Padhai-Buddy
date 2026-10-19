@@ -1,0 +1,85 @@
+import * as crypto from "node:crypto";
+
+function getEffectiveEncryptionKey(
+  configuredKey = process.env.AI_CONFIG_ENCRYPTION_KEY,
+  environment = process.env.NODE_ENV,
+): string {
+  if (!configuredKey) {
+    if (environment === "production") {
+      throw new Error(
+        "AI_CONFIG_ENCRYPTION_KEY must be set in production. Generate a 32-byte key with: openssl rand -hex 32",
+      );
+    }
+    if (environment === "development" || environment === "test") {
+      return "ephemeral-dev-key-do-not-use-in-production";
+    }
+    throw new Error("AI_CONFIG_ENCRYPTION_KEY must be set.");
+  }
+  return configuredKey;
+}
+
+function getEncryptionKeyCandidates(
+  configuredKey = process.env.AI_CONFIG_ENCRYPTION_KEY,
+  environment = process.env.NODE_ENV,
+): Buffer[] {
+  const key = getEffectiveEncryptionKey(configuredKey, environment);
+
+  // The documented command produces 64 hex characters representing 32 bytes.
+  // Use those actual bytes for new ciphertext instead of the first 32 ASCII
+  // characters (the legacy behavior, which had only 128 bits of key entropy).
+  if (/^[a-f0-9]{64}$/i.test(key)) {
+    const modernKey = Buffer.from(key, "hex");
+    const legacyKey = Buffer.from(key.slice(0, 32), "utf8");
+    return [modernKey, legacyKey];
+  }
+
+  // Preserve existing non-hex development/custom keys. This branch remains for
+  // backwards compatibility; production deployments should use a 64-char hex key.
+  return [Buffer.from(key.padEnd(32).slice(0, 32), "utf8")];
+}
+
+export function encryptAiConfig(
+  plaintext: string,
+  configuredKey = process.env.AI_CONFIG_ENCRYPTION_KEY,
+  environment = process.env.NODE_ENV,
+): string {
+  const key = getEncryptionKeyCandidates(configuredKey, environment)[0];
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+
+  return `${iv.toString("hex")}:${authTag.toString("hex")}:${encrypted.toString("hex")}`;
+}
+
+export function decryptAiConfig(
+  encryptedText: string,
+  configuredKey = process.env.AI_CONFIG_ENCRYPTION_KEY,
+  environment = process.env.NODE_ENV,
+): string {
+  const parts = encryptedText.split(":");
+  if (parts.length !== 3) return "";
+
+  try {
+    const iv = Buffer.from(parts[0], "hex");
+    const authTag = Buffer.from(parts[1], "hex");
+    const encrypted = Buffer.from(parts[2], "hex");
+    if (iv.length !== 12 || authTag.length !== 16) return "";
+
+    for (const key of getEncryptionKeyCandidates(configuredKey, environment)) {
+      try {
+        const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+        decipher.setAuthTag(authTag);
+        return Buffer.concat([
+          decipher.update(encrypted),
+          decipher.final(),
+        ]).toString("utf8");
+      } catch {
+        // Try the legacy key derivation for data encrypted before this fix.
+      }
+    }
+    return "";
+  } catch {
+    return "";
+  }
+}
