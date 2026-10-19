@@ -56,25 +56,6 @@ jobs:
           FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
           FIRESTORE_EMULATOR_HOST: localhost:8080
 
-      - name: Start Firebase Emulators
-        run: |
-          npx firebase emulators:start --only auth:9099,firestore:8080 --project test-project &
-          EMULATOR_PID=$!
-          echo "EMULATOR_PID=$EMULATOR_PID" >> $GITHUB_ENV
-          # Wait for both ports to be ready
-          for i in {1..60}; do
-            if nc -z localhost 9099 && nc -z localhost 8080; then
-              echo "Emulators ready"
-              break
-            fi
-            sleep 1
-          done
-          if ! nc -z localhost 9099 || ! nc -z localhost 8080; then
-            echo "Emulators failed to start"
-            kill $EMULATOR_PID
-            exit 1
-          fi
-
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
