@@ -49,14 +49,25 @@ export async function POST(req: NextRequest) {
 
     let body: AnalyticsEvent;
     try {
-      body = await req.json();
+      const parsed: unknown = await req.json();
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return NextResponse.json({ error: "Request body must be a JSON object" }, { status: 400 });
+      }
+      body = parsed as AnalyticsEvent;
     } catch {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
     const { event, feature, metadata } = body;
-    if (!event) {
-      return NextResponse.json({ error: "Event type is required" }, { status: 400 });
+    const allowedEvents = new Set<AnalyticsEvent["event"]>([
+      "page_view",
+      "feature_use",
+      "download",
+      "signup",
+      "session_start",
+    ]);
+    if (typeof event !== "string" || !allowedEvents.has(event as AnalyticsEvent["event"])) {
+      return NextResponse.json({ error: "Unsupported event type" }, { status: 400 });
     }
 
     const now = Date.now();
@@ -65,9 +76,11 @@ export async function POST(req: NextRequest) {
 
     // Unauthenticated clients are rate-limited by IP for privacy-conscious
     // public page-view tracking (page_view only).
-    if (!decoded) {
+    if (!decoded && event === "page_view") {
       const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
-      const rateLimitResult = await checkRateLimit(`analytics-anon:${ip}`);
+      // Page-view telemetry is non-security-sensitive. Allow a reasonable
+      // burst of route changes/public browsing before throttling a shared IP.
+      const rateLimitResult = await checkRateLimit(`analytics-anon:${ip}`, 120);
       if (!rateLimitResult.allowed) {
         return NextResponse.json(
           { error: "Too many requests. Please wait before trying again.", retryAfter: rateLimitResult.retryAfter },
