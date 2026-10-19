@@ -295,8 +295,34 @@ export default async function globalSetup() {
     }
 
     console.log("Global setup - filling credentials...");
-    await emailInput.fill("test@padhai-buddy.test", { force: true });
-    await page.fill('input[type="password"]', "TestPassword123!", { force: true });
+    const loginEmail = "test@padhai-buddy.test";
+    const loginPassword = "TestPassword123!";
+    const emailField = page.locator("#login-email");
+    const passwordField = page.locator("#login-password");
+
+    // Auth guard/hydration can remount the controlled form during startup.
+    // Fill both fields together and verify the React-controlled values survived
+    // before clicking; otherwise native required-field validation can silently
+    // block the submit and make the test time out waiting for navigation.
+    let credentialsPersisted = false;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await emailField.fill(loginEmail);
+      await passwordField.fill(loginPassword);
+      await page.waitForTimeout(100);
+
+      const [actualEmail, actualPassword] = await Promise.all([
+        emailField.inputValue(),
+        passwordField.inputValue(),
+      ]);
+      if (actualEmail === loginEmail && actualPassword === loginPassword) {
+        credentialsPersisted = true;
+        break;
+      }
+    }
+    if (!credentialsPersisted) {
+      throw new Error("Login form values did not persist after hydration; email/password inputs were reset before submit.");
+    }
+    console.log("Global setup - verified login form values are populated");
 
     // Listen for console errors
     page.on("console", msg => {
@@ -310,8 +336,8 @@ export default async function globalSetup() {
 
     console.log("Global setup - submitting login and waiting for navigation...");
     await Promise.all([
-      page.waitForURL(/\/dashboard/, { timeout: 120000 }),
-      page.click('button[type="submit"]', { force: true }),
+      page.waitForURL(/\/dashboard/, { timeout: 45000 }),
+      page.locator('button[type="submit"]').click(),
     ]);
     await page.waitForLoadState("domcontentloaded", { timeout: 60000 });
 
