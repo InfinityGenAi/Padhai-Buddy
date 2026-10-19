@@ -127,7 +127,7 @@ function LoginForm() {
 
   return (
     <PublicAuthGuard>
-      <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
+      <div className="min-h-screen flex items-center justify-center relative overflow-x-hidden overflow-y-auto p-4 py-6 sm:py-8">
         <div className="relative z-10 w-full max-w-md mx-auto">
           <motion.div
             initial={animationsEnabled ? { opacity: 0, y: 20 } : false}
