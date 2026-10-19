@@ -233,7 +233,7 @@ export default function SignupPage() {
 
   if (verificationSent && firebaseUser) {
     return (
-      <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
+      <div className="min-h-screen flex items-center justify-center relative overflow-x-hidden overflow-y-auto p-4 py-6 sm:py-8">
         <motion.div
           variants={animationsEnabled ? staggerContainer : undefined}
           initial={animationsEnabled ? "hidden" : false}
@@ -314,7 +314,7 @@ export default function SignupPage() {
 
   return (
     <PublicAuthGuard>
-      <div className="min-h-screen flex items-center justify-center relative overflow-hidden p-4">
+      <div className="min-h-screen flex items-center justify-center relative overflow-x-hidden overflow-y-auto p-4 py-6 sm:py-8">
         <motion.div
           variants={animationsEnabled ? staggerContainer : undefined}
           initial={animationsEnabled ? "hidden" : false}
