@@ -339,6 +339,7 @@ getDoc(doc(db, "users", fbUser.uid))
     if (!db) throw new Error("Firestore not initialized");
 
     const usernameToStore = username?.trim() || undefined;
+    let resolvedUsername = user?.username;
 
     const updated: UserProfile = {
       uid: auth.currentUser.uid,
@@ -365,17 +366,24 @@ getDoc(doc(db, "users", fbUser.uid))
           },
           body: JSON.stringify({ username: usernameToStore }),
         });
+        const claimData = await claimRes.json().catch(() => ({}));
         if (!claimRes.ok) {
-          const data = await claimRes.json().catch(() => ({}));
-          throw new Error(data.error || "Failed to claim username");
+          throw new Error(claimData.error || "Failed to claim username");
         }
+        resolvedUsername =
+          typeof claimData.username === "string" ? claimData.username : usernameToStore;
       } catch (claimErr) {
         // Username claim failure must not block onboarding completion.
         console.error("[completeOnboarding] Username claim failed:", claimErr);
       }
     }
 
-    setUser(updated);
+    // Keep the in-memory profile in sync with a successful username claim (or
+    // preserve an existing username when the form was left blank).
+    setUser({
+      ...updated,
+      ...(resolvedUsername ? { username: resolvedUsername } : {}),
+    });
     setNeedsOnboarding(false);
   }, [user, firebaseUser]);
 
