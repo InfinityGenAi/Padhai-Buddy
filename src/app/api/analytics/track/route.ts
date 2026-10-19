@@ -59,6 +59,10 @@ export async function POST(req: NextRequest) {
     }
 
     const { event, feature, metadata } = body;
+    if (!event) {
+      return NextResponse.json({ error: "Event type is required" }, { status: 400 });
+    }
+
     const allowedEvents = new Set<AnalyticsEvent["event"]>([
       "page_view",
       "feature_use",
