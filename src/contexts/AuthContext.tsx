@@ -118,6 +118,12 @@ function AuthProvider({ children }: { children: ReactNode }) {
       setIsAdmin(false);
       return;
     }
+    // Hold the auth gate until this user's profile and role claims have been
+    // loaded. Otherwise protected pages can render with a stale/missing profile
+    // and immediately bounce between dashboard and onboarding.
+    setLoading(true);
+    setAuthError(null);
+
     const db = getFirestoreDb();
     if (!db) {
       setAuthError("Firestore is not initialized");
