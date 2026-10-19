@@ -19,6 +19,7 @@ import { doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
 import { getFirebaseAuth, getFirestoreDb, waitForFirebaseInit } from "@/lib/firebase";
 import { deleteCurrentSession } from "@/lib/sessions";
 import type { UserProfile, UserBoard, UserClass, UserPreferences } from "@/types";
+import { profileNeedsOnboarding } from "@/lib/onboarding";
 
 const USERNAME_REGEX = /^[a-z0-9._]{3,20}$/;
 
@@ -140,12 +141,8 @@ getDoc(doc(db, "users", fbUser.uid))
           if (snap.exists()) {
             const data = snap.data() as UserProfile;
             setUser(data);
-            // Require onboarding if class/board or username is missing
-            if (!data.class || !data.board || !data.username) {
-              setNeedsOnboarding(true);
-            } else {
-              setNeedsOnboarding(false);
-            }
+            // Class and board are required; username is optional in onboarding.
+            setNeedsOnboarding(profileNeedsOnboarding(data));
             const remotePrefs = data.preferences;
             const localPrefs = loadLocalPreferences();
             const merged: UserPreferences = {
