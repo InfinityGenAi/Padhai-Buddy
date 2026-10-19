@@ -60,7 +60,6 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run Playwright tests
-        run: npx playwright test
         env:
           FIREBASE_AUTH_EMULATOR_HOST: localhost:9099
           FIRESTORE_EMULATOR_HOST: localhost:8080
@@ -76,6 +75,31 @@ jobs:
           NEXT_PUBLIC_FIREBASE_APP_ID: 1:123456789:web:abcdef
           NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: G-XXXXXXXXXX
           GROQ_API_KEY: test-groq-key
+        run: |
+          # Start Firebase emulators in the same step so they share a process
+          # lifetime with Playwright tests. start-test-server.js (via webServer)
+          # will detect ports in use and skip emulator startup, only launching
+          # Next.js.
+          npx firebase emulators:start --only auth:9099,firestore:8080 --project test-project > emulator.log 2>&1 &
+          EMULATOR_PID=$!
+          # Wait for both ports to be ready
+          for i in {1..60}; do
+            if nc -z localhost 9099 && nc -z localhost 8080; then
+              echo "Emulators ready"
+              break
+            fi
+            if [ $i -eq 60 ]; then
+              echo "Emulators failed to start"
+              cat emulator.log
+              kill $EMULATOR_PID 2>/dev/null || true
+              exit 1
+            fi
+            sleep 1
+          done
+          npx playwright test
+          TEST_EXIT=$?
+          kill $EMULATOR_PID 2>/dev/null || true
+          exit $TEST_EXIT
 
       - name: Upload Playwright report
         if: failure()

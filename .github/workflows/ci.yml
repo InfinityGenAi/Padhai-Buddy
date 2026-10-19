@@ -120,7 +120,31 @@ jobs:
           FIRESTORE_EMULATOR_HOST: "localhost:8080"
           FIREBASE_ADMIN_PROJECT_ID: "test-project"
         run: |
+          # Start Firebase emulators in the same step so they share a process
+          # lifetime with Playwright tests. start-test-server.js (via webServer)
+          # will detect ports in use and skip emulator startup, only launching
+          # Next.js.
+          npx firebase emulators:start --only auth,firestore --project test-project > emulator.log 2>&1 &
+          EMULATOR_PID=$!
+          # Wait for emulators to be ready
+          for i in {1..60}; do
+            if nc -z localhost 9099 && nc -z localhost 8080; then
+              echo "Emulators ready"
+              break
+            fi
+            if [ $i -eq 60 ]; then
+              echo "ERROR: Emulators failed to start"
+              cat emulator.log
+              kill $EMULATOR_PID 2>/dev/null || true
+              exit 1
+            fi
+            sleep 1
+          done
+          # Run Playwright tests (webServer will start Next.js; emulators already running)
           npx playwright test --config=playwright.config.ts --reporter=line
+          TEST_EXIT=$?
+          kill $EMULATOR_PID 2>/dev/null || true
+          exit $TEST_EXIT
 
       - name: Upload Playwright report
         if: always()
