@@ -193,11 +193,13 @@ export async function waitForDashboardReady(page: Page) {
 }
 
 export async function waitForPageReady(page: Page, heading: string) {
-  // Scope to the visible content area so matching words in hidden mobile
-  // navigation don't satisfy readiness checks. Some pages (such as AI Tutor)
-  // have a branded heading and a separate "New Chat" action rather than a
-  // heading whose text exactly matches the short page label.
-  await page.locator("main").getByText(heading, { exact: false }).first().waitFor({
+  // Hidden sidebar text caused false-positive "ready" states on mobile.
+  // Wait for the actual content heading; Chat uses its branded heading.
+  const contentHeading = heading === "Chat" ? "Padhai Buddy AI Tutor" : heading;
+  await page.locator("main").getByRole("heading", {
+    name: contentHeading,
+    exact: true,
+  }).waitFor({
     state: "visible",
     timeout: 15000,
   });
