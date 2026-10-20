@@ -2,11 +2,15 @@ import { AI_PROVIDERS, AIProviderId, AIProvider, UserAIConfig, AIMessage, AIProv
 import { GroqProvider } from "./groq";
 import { OpenAIProvider } from "./openai";
 import { OpenAICompatibleProvider } from "./openai-compatible";
+import { GeminiProvider } from "./gemini";
+import { AnthropicProvider } from "./anthropic";
 
 const providers: Map<AIProviderId, AIProvider> = new Map<AIProviderId, AIProvider>([
   ["groq", new GroqProvider()],
   ["openai", new OpenAIProvider()],
   ["openai-compatible", new OpenAICompatibleProvider()],
+  ["gemini", new GeminiProvider()],
+  ["anthropic", new AnthropicProvider()],
 ]);
 
 export type { AIProviderId, UserAIConfig, AIProviderResponse, AIProviderConfig, AIProviderStreamChunk } from "./types";
