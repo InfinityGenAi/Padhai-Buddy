@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -38,46 +38,105 @@ export function AIProviderConfigModal({ isOpen, onClose }: AIProviderConfigModal
   const [success, setSuccess] = useState<string | null>(null);
   const [models, setModels] = useState<string[]>([]);
   const [testingModel, setTestingModel] = useState<string | null>(null);
+  const [isLoadingConfig, setIsLoadingConfig] = useState(false);
+  const [savedConfig, setSavedConfig] = useState<{
+    provider: AIProviderId;
+    model: string;
+    baseUrl?: string;
+    hasApiKey: boolean;
+  } | null>(null);
 
-  const loadProviders = async () => {
+  const loadProviders = useCallback(async () => {
+    const defaults = Object.values(AI_PROVIDERS);
+    setProviders(defaults);
+    setSelectedProvider("groq");
+    setModel(AI_PROVIDERS.groq.defaultModel);
+    setModels(AI_PROVIDERS.groq.availableModels);
+    setApiKey("");
+    setBaseUrl("");
+    setSavedConfig(null);
+    setError(null);
+    setSuccess(null);
+    setIsLoadingConfig(true);
+
     try {
-      setProviders(Object.values(AI_PROVIDERS));
-      setSelectedProvider("groq");
-      setModel(AI_PROVIDERS.groq.defaultModel);
-    } catch {
-      setError("Failed to load providers");
+      const token = await getFirebaseIdToken();
+      if (!token) throw new Error("Not authenticated");
+
+      const result = await safeFetch<{
+        config: {
+          provider: AIProviderId;
+          model: string;
+          baseUrl?: string;
+          hasApiKey: boolean;
+        } | null;
+        providers?: AIProviderConfig[];
+      }>("/api/ai-config", {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || "Failed to load saved AI configuration");
+      }
+
+      const availableProviders =
+        result.data.providers?.length ? result.data.providers : defaults;
+      setProviders(availableProviders);
+
+      const saved = result.data.config;
+      const savedProvider = saved
+        ? availableProviders.find((provider) => provider.id === saved.provider)
+        : undefined;
+
+      if (saved && savedProvider) {
+        const savedModels = savedProvider.availableModels || [];
+        setSavedConfig(saved);
+        setSelectedProvider(saved.provider);
+        setModel(saved.model);
+        setBaseUrl(saved.baseUrl || "");
+        setModels(
+          savedModels.includes(saved.model) || !saved.model
+            ? savedModels
+            : [...savedModels, saved.model],
+        );
+      }
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error
+          ? `Couldn't load the saved AI configuration: ${err.message}`
+          : "Couldn't load the saved AI configuration.",
+      );
+    } finally {
+      setIsLoadingConfig(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
-      loadProviders();
+      void loadProviders();
     }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (selectedProvider) {
-      const provider = providers.find(p => p.id === selectedProvider);
-      if (provider) {
-        setModel(provider.defaultModel);
-        setModels(provider.availableModels || []);
-      }
-      setBaseUrl("");
-    }
-  }, [selectedProvider, providers]);
+  }, [isOpen, loadProviders]);
 
   const handleProviderChange = (providerId: AIProviderId) => {
+    if (providerId === selectedProvider) return;
+
     setSelectedProvider(providerId);
-    const provider = providers.find(p => p.id === providerId);
+    setApiKey("");
+    setBaseUrl("");
+    const provider = providers.find((item) => item.id === providerId);
     if (provider) {
       setModel(provider.defaultModel);
       setModels(provider.availableModels || []);
     }
   };
 
+  const hasSavedKeyForSelection =
+    savedConfig?.provider === selectedProvider && savedConfig.hasApiKey;
+
   const handleTestConnection = async () => {
-    if (!apiKey.trim()) {
-      setError("Please enter an API key");
+    if (!apiKey.trim() && !hasSavedKeyForSelection) {
+      setError("Please enter an API key for this provider");
       return;
     }
 
@@ -166,6 +225,13 @@ export function AIProviderConfigModal({ isOpen, onClose }: AIProviderConfigModal
         throw new Error(result.error || result.data?.error || "Failed to save");
       }
 
+      setSavedConfig({
+        provider: selectedProvider,
+        model,
+        baseUrl: baseUrl.trim() || undefined,
+        hasApiKey: true,
+      });
+      setApiKey("");
       setSuccess("AI provider configured successfully!");
       playSaveSuccess();
       setTimeout(() => {
@@ -199,7 +265,10 @@ export function AIProviderConfigModal({ isOpen, onClose }: AIProviderConfigModal
       setSuccess("AI provider removed. Using default server configuration.");
       setApiKey("");
       setBaseUrl("");
+      setSavedConfig(null);
       setSelectedProvider("groq");
+      setModel(AI_PROVIDERS.groq.defaultModel);
+      setModels(AI_PROVIDERS.groq.availableModels);
       playSaveSuccess();
       setTimeout(() => onClose(), 1500);
     } catch (err: unknown) {
@@ -250,6 +319,12 @@ export function AIProviderConfigModal({ isOpen, onClose }: AIProviderConfigModal
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4">
+              {isLoadingConfig && (
+                <p className="text-sm text-foreground/60" role="status">
+                  Loading saved AI configuration…
+                </p>
+              )}
+
               {error && (
                 <motion.div
                   initial={{ opacity: 0, y: -5 }}
@@ -329,6 +404,11 @@ export function AIProviderConfigModal({ isOpen, onClose }: AIProviderConfigModal
                         )}
                       </button>
                     </div>
+                    {hasSavedKeyForSelection && (
+                      <p className="text-[10px] text-foreground/50 mt-1">
+                        A key is saved securely on the server. Leave this blank to keep using it, or enter a new key to replace it.
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -369,7 +449,7 @@ export function AIProviderConfigModal({ isOpen, onClose }: AIProviderConfigModal
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={handleTestConnection}
-                  disabled={isTesting || isSaving || !apiKey.trim()}
+                  disabled={isLoadingConfig || isTesting || isSaving || (!apiKey.trim() && !hasSavedKeyForSelection)}
                   className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium border border-border bg-foreground/5 text-foreground/70 hover:bg-foreground/8 transition-colors disabled:opacity-50"
                 >
                   {isTesting ? (
@@ -393,7 +473,7 @@ export function AIProviderConfigModal({ isOpen, onClose }: AIProviderConfigModal
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={handleSave}
-                  disabled={isSaving || isTesting || !apiKey.trim()}
+                  disabled={isLoadingConfig || isSaving || isTesting || (!apiKey.trim() && !hasSavedKeyForSelection)}
                   className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 btn-primary rounded-xl text-sm font-medium disabled:opacity-50"
                 >
                   {isSaving ? "Saving..." : "Save"}
@@ -401,7 +481,7 @@ export function AIProviderConfigModal({ isOpen, onClose }: AIProviderConfigModal
                 </motion.button>
               </div>
 
-              {apiKey && (
+              {savedConfig && (
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
