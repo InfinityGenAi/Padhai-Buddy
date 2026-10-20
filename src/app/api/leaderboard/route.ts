@@ -66,22 +66,53 @@ export async function GET(req: NextRequest) {
     .limit(10)
     .get();
 
-  const users: LeaderboardEntry[] = scoresSnap.docs.map((docSnap) => {
-    const data = docSnap.data();
-    return {
-      name: (data.name as string) || "Anonymous",
-      username: (data.username as string) || undefined,
-      score: typeof data.score === "number" ? data.score : 0,
-      tier: tierForScore(typeof data.score === "number" ? data.score : 0),
-      totalDoubts: typeof data.totalDoubts === "number" ? data.totalDoubts : 0,
-      totalQuizzes: typeof data.totalQuizzes === "number" ? data.totalQuizzes : 0,
-      totalFlashcards: typeof data.totalFlashcards === "number" ? data.totalFlashcards : 0,
-      totalNotes: typeof data.totalNotes === "number" ? data.totalNotes : 0,
-      totalStudySessions: typeof data.totalStudySessions === "number" ? data.totalStudySessions : 0,
-      completedPlans: typeof data.completedPlans === "number" ? data.completedPlans : 0,
-      totalActivity: typeof data.totalActivity === "number" ? data.totalActivity : 0,
-    };
-  });
+  // The score ledger is authoritative for ranking and totals, but profile names
+  // can change and the incremental score writer doesn't necessarily rewrite the
+  // display fields on every activity. Resolve only the ten ranked profiles so
+  // current names/usernames are shown without scanning the whole user collection.
+  const users: LeaderboardEntry[] = await Promise.all(
+    scoresSnap.docs.map(async (docSnap) => {
+      const data = docSnap.data();
+      const profileSnap = await db.collection("users").doc(docSnap.id).get().catch(() => null);
+      const profile = profileSnap?.exists ? profileSnap.data() : undefined;
+      const score = typeof data.score === "number" ? data.score : 0;
+
+      const profileName =
+        typeof profile?.name === "string" && profile.name.trim()
+          ? profile.name.trim()
+          : typeof profile?.username === "string" && profile.username.trim()
+            ? profile.username.trim()
+            : undefined;
+      const ledgerName =
+        typeof data.name === "string" && data.name.trim()
+          ? data.name.trim()
+          : typeof data.username === "string" && data.username.trim()
+            ? data.username.trim()
+            : undefined;
+      const profileUsername =
+        typeof profile?.username === "string" && profile.username.trim()
+          ? profile.username.trim()
+          : undefined;
+      const ledgerUsername =
+        typeof data.username === "string" && data.username.trim()
+          ? data.username.trim()
+          : undefined;
+
+      return {
+        name: profileName || ledgerName || "Anonymous",
+        username: profileUsername || ledgerUsername,
+        score,
+        tier: tierForScore(score),
+        totalDoubts: typeof data.totalDoubts === "number" ? data.totalDoubts : 0,
+        totalQuizzes: typeof data.totalQuizzes === "number" ? data.totalQuizzes : 0,
+        totalFlashcards: typeof data.totalFlashcards === "number" ? data.totalFlashcards : 0,
+        totalNotes: typeof data.totalNotes === "number" ? data.totalNotes : 0,
+        totalStudySessions: typeof data.totalStudySessions === "number" ? data.totalStudySessions : 0,
+        completedPlans: typeof data.completedPlans === "number" ? data.completedPlans : 0,
+        totalActivity: typeof data.totalActivity === "number" ? data.totalActivity : 0,
+      };
+    }),
+  );
 
   // Sort by score desc, then total activity desc, then name for stable tie-break.
   users.sort((a, b) => {
