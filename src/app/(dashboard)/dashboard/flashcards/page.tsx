@@ -244,9 +244,11 @@ export default function FlashcardsPage() {
     fetchCards(deck.id).finally(() => setLoading(false));
   };
 
-  const startStudy = async (deckId: string) => {
+  const startStudy = async (deckId: string, deckTitle?: string) => {
     setActiveDeckId(deckId);
+    if (deckTitle) setActiveDeckTitle(deckTitle);
     setLoading(true);
+    setError(null);
     try {
       const token = await (await import("@/lib/auth-utils")).getFirebaseIdToken();
       const res = await fetch(`/api/flashcards?deckId=${deckId}`, {
@@ -258,6 +260,13 @@ export default function FlashcardsPage() {
       setCards(studyCards);
       setCurrentCardIndex(0);
       setIsFlipped(false);
+      if (studyCards.length === 0) {
+        // Do not silently fall back to the deck list when a student tries to
+        // study an empty deck. Open its management view and explain next steps.
+        setView("deckDetail");
+        setError("This deck has no cards yet. Add your first card to start studying.");
+        return;
+      }
       setView("study");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load cards");
@@ -426,7 +435,7 @@ export default function FlashcardsPage() {
                       <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-foreground/5 capitalize">{card.status}</span>
                     </div>
                     <div className="flex gap-1 ml-2">
-                      <button onClick={() => startStudy(activeDeckId)} className="p-1.5 rounded-lg text-foreground/40 hover:text-primary" title="Study">
+                      <button onClick={() => startStudy(activeDeckId, activeDeckTitle)} className="p-1.5 rounded-lg text-foreground/40 hover:text-primary" title="Study">
                         <SparklesIcon className="w-4 h-4" />
                       </button>
                       <button onClick={() => startEditCard(card)} className="p-1.5 rounded-lg text-foreground/40 hover:text-blue-500" title="Edit">
@@ -518,7 +527,7 @@ export default function FlashcardsPage() {
                 <p className="text-xs text-foreground/50">{deck.subject}</p>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => startStudy(deck.id)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20">
+                <button onClick={() => startStudy(deck.id, deck.title)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20">
                   Study
                 </button>
                 <button onClick={() => openDeck(deck)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-foreground/5 hover:text-foreground">
