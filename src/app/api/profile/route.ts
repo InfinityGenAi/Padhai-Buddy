@@ -73,10 +73,25 @@ export async function POST(req: NextRequest) {
       if (url.length > 2048) {
         return NextResponse.json({ error: "Photo URL is too long" }, { status: 400 });
       }
+      let parsedPhotoUrl: URL;
       try {
-        new URL(url);
+        parsedPhotoUrl = new URL(url);
       } catch {
         return NextResponse.json({ error: "Photo URL must be a valid URL" }, { status: 400 });
+      }
+      const allowLocalHttp =
+        process.env.NODE_ENV !== "production" &&
+        parsedPhotoUrl.protocol === "http:" &&
+        ["localhost", "127.0.0.1", "::1"].includes(parsedPhotoUrl.hostname);
+      if (
+        (parsedPhotoUrl.protocol !== "https:" && !allowLocalHttp) ||
+        parsedPhotoUrl.username ||
+        parsedPhotoUrl.password
+      ) {
+        return NextResponse.json(
+          { error: "Photo URL must use HTTPS and must not include credentials" },
+          { status: 400 },
+        );
       }
       updates.photoURL = url;
     }
