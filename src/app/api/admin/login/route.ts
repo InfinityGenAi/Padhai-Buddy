@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, initializationError } from "@/lib/firebase-admin";
 import { checkRateLimit } from "@/lib/rate-limiter";
+import { getClientIp } from "@/lib/client-ip";
 
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
 const ADMIN_UID = "admin-stable-uid";
@@ -27,14 +28,6 @@ const ADMIN_UID = "admin-stable-uid";
  *
  * SECURITY: ADMIN_SECRET must remain server-side only. Never expose to client.
  */
-function getClientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0].trim();
-  }
-  return req.headers.get("x-real-ip") || "unknown";
-}
-
 export async function POST(req: NextRequest) {
   try {
     if (!adminAuth || initializationError) {
