@@ -3,6 +3,8 @@ import { adminAuth, initializationError } from "@/lib/firebase-admin";
 import { checkRateLimit } from "@/lib/rate-limiter";
 import { getClientIp } from "@/lib/client-ip";
 
+export const runtime = "nodejs";
+
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
 const ADMIN_UID = "admin-stable-uid";
 
