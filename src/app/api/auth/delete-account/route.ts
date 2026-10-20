@@ -114,20 +114,17 @@ export async function POST(req: NextRequest) {
         await batch.commit();
       }
 
-      // Visitor markers contain a UID under dailyVisitors/{date}/users/{uid}.
-      // Delete all dates' markers, but leave date-level aggregate counters intact.
-      for (;;) {
-        const markers = await adminDb.collectionGroup("users")
-          .where("uid", "==", uid)
-          .limit(BATCH_SIZE)
-          .get();
-        const visitorMarkers = markers.docs.filter((d) => d.ref.path.startsWith("dailyVisitors/"));
-        if (visitorMarkers.length === 0) break;
-        for (let i = 0; i < visitorMarkers.length; i += BATCH_SIZE) {
-          const batch = adminDb.batch();
-          visitorMarkers.slice(i, i + BATCH_SIZE).forEach((d) => batch.delete(d.ref));
-          await batch.commit();
-        }
+      // Visitor markers are nested at dailyVisitors/{date}/users/{uid}.
+      // Visit each date explicitly rather than using a filtered collection-group
+      // query: a query limit could otherwise stop on unrelated "users" documents
+      // and leave old markers behind. Aggregate date documents are preserved.
+      const visitorDates = await adminDb.collection("dailyVisitors").get();
+      for (let i = 0; i < visitorDates.docs.length; i += BATCH_SIZE) {
+        const batch = adminDb.batch();
+        visitorDates.docs.slice(i, i + BATCH_SIZE).forEach((dateDoc) => {
+          batch.delete(dateDoc.ref.collection("users").doc(uid));
+        });
+        await batch.commit();
       }
 
       // Release the username only if its mapping still belongs to this UID;
