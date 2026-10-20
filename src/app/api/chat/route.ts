@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { getGroqClient, GROQ_TEXT_MODEL, buildSystemPrompt, StudyMode } from "@/lib/groq";
 import { checkRateLimit } from "@/lib/rate-limiter";
+import { getProvider, sendMessage as sendProviderMessage, type AIMessage, type UserAIConfig, type AIProviderResponse, type AIProviderStreamChunk } from "@/lib/ai-providers";
+import { decryptAiConfig } from "@/lib/ai-config-crypto";
 
 const MAX_MESSAGE_LENGTH = 5000;
 const MAX_HISTORY_MESSAGES = 10;
@@ -130,27 +132,93 @@ interface SessionData {
   }
 }
 
+function isAsyncIterable<T = unknown>(value: unknown): value is AsyncIterable<T> {
+  return !!value && typeof (value as { [Symbol.asyncIterator]?: unknown })[Symbol.asyncIterator] === "function";
+}
+
 function createStreamingResponse(stream: AsyncIterable<unknown>): ReadableStream {
   const encoder = new TextEncoder();
   return new ReadableStream({
     async start(controller) {
       try {
         for await (const chunk of stream) {
-          const choice = (chunk as { choices?: Array<{ delta?: { content?: string } }> }).choices?.[0];
-          const content = choice?.delta?.content;
-          if (content) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+          const item = chunk as {
+            content?: unknown;
+            error?: unknown;
+            done?: unknown;
+            choices?: Array<{ delta?: { content?: unknown } }>;
+          };
+          if (typeof item.error === "string" && item.error) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: item.error })}\n\n`));
+            break;
           }
+          const choiceContent = item.choices?.[0]?.delta?.content;
+          const text = typeof item.content === "string" ? item.content : choiceContent;
+          if (typeof text === "string" && text.length > 0) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: text })}\n\n`));
+          }
+          if (item.done === true) break;
         }
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();
       } catch (error) {
         console.error("[CHAT] Streaming error:", error);
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Streaming failed" })}\n\n`));
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();
       }
     },
   });
+}
+
+async function loadUserAIConfig(uid: string): Promise<UserAIConfig | null> {
+  if (!adminDb) return null;
+  const configRef = adminDb.collection("users").doc(uid).collection("settings").doc("aiConfig");
+  const snapshot = await configRef.get();
+  if (!snapshot.exists) return null;
+
+  const encryptedConfig = snapshot.data()?.encryptedConfig;
+  if (typeof encryptedConfig !== "string" || !encryptedConfig) {
+    throw new Error("Saved AI configuration is invalid. Please reconfigure your AI provider in Settings.");
+  }
+
+  const plaintext = decryptAiConfig(encryptedConfig);
+  if (!plaintext) {
+    throw new Error("Saved AI configuration could not be decrypted. Please reconfigure your AI provider in Settings.");
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(plaintext);
+  } catch {
+    throw new Error("Saved AI configuration is invalid. Please reconfigure your AI provider in Settings.");
+  }
+
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("Saved AI configuration is invalid. Please reconfigure your AI provider in Settings.");
+  }
+
+  const config = parsed as Partial<UserAIConfig>;
+  if (
+    typeof config.provider !== "string" ||
+    typeof config.apiKey !== "string" ||
+    !config.apiKey.trim() ||
+    typeof config.model !== "string" ||
+    !config.model.trim()
+  ) {
+    throw new Error("Saved AI configuration is incomplete. Please reconfigure your AI provider in Settings.");
+  }
+  if (!getProvider(config.provider as UserAIConfig["provider"])) {
+    throw new Error("The saved AI provider is not supported by this version. Please select a provider in Settings.");
+  }
+
+  return {
+    provider: config.provider as UserAIConfig["provider"],
+    apiKey: config.apiKey,
+    model: config.model,
+    baseUrl: typeof config.baseUrl === "string" ? config.baseUrl : undefined,
+    updatedAt: typeof config.updatedAt === "number" ? config.updatedAt : Date.now(),
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -292,16 +360,34 @@ export async function POST(req: NextRequest) {
     const shouldStream = stream === true;
 
     try {
-      if (shouldStream) {
-        const groqStream = await getGroqClient().chat.completions.create({
-          model: GROQ_TEXT_MODEL,
-          messages,
-          temperature: 0.3,
-          max_tokens: 2048,
-          stream: true,
-        });
+      const savedConfig = await loadUserAIConfig(decoded.uid);
+      const providerConfig: UserAIConfig = savedConfig || {
+        provider: "groq",
+        apiKey: process.env.GROQ_API_KEY || "",
+        model: GROQ_TEXT_MODEL,
+        updatedAt: Date.now(),
+      };
 
-        return new NextResponse(createStreamingResponse(groqStream), {
+      if (!providerConfig.apiKey) {
+        return NextResponse.json(
+          { error: "No AI provider is configured. Add an API key in AI Provider Settings." },
+          { status: 503 },
+        );
+      }
+
+      const providerMessages: AIMessage[] = messages;
+      const result = await sendProviderMessage(
+        providerConfig.provider,
+        providerMessages,
+        providerConfig,
+        shouldStream,
+      );
+
+      if (shouldStream) {
+        if (!isAsyncIterable(result)) {
+          throw new Error("AI provider did not return a streaming response");
+        }
+        return new NextResponse(createStreamingResponse(result), {
           headers: {
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache",
@@ -312,16 +398,8 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      const completion = await getGroqClient().chat.completions.create({
-        model: GROQ_TEXT_MODEL,
-        messages,
-        temperature: 0.3,
-        max_tokens: 2048,
-      });
-
-      const answer =
-        completion.choices[0]?.message?.content ||
-        "I couldn't generate an answer at this time. Please try again.";
+      const response = result as AIProviderResponse;
+      const answer = response.content || "I couldn't generate an answer at this time. Please try again.";
 
       return NextResponse.json({
         answer,
@@ -332,10 +410,17 @@ export async function POST(req: NextRequest) {
           "X-RateLimit-Remaining": String(rateLimitResult.remaining),
         },
       });
-    } catch {
+    } catch (error: unknown) {
+      // Preserve actionable configuration errors without returning provider
+      // credentials or raw request data to the client.
+      const message = error instanceof Error ? error.message : "";
+      if (message.startsWith("Saved AI configuration") || message.startsWith("The saved AI provider")) {
+        return NextResponse.json({ error: message }, { status: 400 });
+      }
+      console.error("[CHAT] Provider request failed:", error);
       return NextResponse.json(
         {
-          error: "AI service temporarily unavailable. Please try again in a moment.",
+          error: "AI service temporarily unavailable. Please check your provider configuration and try again.",
         },
         { status: 502 },
       );
