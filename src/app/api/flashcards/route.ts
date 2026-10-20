@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { getGroqClient, GROQ_TEXT_MODEL } from "@/lib/groq";
-import { incrementUserScore } from "@/lib/score-ledger";
-import type { Firestore } from "firebase-admin/firestore";
+import { activityPoints } from "@/lib/score-ledger";
+import { FieldValue, type Firestore } from "firebase-admin/firestore";
 
 interface FlashcardItem {
   front: string;
@@ -128,18 +128,11 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "updateCard" && deckId && cardId) {
-      // Verify parent deck exists and belongs to user
       const deckRef = adminDb.collection("users").doc(decoded.uid).collection("flashcardDecks").doc(deckId);
-      const deckSnap = await deckRef.get();
-      if (!deckSnap.exists) {
-        return NextResponse.json({ error: "Deck not found" }, { status: 404 });
-      }
-
       const cardRef = deckRef.collection("cards").doc(cardId);
-      const cardSnap = await cardRef.get();
-      const oldStatus = cardSnap.exists ? (cardSnap.data() as { status?: string }).status : undefined;
+      const scoreRef = adminDb.collection("userScores").doc(decoded.uid);
 
-      const updates: Record<string, unknown> = { updatedAt: Date.now() };
+      const updates: Record<string, unknown> = {};
       if (front !== undefined) {
         if (typeof front !== "string" || front.trim().length > 500) return NextResponse.json({ error: "Front must be a string of at most 500 characters" }, { status: 400 });
         updates.front = front.trim();
@@ -152,17 +145,55 @@ export async function POST(req: NextRequest) {
         if (!VALID_CARD_STATUSES.includes(String(status))) return NextResponse.json({ error: "Invalid card status" }, { status: 400 });
         updates.status = String(status);
       }
-      await cardRef.update(updates);
-      await deckRef.update({ updatedAt: Date.now() });
 
-      // Credit the server-owned ledger when a card is reviewed for the first time.
-      const newStatus = status !== undefined ? String(status) : oldStatus;
-      if (oldStatus !== "reviewed" && newStatus === "reviewed") {
-        try {
-          await incrementUserScore(decoded.uid, "flashcard");
-        } catch {
-          // Never block card update on ledger updates.
+      // Update the card and credit the leaderboard in one transaction. Only the
+      // first transition to "known" is rewarded; the server-only marker prevents
+      // cycling status values to farm points, even with concurrent requests.
+      const result = await adminDb.runTransaction(async (transaction) => {
+        const deckSnap = await transaction.get(deckRef);
+        if (!deckSnap.exists) return "deck-not-found" as const;
+
+        const cardSnap = await transaction.get(cardRef);
+        if (!cardSnap.exists) return "card-not-found" as const;
+
+        const cardData = cardSnap.data() as { status?: unknown; scoreCredited?: unknown };
+        const oldStatus = typeof cardData.status === "string" ? cardData.status : "new";
+        const newStatus = status !== undefined ? String(status) : oldStatus;
+        const shouldCredit =
+          oldStatus !== "known" &&
+          newStatus === "known" &&
+          cardData.scoreCredited !== true;
+
+        const cardUpdates: Record<string, unknown> = {
+          ...updates,
+          updatedAt: Date.now(),
+        };
+
+        if (shouldCredit) {
+          cardUpdates.scoreCredited = true;
+          transaction.set(
+            scoreRef,
+            {
+              uid: decoded.uid,
+              updatedAt: Date.now(),
+              totalFlashcards: FieldValue.increment(1),
+              score: FieldValue.increment(activityPoints("flashcard")),
+              totalActivity: FieldValue.increment(1),
+            },
+            { merge: true },
+          );
         }
+
+        transaction.update(cardRef, cardUpdates);
+        transaction.update(deckRef, { updatedAt: Date.now() });
+        return "ok" as const;
+      });
+
+      if (result === "deck-not-found") {
+        return NextResponse.json({ error: "Deck not found" }, { status: 404 });
+      }
+      if (result === "card-not-found") {
+        return NextResponse.json({ error: "Card not found" }, { status: 404 });
       }
 
       return NextResponse.json({ success: true });
