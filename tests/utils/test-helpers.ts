@@ -193,9 +193,11 @@ export async function waitForDashboardReady(page: Page) {
 }
 
 export async function waitForPageReady(page: Page, heading: string) {
-  // On mobile, broad text locators may first match a hidden sidebar label.
-  // Wait for the actual visible page heading instead.
-  await page.getByRole("heading", { name: heading, exact: true }).waitFor({
+  // Scope to the visible content area so matching words in hidden mobile
+  // navigation don't satisfy readiness checks. Some pages (such as AI Tutor)
+  // have a branded heading and a separate "New Chat" action rather than a
+  // heading whose text exactly matches the short page label.
+  await page.locator("main").getByText(heading, { exact: false }).first().waitFor({
     state: "visible",
     timeout: 15000,
   });
