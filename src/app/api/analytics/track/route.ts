@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { checkRateLimit } from "@/lib/rate-limiter";
+import { getClientIp } from "@/lib/client-ip";
 import { FieldValue } from "firebase-admin/firestore";
 
 export interface AnalyticsEvent {
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
     // Unauthenticated clients are rate-limited by IP for privacy-conscious
     // public page-view tracking (page_view only).
     if (!decoded && event === "page_view") {
-      const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
+      const ip = getClientIp(req);
       // Page-view telemetry is non-security-sensitive. Allow a reasonable
       // burst of route changes/public browsing before throttling a shared IP.
       const rateLimitResult = await checkRateLimit(`analytics-anon:${ip}`, 120);
