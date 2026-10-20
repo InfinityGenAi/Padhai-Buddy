@@ -89,7 +89,7 @@ export class OpenAIProvider implements AIProvider {
         .filter((id): id is string => typeof id === "string" && id.length > 0)
         // The API's model catalog also includes embeddings, audio, moderation,
         // and completion-only models that cannot be used by chat.completions.
-        .filter((id) => /^(gpt-|chatgpt-|o\\d|codex-)/i.test(id))
+        .filter((id) => /^(gpt-|chatgpt-|o[0-9]|codex-)/i.test(id))
         .filter((id) => !/(embedding|moderation|whisper|dall-e|tts|transcrib|audio|realtime|instruct|search-preview)/i.test(id)),
     )];
   }
