@@ -147,8 +147,11 @@ service cloud.firestore {
             && request.resource.data.back is string
             && request.resource.data.status in ["new", "learning", "known", "difficult"]
             && request.resource.data.createdAt is number
-            && request.resource.data.updatedAt is number;
-          allow update: if request.auth != null && request.auth.uid == userId;
+            && request.resource.data.updatedAt is number
+            // Score-credit markers are server-owned; clients cannot create or alter them.
+            && !("scoreCredited" in request.resource.data);
+          allow update: if request.auth != null && request.auth.uid == userId
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["scoreCredited"]);
           allow delete: if request.auth != null && request.auth.uid == userId;
         }
       }
