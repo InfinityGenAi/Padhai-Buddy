@@ -26,7 +26,7 @@ export async function GET() {
 
   checks.groqApi = !!process.env.GROQ_API_KEY;
   checks.aiConfigEncryption =
-    !isProduction || Boolean(process.env.AI_CONFIG_ENCRYPTION_KEY);
+    !isProduction || /^[a-f0-9]{64}$/i.test(process.env.AI_CONFIG_ENCRYPTION_KEY || "");
   // The in-memory limiter is process-local and does not protect a multi-instance
   // serverless deployment. Production readiness requires the configured Redis store.
   checks.distributedRateLimiting =
