@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { resolve } from "path";
 import http from "http";
 import { cert, getApps, initializeApp, deleteApp } from "firebase-admin/app";
@@ -587,6 +587,44 @@ test.describe("Security: Firestore rules (uid immutability)", () => {
   });
 });
 
+async function fillAndVerifySignupForm(page: Page, email: string): Promise<void> {
+  // The auth provider can finish its initial Firebase bootstrap after the
+  // signup page first mounts. Fill all controlled fields together, then verify
+  // React retained their values before trying to submit.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await page.getByPlaceholder("Enter your name").fill("Audit Signup");
+    await page.getByPlaceholder("Enter your email").fill(email);
+    await page.getByPlaceholder("Create a password").fill(PASSWORD);
+    await page.getByPlaceholder("Confirm your password").fill(PASSWORD);
+    await page.locator("select").nth(0).selectOption("10");
+    await page.locator("select").nth(1).selectOption("CBSE");
+    await page.waitForTimeout(150);
+
+    const [name, actualEmail, password, confirmPassword, selectedClass, selectedBoard] =
+      await Promise.all([
+        page.getByPlaceholder("Enter your name").inputValue(),
+        page.getByPlaceholder("Enter your email").inputValue(),
+        page.getByPlaceholder("Create a password").inputValue(),
+        page.getByPlaceholder("Confirm your password").inputValue(),
+        page.locator("select").nth(0).inputValue(),
+        page.locator("select").nth(1).inputValue(),
+      ]);
+
+    if (
+      name === "Audit Signup" &&
+      actualEmail === email &&
+      password === PASSWORD &&
+      confirmPassword === PASSWORD &&
+      selectedClass === "10" &&
+      selectedBoard === "CBSE"
+    ) {
+      return;
+    }
+  }
+
+  throw new Error("Signup form values were reset during auth hydration; refusing to submit incomplete credentials.");
+}
+
 test.describe("Security: signup verification email failure", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -642,12 +680,7 @@ test.describe("Security: signup verification email failure", () => {
     // Use from=landing query param to bypass direct URL entry guard (persists across redirects)
     await page.goto("http://localhost:3000/signup?from=landing", { waitUntil: "domcontentloaded" });
 
-    await page.getByPlaceholder("Enter your name").fill("Audit Signup");
-    await page.getByPlaceholder("Enter your email").fill(email);
-    await page.getByPlaceholder("Create a password").fill(PASSWORD);
-    await page.getByPlaceholder("Confirm your password").fill(PASSWORD);
-    await page.locator("select").nth(0).selectOption("10");
-    await page.locator("select").nth(1).selectOption("CBSE");
+    await fillAndVerifySignupForm(page, email);
 
     await page.getByRole("button", { name: "Create Account" }).click();
 
