@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { DevicePhoneMobileIcon, CheckCircleIcon, GlobeAltIcon, ArrowDownTrayIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import BrandLogo from "@/components/BrandLogo";
 import Link from "next/link";
@@ -19,23 +19,58 @@ interface GitHubRelease {
   }>;
 }
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+}
+
 export default function DownloadAndroidPage() {
   const [release, setRelease] = useState<GitHubRelease | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installMessage, setInstallMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+    };
+    const handleInstalled = () => {
+      setInstallPrompt(null);
+      setInstallMessage("Padhai Buddy was installed successfully.");
+    };
+    window.addEventListener("beforeinstallprompt", handleInstallPrompt);
+    window.addEventListener("appinstalled", handleInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleInstallPrompt);
+      window.removeEventListener("appinstalled", handleInstalled);
+    };
+  }, []);
+
+  const handleInstall = useCallback(async () => {
+    if (!installPrompt) {
+      setInstallMessage("Automatic install is not available in this browser yet. In Chrome, open the ⋮ menu and choose Install app or Add to Home screen.");
+      return;
+    }
+    try {
+      await installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+      setInstallMessage(choice.outcome === "accepted" ? "Installation started. Follow the browser's prompts to finish." : "Installation was cancelled. You can install later from the browser menu.");
+    } catch {
+      setInstallMessage("Automatic install failed. Open the Chrome ⋮ menu and choose Install app or Add to Home screen.");
+    } finally {
+      setInstallPrompt(null);
+    }
+  }, [installPrompt]);
 
   useEffect(() => {
     async function fetchLatestRelease() {
       try {
         // Fetch latest release from GitHub API
         const response = await fetch(
-          "https://api.github.com/repos/InfinityGenAi/Padhai-Buddy/releases/latest",
-          {
-            headers: {
-              Accept: "application/vnd.github.v3+json",
-            },
-            next: { revalidate: 3600 }, // Cache for 1 hour
-          }
+          "/api/releases/latest",
+          { cache: "no-store" }
         );
 
         if (!response.ok) {
@@ -205,17 +240,17 @@ export default function DownloadAndroidPage() {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => {
-                // Trigger PWA install prompt if available
-                if ('serviceWorker' in navigator) {
-                  window.dispatchEvent(new CustomEvent('pwa-install-prompt'));
-                }
-              }}
+              onClick={handleInstall}
               className="w-full btn-primary py-3 rounded-xl font-medium flex items-center justify-center gap-2"
             >
               <GlobeAltIcon className="w-5 h-5" />
-              Open in Browser to Install PWA
+              {installPrompt ? "Install Padhai Buddy" : "Install / Add to Home Screen"}
             </motion.button>
+            {installMessage && (
+              <p role="status" className="text-xs text-foreground/70 bg-primary/5 border border-primary/20 rounded-lg p-3">
+                {installMessage}
+              </p>
+            )}
 
             <p className="text-xs text-foreground/50 text-center">
               Padhai Buddy is a Progressive Web App. Install it directly from your browser.
