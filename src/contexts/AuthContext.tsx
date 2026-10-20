@@ -109,27 +109,32 @@ function AuthProvider({ children }: { children: ReactNode }) {
   );
   const signingUpRef = useRef(false);
 
-  const loadUserProfile = useCallback(async (fbUser: FirebaseUser | null) => {
+  const loadUserProfile = useCallback(async (
+    fbUser: FirebaseUser | null,
+    manageLoadingState = true,
+  ) => {
     if (!fbUser) {
       setUser(null);
       setAuthError(null);
       setNeedsOnboarding(false);
-      setLoading(false);
+      if (manageLoadingState) setLoading(false);
       setIsAdmin(false);
       return;
     }
-    // Hold the auth gate until this user's profile and role claims have been
-    // loaded. Otherwise protected pages can render with a stale/missing profile
-    // and immediately bounce between dashboard and onboarding.
-    setLoading(true);
-    setAuthError(null);
+    // Hold the auth gate while a new auth session is bootstrapping. Routine
+    // profile refreshes (for example after saving the profile form) must not
+    // unmount the current page or dismiss its success/error notification.
+    if (manageLoadingState) {
+      setLoading(true);
+      setAuthError(null);
+    }
 
     const db = getFirestoreDb();
     if (!db) {
       setAuthError("Firestore is not initialized");
       setUser(null);
       setNeedsOnboarding(false);
-      setLoading(false);
+      if (manageLoadingState) setLoading(false);
       setIsAdmin(false);
       return;
     }
@@ -182,7 +187,7 @@ getDoc(doc(db, "users", fbUser.uid))
           setNeedsOnboarding(false);
         })
         .finally(() => {
-          if (!signingUpRef.current) {
+          if (manageLoadingState && !signingUpRef.current) {
             setLoading(false);
           }
         });
@@ -216,9 +221,8 @@ getDoc(doc(db, "users", fbUser.uid))
 
   const reloadProfile = useCallback(() => {
     if (firebaseUser) {
-      setLoading(true);
       setAuthError(null);
-      loadUserProfile(firebaseUser);
+      loadUserProfile(firebaseUser, false);
     }
   }, [firebaseUser, loadUserProfile]);
 
