@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { username } = body;
-    if (!username) {
+    if (typeof username !== "string" || !username.trim()) {
       return NextResponse.json({ error: "Username is required" }, { status: 400 });
     }
 
