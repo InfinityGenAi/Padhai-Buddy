@@ -14,7 +14,7 @@ import {
   Cog6ToothIcon,
   ArrowPathIcon,
 } from "@heroicons/react/24/outline";
-import { getAllProviders, validateProviderConfig, fetchModels, AIProviderId, AIProviderConfig } from "@/lib/ai-providers";
+import { AI_PROVIDERS, type AIProviderId, type AIProviderConfig } from "@/lib/ai-providers/types";
 import { getFirebaseIdToken } from "@/lib/auth-utils";
 import { playSaveSuccess, playError } from "@/lib/sounds";
 import { safeFetch } from "@/lib/api-client";
@@ -41,10 +41,9 @@ export function AIProviderConfigModal({ isOpen, onClose }: AIProviderConfigModal
 
   const loadProviders = async () => {
     try {
-      const allProviders = getAllProviders();
-      setProviders(Object.values(allProviders));
+      setProviders(Object.values(AI_PROVIDERS));
       setSelectedProvider("groq");
-      setModel(allProviders.groq.defaultModel);
+      setModel(AI_PROVIDERS.groq.defaultModel);
     } catch {
       setError("Failed to load providers");
     }
@@ -99,18 +98,26 @@ export function AIProviderConfigModal({ isOpen, onClose }: AIProviderConfigModal
         updatedAt: Date.now(),
       };
 
-      const validation = await validateProviderConfig(config.provider, config);
-      if (!validation.valid) {
-        throw new Error(validation.error || "Invalid configuration");
+      const result = await safeFetch<{ success: boolean; message?: string; models?: string[]; error?: string }>(
+        "/api/ai-config",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ ...config, testOnly: true }),
+        },
+      );
+      if (!result.success || !result.data?.success) {
+        throw new Error(result.error || result.data?.error || "Invalid configuration");
       }
 
-      // Also test by fetching models
-      const fetchedModels = await fetchModels(selectedProvider, apiKey, baseUrl.trim() || undefined);
+      // Provider keys stay server-side after entry; validation and model catalog
+      // requests are made by the authenticated API, not directly from the browser.
+      const fetchedModels = (result.data.models || []).filter(
+        (availableModel): availableModel is string => typeof availableModel === "string",
+      );
       if (fetchedModels.length > 0) {
         setModels(fetchedModels);
-        if (!models.includes(model)) {
-          setModel(fetchedModels[0]);
-        }
+        if (!fetchedModels.includes(model)) setModel(fetchedModels[0]);
       }
 
       setSuccess("Connection successful! Configuration is valid.");
@@ -149,18 +156,15 @@ export function AIProviderConfigModal({ isOpen, onClose }: AIProviderConfigModal
         updatedAt: Date.now(),
       };
 
-      const validation = await validateProviderConfig(config.provider, config);
-      if (!validation.valid) {
-        throw new Error(validation.error || "Invalid configuration");
-      }
-
-      const result = await safeFetch("/api/ai-config", {
+      const result = await safeFetch<{ success: boolean; error?: string }>("/api/ai-config", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: JSON.stringify(config),
       });
 
-      if (!result.success) throw new Error(result.error || "Failed to save");
+      if (!result.success || !result.data?.success) {
+        throw new Error(result.error || result.data?.error || "Failed to save");
+      }
 
       setSuccess("AI provider configured successfully!");
       playSaveSuccess();
