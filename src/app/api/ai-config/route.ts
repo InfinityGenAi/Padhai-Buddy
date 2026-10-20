@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { checkRateLimit } from "@/lib/rate-limiter";
-import { validateProviderConfig, getAllProviders, getProviderConfig, AIProviderId, UserAIConfig } from "@/lib/ai-providers";
+import { validateProviderConfig, getAllProviders, getProviderConfig, fetchModels, AIProviderId, UserAIConfig } from "@/lib/ai-providers";
 import { encryptAiConfig, decryptAiConfig } from "@/lib/ai-config-crypto";
 
 async function getUserConfig(uid: string): Promise<UserAIConfig | null> {
@@ -142,13 +142,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: validation.error || "Invalid configuration" }, { status: 400 });
     }
 
-    if (!testOnly) {
+    let models: string[] = [];
+    if (testOnly) {
+      try {
+        models = await fetchModels(providerId, config.apiKey, config.baseUrl);
+      } catch {
+        // The provider's credential validation already passed. If its model
+        // catalog is unavailable, keep the configured model and still report
+        // the connection result instead of leaking provider SDK internals.
+        models = providerConfig.availableModels || [];
+      }
+    } else {
       await saveUserConfig(decoded.uid, config);
     }
 
     return NextResponse.json({
       success: true,
       message: testOnly ? "Configuration validated successfully" : "Configuration saved",
+      ...(testOnly ? { models } : {}),
     });
   } catch (error: unknown) {
     console.error("[AI-CONFIG POST] Error:", error);
