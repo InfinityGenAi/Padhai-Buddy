@@ -114,16 +114,21 @@ export async function POST(req: NextRequest) {
         await batch.commit();
       }
 
-      // Visitor markers are nested at dailyVisitors/{date}/users/{uid}.
-      // Visit each date explicitly rather than using a filtered collection-group
-      // query: a query limit could otherwise stop on unrelated "users" documents
-      // and leave old markers behind. Aggregate date documents are preserved.
-      const visitorDates = await adminDb.collection("dailyVisitors").get();
-      for (let i = 0; i < visitorDates.docs.length; i += BATCH_SIZE) {
+      // Firestore does not require a parent dailyVisitors/{date} document
+      // to exist when its nested users/{uid} subcollection has documents.
+      // Therefore query the marker collection group directly instead of listing
+      // dailyVisitors parents. Delete only paths under dailyVisitors and keep
+      // aggregate analytics records intact.
+      const visitorMarkers = await adminDb.collectionGroup("users")
+        .where("uid", "==", uid)
+        .get();
+      const ownedVisitorMarkers = visitorMarkers.docs.filter((marker) =>
+        marker.ref.path.startsWith("dailyVisitors/") &&
+        marker.ref.parent.parent?.parent?.id === "dailyVisitors"
+      );
+      for (let i = 0; i < ownedVisitorMarkers.length; i += BATCH_SIZE) {
         const batch = adminDb.batch();
-        visitorDates.docs.slice(i, i + BATCH_SIZE).forEach((dateDoc) => {
-          batch.delete(dateDoc.ref.collection("users").doc(uid));
-        });
+        ownedVisitorMarkers.slice(i, i + BATCH_SIZE).forEach((marker) => batch.delete(marker.ref));
         await batch.commit();
       }
 
