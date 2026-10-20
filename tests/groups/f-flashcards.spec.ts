@@ -5,43 +5,69 @@ test.describe("F. Flashcards Tests", () => {
   test.beforeEach(async ({ page }) => {
     await mockSessionsRoute(page);
     await page.goto("http://localhost:3000/dashboard/flashcards/");
-    await page.waitForLoadState("domcontentloaded");
+    await expect(page.getByRole("heading", { name: "Flashcards", exact: true })).toBeVisible();
   });
 
   test("flashcards page loads", async ({ page }) => {
-    await expect(page.locator("h1:has-text('Flashcards')").first()).toBeAttached();
+    await expect(page.getByRole("heading", { name: "Flashcards", exact: true })).toBeVisible();
   });
 
   test("create deck button is visible", async ({ page }) => {
-    await expect(page.locator("text=New Deck").first()).toBeAttached();
+    await expect(page.getByRole("button", { name: "New Deck" })).toBeVisible();
   });
 
   test("create deck and see it in list", async ({ page }) => {
-    await expect(page.locator("text=No flashcard decks yet").first()).toBeAttached();
+    const deckTitle = `My Test Deck ${Date.now()}`;
 
-    await page.click("text=New Deck");
-    await expect(page.locator("text=Create Deck").first()).toBeAttached();
+    await page.getByRole("button", { name: "New Deck" }).click();
+    await expect(page.getByRole("heading", { name: "Create Deck", exact: true })).toBeVisible();
 
-    await page.fill('input[placeholder="Deck title"]', "My Test Deck");
-    await page.fill('input[placeholder="Subject"]', "Physics");
-    await page.click("button:has-text('Create')");
+    await page.getByPlaceholder("Deck title").fill(deckTitle);
+    await page.getByPlaceholder("Subject").fill("Physics");
+    await page.getByRole("button", { name: "Create", exact: true }).click();
 
-    await expect(page.locator("text=My Test Deck").first()).toBeVisible();
-    await expect(page.locator("text=Physics").first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: deckTitle, exact: true })).toBeVisible();
+    await expect(page.getByText("Physics", { exact: true }).last()).toBeVisible();
   });
 
-  test("study deck flips card and marks known", async ({ page }) => {
-    await page.click("text=New Deck");
-    await page.fill('input[placeholder="Deck title"]', "Study Deck");
-    await page.fill('input[placeholder="Subject"]', "Physics");
-    await page.click("button:has-text('Create')");
-    await expect(page.locator("text=Study Deck").first()).toBeVisible();
+  test("study deck flips a card and marks it known", async ({ page }) => {
+    const deckTitle = `Study Deck ${Date.now()}`;
 
-    await page.click("button:has-text('Study')");
-    await expect(page.locator("text=Studying").first()).toBeAttached();
-    await expect(page.locator("text=What is physics?").first()).toBeVisible();
+    await page.getByRole("button", { name: "New Deck" }).click();
+    await page.getByPlaceholder("Deck title").fill(deckTitle);
+    await page.getByPlaceholder("Subject").fill("Physics");
+    await page.getByRole("button", { name: "Create", exact: true }).click();
+    await expect(page.getByRole("heading", { name: deckTitle, exact: true })).toBeVisible();
 
-    await page.click("text=Known");
-    await expect(page.locator("text=Card 2 of").first()).toBeAttached();
+    // Open this specific deck, then create real cards before starting study mode.
+    const deckRow = page.locator(".subtle-card").filter({
+      has: page.getByRole("heading", { name: deckTitle, exact: true }),
+    });
+    await deckRow.getByRole("button", { name: "Manage" }).click();
+    await expect(page.getByRole("button", { name: "Add Card" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Add Card" }).click();
+    await page.getByPlaceholder("Front (question)").fill("What is physics?");
+    await page.getByPlaceholder("Back (answer)").fill("The study of matter, energy, and their interactions.");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(page.getByText("What is physics?", { exact: true })).toBeVisible();
+
+    await page.getByRole("button", { name: "Add Card" }).click();
+    await page.getByPlaceholder("Front (question)").fill("What is force?");
+    await page.getByPlaceholder("Back (answer)").fill("A push or pull that can change motion.");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(page.getByText("What is force?", { exact: true })).toBeVisible();
+
+    await page.locator('button[title="Study"]').click();
+    await expect(page.getByRole("heading", { name: "Studying", exact: true })).toBeVisible();
+    await expect(page.getByText("What is physics?", { exact: true })).toBeVisible();
+
+    // The card face is clickable; verify the answer is revealed before marking it known.
+    await page.locator(".subtle-card").last().click();
+    await expect(page.getByText("The study of matter, energy, and their interactions.", { exact: true })).toBeAttached();
+
+    await page.getByRole("button", { name: "Known", exact: true }).click();
+    await expect(page.getByText(/Card 2 of 2/)).toBeVisible();
+    await expect(page.getByText("What is force?", { exact: true })).toBeVisible();
   });
 });
