@@ -7,16 +7,20 @@ interface BrandLogoProps {
   alt?: string;
 }
 
+/**
+ * Single source of truth for the official Padhai Buddy brand mark.
+ * Use the repository's approved PNG asset so pages don't render the
+ * older, mismatched SVG variant.
+ */
 export default function BrandLogo({
   size = 40,
   className = "",
   href,
   alt = "Padhai Buddy",
 }: BrandLogoProps) {
-  const src = "/brand/padhai-buddy-logo.svg";
   const content = (
     <Image
-      src={src}
+      src="/brand/padhai-buddy-logo.png"
       alt={alt}
       width={size}
       height={size}
@@ -27,7 +31,7 @@ export default function BrandLogo({
 
   if (href) {
     return (
-      <a href={href} className="inline-flex flex-shrink-0">
+      <a href={href} className="inline-flex flex-shrink-0" aria-label={alt}>
         {content}
       </a>
     );
