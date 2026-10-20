@@ -85,10 +85,18 @@ export class GeminiProvider implements AIProvider {
     if (!config.model.trim()) return { valid: false, error: "Gemini model is required" };
 
     try {
-      const models = await this.createClient(config.apiKey).models.list();
-      return models.data.length > 0
-        ? { valid: true }
-        : { valid: false, error: "The Gemini API returned no available models" };
+      const response = await this.createClient(config.apiKey).models.list();
+      const models = response.data
+        .map((model) => model.id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0);
+
+      if (models.length === 0) {
+        return { valid: false, error: "The Gemini API returned no available models" };
+      }
+      if (!models.includes(config.model)) {
+        return { valid: false, error: "Selected Gemini model is not available for this API key. Refresh the model list and choose another model." };
+      }
+      return { valid: true };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unable to validate Gemini API key";
       return { valid: false, error: message };

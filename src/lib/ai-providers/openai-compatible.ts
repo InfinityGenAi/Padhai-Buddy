@@ -78,7 +78,17 @@ export class OpenAICompatibleProvider implements AIProvider {
         baseURL: config.baseUrl,
         fetch: safeProviderFetch,
       });
-      await client.models.list();
+      const response = await client.models.list();
+      const models = response.data
+        .map((model) => model.id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0);
+
+      if (models.length === 0) {
+        return { valid: false, error: "The provider returned no available models" };
+      }
+      if (!models.includes(config.model)) {
+        return { valid: false, error: "Selected model is not available at this endpoint. Refresh the model list and choose another model." };
+      }
       return { valid: true };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Invalid configuration";

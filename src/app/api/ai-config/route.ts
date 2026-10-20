@@ -203,22 +203,32 @@ export async function POST(req: NextRequest) {
       updatedAt: Date.now(),
     };
 
-    const validation = await validateProviderConfig(config.provider as AIProviderId, config as UserAIConfig);
-    if (!validation.valid) {
-      return NextResponse.json({ error: validation.error || "Invalid configuration" }, { status: 400 });
-    }
-
     let models: string[] = [];
     if (testOnly) {
       try {
         models = await fetchModels(providerId, config.apiKey, config.baseUrl);
       } catch {
-        // The provider's credential validation already passed. If its model
-        // catalog is unavailable, keep the configured model and still report
-        // the connection result instead of leaking provider SDK internals.
+        models = [];
+      }
+      if (models.length === 0) {
         models = providerConfig.availableModels || [];
       }
-    } else {
+    }
+
+    // During a connection test, validate the credentials using a real model
+    // returned by the provider if the selected default is stale. The modal
+    // receives the live catalog and moves selection to its first valid model.
+    // Saving (testOnly=false) always validates the exact model the user chose.
+    const configToValidate =
+      testOnly && models.length > 0 && !models.includes(config.model)
+        ? { ...config, model: models[0] }
+        : config;
+    const validation = await validateProviderConfig(providerId, configToValidate);
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error || "Invalid configuration" }, { status: 400 });
+    }
+
+    if (!testOnly) {
       await saveUserConfig(decoded.uid, config);
     }
 

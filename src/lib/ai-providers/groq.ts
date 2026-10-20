@@ -58,9 +58,21 @@ export class GroqProvider implements AIProvider {
   }
 
   async validateConfig(config: UserAIConfig): Promise<{ valid: boolean; error?: string }> {
+    if (!config.apiKey.trim()) return { valid: false, error: "Groq API key is required" };
+    if (!config.model.trim()) return { valid: false, error: "Groq model is required" };
+
     try {
-      const client = new Groq({ apiKey: config.apiKey });
-      await client.models.list();
+      const response = await new Groq({ apiKey: config.apiKey }).models.list();
+      const models = response.data
+        .map((model) => model.id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0);
+
+      if (models.length === 0) {
+        return { valid: false, error: "Groq returned no available models for this API key" };
+      }
+      if (!models.includes(config.model)) {
+        return { valid: false, error: "Selected Groq model is not available for this API key. Refresh the model list and choose another model." };
+      }
       return { valid: true };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Invalid API key";
@@ -68,12 +80,14 @@ export class GroqProvider implements AIProvider {
     }
   }
 
-  async getModels(): Promise<string[]> {
-    return [
-      "openai/gpt-oss-120b",
-      "llama-3.3-70b-versatile",
-      "llama-3.1-8b-instant",
-      "mixtral-8x7b-32768",
-    ];
+  async getModels(apiKey: string): Promise<string[]> {
+    if (!apiKey.trim()) return [];
+    const response = await new Groq({ apiKey }).models.list();
+    return [...new Set(
+      response.data
+        .map((model) => model.id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0)
+        .filter((id) => !/(whisper|tts|speech|transcrib|audio|embedding|moderation|guard|safeguard)/i.test(id)),
+    )];
   }
 }
