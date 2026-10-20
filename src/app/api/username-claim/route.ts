@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { checkRateLimit } from "@/lib/rate-limiter";
+import { getClientIp } from "@/lib/client-ip";
 
 const USERNAME_REGEX = /^[a-z0-9._]{3,20}$/;
 
@@ -37,14 +38,6 @@ const RESERVED_USERNAMES = new Set([
   "true",
   "false",
 ]);
-
-function getClientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  const real = req.headers.get("x-real-ip");
-  if (real) return real.trim();
-  return "unknown";
-}
 
 export async function POST(req: NextRequest) {
   try {
