@@ -44,14 +44,24 @@ function initializeAdmin() {
   });
 }
 
-const app = initializeAdmin();
+let app: ReturnType<typeof initializeAdmin>;
 
-if (!app && !useEmulator) {
+try {
+  app = initializeAdmin();
+} catch (error) {
+  // A malformed private key or invalid service-account value must not throw
+  // while this module is imported: that would turn every API route importing
+  // Firebase Admin into an opaque platform-level HTTP 500.
+  const detail = error instanceof Error ? error.message : String(error);
+  initializationError = `Firebase Admin initialization failed: ${detail}`;
+  console.error("[Firebase Admin] Initialization error:", initializationError);
+}
+
+if (!app && !initializationError && !useEmulator) {
   initializationError =
     `Missing required Firebase Admin environment variables: ${missingEnvVars.join(", ")}. ` +
-    `Add them to .env.local. See .env.local.example for the required format. ` +
-    `For FIREBASE_ADMIN_CLIENT_EMAIL and FIREBASE_ADMIN_PRIVATE_KEY, ` +
-    `download your service account JSON from the Firebase Console > Project Settings > Service Accounts.`;
+    `Configure these in the deployment environment. See .env.local.example for the required format. ` +
+    `FIREBASE_ADMIN_CLIENT_EMAIL and FIREBASE_ADMIN_PRIVATE_KEY must come from the Firebase Console service-account JSON.`;
   console.error("[Firebase Admin] Initialization error:", initializationError);
 }
 
