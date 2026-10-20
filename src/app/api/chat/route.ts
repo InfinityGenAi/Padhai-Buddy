@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { GROQ_TEXT_MODEL, buildSystemPrompt, StudyMode } from "@/lib/groq";
 import { checkRateLimit } from "@/lib/rate-limiter";
-import { getProvider, sendMessage as sendProviderMessage, type AIMessage, type UserAIConfig, type AIProviderResponse } from "@/lib/ai-providers";
+import { getProvider, sendMessage as sendProviderMessage, type UserAIConfig, type AIProviderResponse } from "@/lib/ai-providers";
+import type { AIMessage } from "@/lib/ai-providers/types";
 import { decryptAiConfig } from "@/lib/ai-config-crypto";
 
 const MAX_MESSAGE_LENGTH = 5000;
