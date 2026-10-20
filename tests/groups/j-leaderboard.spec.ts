@@ -401,6 +401,56 @@ test.describe("Leaderboard API: forged client activity is not trusted", () => {
   });
 });
 
+test.describe("Leaderboard API: current profile labels", () => {
+  let user: { email: string; uid: string; token: string };
+  let currentUsername = "";
+
+  test.beforeAll(async () => {
+    user = await createThrowawayUser("lb-current-profile");
+    currentUsername = `current_${user.uid.slice(-6).toLowerCase()}`;
+
+    await adminDb.collection("users").doc(user.uid).set({
+      uid: user.uid,
+      name: "Current Profile Name",
+      email: user.email,
+      username: currentUsername,
+      class: 10,
+      board: "CBSE",
+      createdAt: Date.now(),
+      preferences: {},
+    });
+
+    // Intentionally write stale display fields to prove the API hydrates current
+    // profile labels while continuing to trust the server-owned score totals.
+    await writeUserScore(
+      user.uid,
+      { name: "Stale Ledger Name", username: "stale_ledger_name", email: user.email },
+      { doubts: 1000 },
+    );
+  });
+
+  test.afterAll(async () => {
+    await deleteThrowawayUser(user.uid);
+  });
+
+  test("uses current profile name and username instead of stale ledger labels", async () => {
+    const response = await callLeaderboard(user.token);
+    expect(response.status).toBe(200);
+
+    const data = await response.json();
+    const entry = data.users.find(
+      (item: { username?: string }) => item.username === currentUsername,
+    );
+
+    expect(entry).toBeDefined();
+    expect(entry.name).toBe("Current Profile Name");
+    expect(entry.username).toBe(currentUsername);
+    expect(entry.email).toBeUndefined();
+    expect(entry.uid).toBeUndefined();
+    expect(entry.score).toBe(10000);
+  });
+});
+
 test.describe("Leaderboard API: empty data state", () => {
   test("returns empty users array when no ledger entries exist", async () => {
     const user = await createThrowawayUser("lb-empty-fresh");
