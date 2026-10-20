@@ -354,14 +354,15 @@ export default function Home() {
               initial={animationsEnabled ? { opacity: 0, y: 20 } : false}
               animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
               transition={{ duration: 0.6, ease: "easeOut" }}
-              className="mb-16 text-center"
+              className="mb-16 flex justify-center"
             >
               <Image
                 src="/images/hero-study.jpg"
-                alt="Boy studying with laptop and notebooks at a desk"
-                fill
-                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                className="w-80 h-auto mx-auto mb-6 rounded-xl object-cover"
+                alt="Student studying with a laptop and notebooks at a desk"
+                width={640}
+                height={420}
+                sizes="(max-width: 640px) calc(100vw - 2rem), (max-width: 1024px) 80vw, 640px"
+                className="block w-full max-w-2xl h-auto max-h-[420px] rounded-2xl object-cover shadow-lg"
                 priority
               />
             </motion.div>
