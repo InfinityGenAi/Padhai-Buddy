@@ -193,7 +193,12 @@ export async function waitForDashboardReady(page: Page) {
 }
 
 export async function waitForPageReady(page: Page, heading: string) {
-  await page.waitForSelector(`text=${heading}`, { timeout: 15000 });
+  // On mobile, broad text locators may first match a hidden sidebar label.
+  // Wait for the actual visible page heading instead.
+  await page.getByRole("heading", { name: heading, exact: true }).waitFor({
+    state: "visible",
+    timeout: 15000,
+  });
 }
 
 function isPortInUse(port: number): Promise<boolean> {
