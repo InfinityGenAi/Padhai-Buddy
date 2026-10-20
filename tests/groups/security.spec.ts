@@ -525,6 +525,101 @@ test.describe("Security: delete account", () => {
   });
 });
 
+test.describe("Security: flashcard leaderboard rewards", () => {
+  let user: { email: string; uid: string; token: string };
+  let deckId = "";
+  let cardId = "";
+
+  test.beforeAll(async () => {
+    user = await createThrowawayUser("flashcard-score-audit");
+    await createProfileDoc(user.uid, user.email);
+    deckId = `score-deck-${user.uid.slice(-8)}`;
+    cardId = `score-card-${user.uid.slice(-8)}`;
+
+    await adminDb.collection("users").doc(user.uid)
+      .collection("flashcardDecks").doc(deckId)
+      .set({ title: "Score test", subject: "Maths", createdAt: Date.now(), updatedAt: Date.now() });
+
+    await adminDb.collection("users").doc(user.uid)
+      .collection("flashcardDecks").doc(deckId)
+      .collection("cards").doc(cardId)
+      .set({
+        deckId,
+        front: "What is 2 + 2?",
+        back: "4",
+        status: "new",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+  });
+
+  test.afterAll(async () => {
+    if (user?.uid && deckId && cardId) {
+      await adminDb.collection("users").doc(user.uid)
+        .collection("flashcardDecks").doc(deckId)
+        .collection("cards").doc(cardId).delete().catch(() => undefined);
+      await adminDb.collection("users").doc(user.uid)
+        .collection("flashcardDecks").doc(deckId).delete().catch(() => undefined);
+      await deleteThrowawayUser(user.uid);
+    }
+  });
+
+  async function updateCard(status: string) {
+    return fetch(`${process.env.BASE_URL || "http://localhost:3000"}/api/flashcards`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${user.token}`,
+      },
+      body: JSON.stringify({ action: "updateCard", deckId, cardId, status }),
+    });
+  }
+
+  test("credits the first Known transition once and protects the marker from clients", async () => {
+    const firstKnown = await updateCard("known");
+    expect(firstKnown.status).toBe(200);
+
+    const scoreRef = adminDb.collection("userScores").doc(user.uid);
+    const firstScore = (await scoreRef.get()).data();
+    expect(firstScore?.score).toBe(5);
+    expect(firstScore?.totalFlashcards).toBe(1);
+    expect(firstScore?.totalActivity).toBe(1);
+
+    const cardRef = adminDb.collection("users").doc(user.uid)
+      .collection("flashcardDecks").doc(deckId)
+      .collection("cards").doc(cardId);
+    expect((await cardRef.get()).data()?.scoreCredited).toBe(true);
+
+    // A signed-in client must not be able to reset the server-owned marker to
+    // award the same card repeatedly through the API.
+    const markerUrl =
+      `http://localhost:8080/v1/projects/${PROJECT_ID}/databases/(default)/documents/users/${user.uid}/flashcardDecks/${deckId}/cards/${cardId}?updateMask.fieldPaths=scoreCredited`;
+    const markerMutation = await fetch(markerUrl, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${user.token}`,
+      },
+      body: JSON.stringify({ fields: { scoreCredited: { booleanValue: false } } }),
+    });
+    expect(markerMutation.status).toBe(403);
+
+    for (const status of ["difficult", "known", "new", "known"]) {
+      const response = await updateCard(status);
+      expect(response.status).toBe(200);
+    }
+
+    // "reviewed" is not a valid UI or rules status; Known is the rewarded state.
+    const invalidStatus = await updateCard("reviewed");
+    expect(invalidStatus.status).toBe(400);
+
+    const finalScore = (await scoreRef.get()).data();
+    expect(finalScore?.score).toBe(5);
+    expect(finalScore?.totalFlashcards).toBe(1);
+    expect(finalScore?.totalActivity).toBe(1);
+  });
+});
+
 test.describe("Security: Firestore rules (uid immutability)", () => {
   let user: { email: string; uid: string; token: string };
 
