@@ -6,14 +6,50 @@ import { encryptAiConfig, decryptAiConfig } from "@/lib/ai-config-crypto";
 
 async function getUserConfig(uid: string): Promise<UserAIConfig | null> {
   if (!adminDb) return null;
-  const doc = await adminDb.collection("users").doc(uid).collection("settings").doc("aiConfig").get();
-  if (!doc.exists) return null;
-const data = doc.data();
-    if (!data) return null;
-    if (!data.encryptedConfig) return null;
+  const snapshot = await adminDb
+    .collection("users")
+    .doc(uid)
+    .collection("settings")
+    .doc("aiConfig")
+    .get();
+  if (!snapshot.exists) return null;
+
+  const encryptedConfig = snapshot.data()?.encryptedConfig;
+  if (typeof encryptedConfig !== "string" || !encryptedConfig) return null;
+
   try {
-    const decrypted = decryptAiConfig(data.encryptedConfig);
-    return JSON.parse(decrypted);
+    const decrypted = decryptAiConfig(encryptedConfig);
+    if (!decrypted) return null;
+
+    const parsed: unknown = JSON.parse(decrypted);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+
+    const config = parsed as Partial<UserAIConfig>;
+    const validProviders: AIProviderId[] = [
+      "groq",
+      "openai",
+      "gemini",
+      "anthropic",
+      "openai-compatible",
+    ];
+    if (
+      typeof config.provider !== "string" ||
+      !validProviders.includes(config.provider as AIProviderId) ||
+      typeof config.apiKey !== "string" ||
+      !config.apiKey.trim() ||
+      typeof config.model !== "string" ||
+      !config.model.trim()
+    ) {
+      return null;
+    }
+
+    return {
+      provider: config.provider as AIProviderId,
+      apiKey: config.apiKey,
+      model: config.model,
+      baseUrl: typeof config.baseUrl === "string" ? config.baseUrl : undefined,
+      updatedAt: typeof config.updatedAt === "number" ? config.updatedAt : Date.now(),
+    };
   } catch {
     return null;
   }
