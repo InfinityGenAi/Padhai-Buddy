@@ -32,6 +32,13 @@ test.describe("AI config encryption", () => {
     expect(decryptAiConfig(encrypted, KEY_HEX, ENVIRONMENT)).toBe(plaintext);
   });
 
+  test("rejects weak or incorrectly formatted production encryption keys", () => {
+    expect(() => encryptAiConfig("sensitive", "not-a-64-character-hex-key", "production"))
+      .toThrow(/64-character hex string/);
+    expect(() => encryptAiConfig("sensitive", "f".repeat(63), "production"))
+      .toThrow(/64-character hex string/);
+  });
+
   test("returns an empty value for malformed or tampered ciphertext", () => {
     expect(decryptAiConfig("not:a-ciphertext", KEY_HEX, ENVIRONMENT)).toBe("");
     const encrypted = encryptAiConfig("sensitive", KEY_HEX, ENVIRONMENT);
