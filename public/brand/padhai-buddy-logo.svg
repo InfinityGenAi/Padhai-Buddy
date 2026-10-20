@@ -1,13 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-labelledby="logoTitle">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-labelledby="logoTitle">
   <title id="logoTitle">Padhai Buddy</title>
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0e7490"/>
-      <stop offset="1" stop-color="#14b8a6"/>
+    <linearGradient id="pb-gradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#12b9d2"/>
+      <stop offset="0.55" stop-color="#05b9a1"/>
+      <stop offset="1" stop-color="#087f91"/>
     </linearGradient>
   </defs>
-  <circle cx="64" cy="64" r="61" fill="url(#bg)"/>
-  <path d="M31 28h38c17 0 28 10 28 26S86 80 69 80H51v22H31V28zm20 17v18h17c6 0 10-3 10-9s-4-9-10-9H51z" fill="#fff"/>
-  <path d="M83 18c13 0 22 8 23 20-12 1-22-7-23-20z" fill="#99f6e4"/>
-  <path d="M84 20l15 14" stroke="#0f766e" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="256" cy="256" r="244" fill="url(#pb-gradient)"/>
+  <path d="M151 125c0-12 10-22 22-22h102c83 0 135 46 135 117 0 70-53 117-135 117h-48v81c0 12-10 22-22 22h-32c-12 0-22-10-22-22V125zm76 40v107h48c38 0 59-20 59-52 0-34-21-55-59-55h-48z" fill="#fff"/>
+  <path d="M267 505c25-67 62-109 121-143 36-21 71-32 109-44-9 57-30 104-66 136-38 34-90 50-164 51z" fill="#078b8c"/>
+  <path d="M294 496c42-59 88-99 153-135-48 17-93 42-130 75-20 18-37 38-53 60" fill="#001318"/>
 </svg>

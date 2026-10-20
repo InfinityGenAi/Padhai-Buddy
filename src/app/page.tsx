@@ -36,6 +36,7 @@ import {
   ClockIcon,
   DevicePhoneMobileIcon,
   GlobeAltIcon,
+  ArrowDownTrayIcon,
 } from "@heroicons/react/24/outline";
 
 const studyModes = [
@@ -177,7 +178,15 @@ export default function Home() {
           <span className="text-xl font-bold text-foreground tracking-tight">Padhai Buddy</span>
         </motion.div>
 
-        <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Link
+            href="/download/android"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-primary hover:bg-primary/15 transition-colors focus-ring whitespace-nowrap"
+          >
+            <ArrowDownTrayIcon className="h-4 w-4" />
+            <span>Download App</span>
+          </Link>
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
           <Link href="#features" className="text-foreground/60 hover:text-foreground transition-colors">Features</Link>
           <Link href="#how-it-works" className="text-foreground/60 hover:text-foreground transition-colors">How It Works</Link>
           <Link href="#trust" className="text-foreground/60 hover:text-foreground transition-colors">Why Choose Us</Link>
@@ -196,7 +205,8 @@ export default function Home() {
           >
             Get Started
           </Button>
-        </nav>
+          </nav>
+        </div>
       </header>
 
       <main className="relative z-10">
@@ -359,11 +369,10 @@ export default function Home() {
               <Image
                 src="/images/hero-study.jpg"
                 alt="Student studying with a laptop and notebooks at a desk"
-                width={640}
-                height={420}
-                sizes="(max-width: 640px) calc(100vw - 2rem), (max-width: 1024px) 80vw, 640px"
-                className="block w-full max-w-2xl h-auto max-h-[420px] rounded-2xl object-cover shadow-lg"
-                priority
+                width={960}
+                height={560}
+                sizes="(max-width: 640px) calc(100vw - 2rem), (max-width: 1024px) 80vw, 960px"
+                className="block w-full max-w-4xl h-auto max-h-[560px] rounded-2xl object-cover shadow-lg"
               />
             </motion.div>
 
@@ -425,10 +434,10 @@ export default function Home() {
               <Image
                 src="/images/study-notebooks.jpg"
                 alt="Student with notebooks studying at a desk"
-                fill
-                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                className="w-64 h-auto mx-auto mb-4 rounded-xl object-cover"
-                priority
+                width={720}
+                height={420}
+                sizes="(max-width: 640px) calc(100vw - 2rem), 720px"
+                className="block w-full max-w-2xl h-auto max-h-[420px] mx-auto rounded-2xl object-cover shadow-lg"
               />
             </div>
 
@@ -477,10 +486,10 @@ export default function Home() {
               <Image
                 src="/images/study-library.jpg"
                 alt="Student studying in library with books"
-                fill
-                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                className="w-64 h-auto mx-auto mb-4 rounded-xl object-cover"
-                priority
+                width={720}
+                height={420}
+                sizes="(max-width: 640px) calc(100vw - 2rem), 720px"
+                className="block w-full max-w-2xl h-auto max-h-[420px] mx-auto rounded-2xl object-cover shadow-lg"
               />
             </div>
 
@@ -612,6 +621,7 @@ export default function Home() {
                 <li><Link href="#ai-tutor" className="hover:text-foreground transition-colors">AI Tutor</Link></li>
                 <li><Link href="#how-it-works" className="hover:text-foreground transition-colors">How It Works</Link></li>
                 <li><Link href="#trust" className="hover:text-foreground transition-colors">Why Choose Us</Link></li>
+                <li><Link href="/download/android" className="inline-flex items-center gap-2 text-primary font-semibold hover:underline"><ArrowDownTrayIcon className="h-4 w-4" /> Download App</Link></li>
               </ul>
             </div>
             <div>
