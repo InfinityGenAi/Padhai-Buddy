@@ -387,7 +387,7 @@ export function AIProviderConfigModal({ isOpen, onClose }: AIProviderConfigModal
                         type={showApiKey ? "text" : "password"}
                         value={apiKey}
                         onChange={(e) => setApiKey(e.target.value)}
-                        placeholder="Enter your API key"
+                        placeholder={hasSavedKeyForSelection ? "Saved API key — leave blank to keep it" : "Enter your API key"}
                         className="w-full bg-background border border-border rounded-xl px-3 py-2 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                         autoComplete="off"
                       />
