@@ -2,8 +2,8 @@
 // This SW caches static assets for offline support
 // It does NOT cache API responses or authenticated content
 
-const CACHE_NAME = 'padhai-buddy-v1';
-const STATIC_CACHE_NAME = 'padhai-buddy-static-v1';
+const CACHE_NAME = 'padhai-buddy-v2';
+const STATIC_CACHE_NAME = 'padhai-buddy-static-v2';
 const OFFLINE_PAGE = '/offline.html';
 
 // Assets to cache on install
@@ -24,6 +24,7 @@ const NEVER_CACHE_PATHS = [
   '/api/',
   '/dashboard',
   '/onboarding',
+  '/download/',
   '/login',
   '/signup',
   '/forgot-password',
