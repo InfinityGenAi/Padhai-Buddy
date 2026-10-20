@@ -194,8 +194,8 @@ export function AIProviderConfigModal({ isOpen, onClose }: AIProviderConfigModal
   };
 
   const handleSave = async () => {
-    if (!apiKey.trim()) {
-      setError("Please enter an API key");
+    if (!apiKey.trim() && !hasSavedKeyForSelection) {
+      setError("Please enter an API key for this provider");
       return;
     }
 
