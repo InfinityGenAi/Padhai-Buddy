@@ -17,7 +17,9 @@ export async function GET() {
     );
 
     if (response.status === 404) {
-      return NextResponse.json({ message: "No published release found", assets: [] }, { status: 404 });
+      // No GitHub release is published yet. This is a valid empty state,
+      // not an API failure: the download page can show PWA installation steps.
+      return NextResponse.json({ message: "No published release found", assets: [] }, { status: 200 });
     }
     if (!response.ok) {
       console.error("[RELEASES] GitHub API returned", response.status);

@@ -29,10 +29,14 @@ export interface AnalyticsEvent {
 
 export async function POST(req: NextRequest) {
   try {
+    // Analytics is non-critical telemetry. If Admin SDK is unavailable,
+    // do not flood every route transition with HTTP 500 responses. Keep the
+    // underlying configuration error in server logs for operators to fix.
     if (!adminAuth || !adminDb || initializationError) {
+      console.error("[ANALYTICS_TRACK] telemetry unavailable:", initializationError || "Firebase Admin is not initialized");
       return NextResponse.json(
-        { error: initializationError || "Server configuration error" },
-        { status: 500 },
+        { success: false, tracked: false, reason: "analytics_unavailable" },
+        { status: 202 },
       );
     }
 
