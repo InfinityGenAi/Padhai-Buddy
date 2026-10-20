@@ -227,13 +227,16 @@ export default function DownloadAndroidPage() {
               </motion.div>
             )}
 
-            {/* PWA Install Instructions - always available */}
+            {/* Clear platform-specific installation instructions */}
             <div className="bg-foreground/5 border border-border rounded-xl p-4 text-left">
-              <p className="text-sm font-medium text-foreground mb-2">How to install (PWA):</p>
-              <ol className="space-y-2 text-xs text-foreground/60">
-                <li className="flex items-center gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">1</span>Open this page in Chrome on Android</li>
-                <li className="flex items-center gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">2</span>Tap the menu (⋮) → "Add to Home screen" or "Install app"</li>
-                <li className="flex items-center gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">3</span>Confirm to add the icon to your home screen</li>
+              <p className="text-sm font-medium text-foreground mb-2">Install Padhai Buddy</p>
+              <p className="text-xs text-foreground/60 mb-3">
+                The install prompt is controlled by your browser and appears only when PWA requirements are met.
+              </p>
+              <ol className="space-y-2 text-xs text-foreground/70">
+                <li className="flex items-start gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">1</span><span><strong>Android (Chrome):</strong> Open this page in Chrome, tap ⋮, then choose "Install app" or "Add to Home screen".</span></li>
+                <li className="flex items-start gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">2</span><span><strong>Computer (Chrome/Edge):</strong> Look for the install icon in the address bar, or open the browser menu and choose "Install Padhai Buddy".</span></li>
+                <li className="flex items-start gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">3</span><span>If neither option appears, update the browser, stay online, reload this page, and check that the site is using HTTPS.</span></li>
               </ol>
             </div>
 
@@ -244,7 +247,7 @@ export default function DownloadAndroidPage() {
               className="w-full btn-primary py-3 rounded-xl font-medium flex items-center justify-center gap-2"
             >
               <GlobeAltIcon className="w-5 h-5" />
-              {installPrompt ? "Install Padhai Buddy" : "Install / Add to Home Screen"}
+              {installPrompt ? "Install Padhai Buddy" : "Show installation steps"}
             </motion.button>
             {installMessage && (
               <p role="status" className="text-xs text-foreground/70 bg-primary/5 border border-primary/20 rounded-lg p-3">
