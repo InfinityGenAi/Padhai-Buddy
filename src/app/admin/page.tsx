@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { signInWithCustomToken, signOut } from "firebase/auth";
+import { signOut } from "firebase/auth";
 import { useAuth } from "@/contexts/AuthContext";
 import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, query, orderBy, limit, setDoc } from "firebase/firestore";
@@ -34,60 +34,50 @@ import { useRouter } from "next/navigation";
  */
 
 export default function AdminDashboard() {
-  const { loading, isAdmin, authError, user } = useAuth();
+  const { loading, isAdmin, authError, signInWithGoogle } = useAuth();
   const [selectedSection, setSelectedSection] = useState<string>("overview");
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  const handleLogin = async (password: string) => {
+  const handleGoogleAdminLogin = async () => {
     setLoginLoading(true);
     setLoginError(null);
     try {
-      const res = await fetch("/api/admin/login", {
+      // Google authenticates the person; the server separately checks the
+      // allowlisted admin email before granting the admin custom claim.
+      await signInWithGoogle();
+      const auth = getFirebaseAuth();
+      const firebaseUser = auth?.currentUser;
+      if (!firebaseUser) throw new Error("Google sign-in did not create an active session");
+
+      const idToken = await firebaseUser.getIdToken();
+      const res = await fetch("/api/admin/authorize", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ password }),
+        headers: { Authorization: `Bearer ${idToken}` },
       });
 
-      // Vercel/platform failures can return an empty or non-JSON body.
-      // Parse defensively so the UI reports the HTTP status instead of masking
-      // the original server failure with "Unexpected end of JSON input".
       const responseText = await res.text();
-      let data: {
-        success?: boolean;
-        error?: string;
-        customToken?: string;
-      } = {};
+      let data: { success?: boolean; error?: string } = {};
       if (responseText) {
         try {
           data = JSON.parse(responseText) as typeof data;
         } catch {
-          throw new Error(
-            `Admin login API returned a non-JSON response (HTTP ${res.status}). Check Vercel runtime logs.`,
-          );
+          throw new Error(`Admin authorization returned a non-JSON response (HTTP ${res.status}).`);
         }
       }
 
       if (!res.ok || !data.success) {
-        throw new Error(
-          data.error ||
-            `Admin login failed (HTTP ${res.status}). Check Vercel runtime logs and production environment variables.`,
-        );
+        throw new Error(data.error || `Admin authorization failed (HTTP ${res.status}).`);
       }
 
-      const auth = getFirebaseAuth();
-      if (!auth) throw new Error("Firebase auth not initialized");
-      if (data.customToken) {
-        const cred = await signInWithCustomToken(auth, data.customToken);
-        await cred.user.getIdTokenResult(true);
-      }
-      setLoginError(null);
+      // Refresh the token to pick up the newly assigned admin claim, then
+      // reload so AuthContext evaluates the refreshed claim from a clean start.
+      await firebaseUser.getIdToken(true);
+      window.location.reload();
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Login failed";
+      const errorMessage = err instanceof Error ? err.message : "Google admin sign-in failed";
       setLoginError(errorMessage);
-      console.error("Admin login error:", err);
+      console.error("Google admin login error:", err);
     } finally {
       setLoginLoading(false);
     }
@@ -117,53 +107,37 @@ export default function AdminDashboard() {
     );
   }
 
-  // Show login form if not admin
+  // Show Google sign-in if the current session does not have the admin claim.
   if (!isAdmin) {
     return (
       <div className="min-h-screen bg-background">
         <div className="max-w-md mx-auto p-8">
           <h1 className="text-4xl font-bold text-foreground mb-8">
-            Admin Login
+            Admin Dashboard
           </h1>
 
           <div className="bg-white border border-border p-6 shadow-xl max-w-md mx-auto">
-            <h2 className="text-2xl font-bold text-foreground mb-6">Admin Authentication</h2>
+            <h2 className="text-2xl font-bold text-foreground mb-3">Secure Admin Access</h2>
+            <p className="text-sm text-foreground/60 mb-6">
+              Continue with the authorized Google account. Only infinitygenai@gmail.com can access this dashboard.
+            </p>
 
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const elements = (e.target as HTMLFormElement).elements;
-              const passwordInput = elements.namedItem("admin-password") as HTMLInputElement;
-              handleLogin(passwordInput.value);
-            }}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Admin Password
-                </label>
-                <input
-                  type="password"
-                  id="admin-password"
-                  name="admin-password"
-                  required
-                  className="w-full px-4 py-2 rounded-xl border border-border focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
-                  placeholder="Enter admin password"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loginLoading}
-                className="w-full px-4 py-3 rounded-xl text-white bg-primary font-medium hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                {loginLoading ? "Signing in..." : "Sign In as Admin"}
-              </button>
-            </form>
+            <button
+              type="button"
+              onClick={handleGoogleAdminLogin}
+              disabled={loginLoading}
+              className="w-full px-4 py-3 rounded-xl text-white bg-primary font-medium hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loginLoading ? "Verifying Google account..." : "Continue with Google"}
+            </button>
 
             {loginError && (
-              <div className="mt-4 p-3 rounded-xl bg-red-500/10 text-red-400 text-sm">
+              <div role="alert" className="mt-4 p-3 rounded-xl bg-red-500/10 text-red-600 text-sm">
                 {loginError}
               </div>
             )}
             {authError && !loginError && (
-              <div className="mt-4 p-3 rounded-xl bg-red-500/10 text-red-400 text-sm">
+              <div role="alert" className="mt-4 p-3 rounded-xl bg-red-500/10 text-red-600 text-sm">
                 {authError}
               </div>
             )}
