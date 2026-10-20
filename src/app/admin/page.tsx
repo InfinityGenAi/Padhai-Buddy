@@ -51,14 +51,30 @@ export default function AdminDashboard() {
         body: JSON.stringify({ password }),
       });
 
-      const data = (await res.json()) as {
-        success: boolean;
+      // Vercel/platform failures can return an empty or non-JSON body.
+      // Parse defensively so the UI reports the HTTP status instead of masking
+      // the original server failure with "Unexpected end of JSON input".
+      const responseText = await res.text();
+      let data: {
+        success?: boolean;
         error?: string;
         customToken?: string;
-      };
+      } = {};
+      if (responseText) {
+        try {
+          data = JSON.parse(responseText) as typeof data;
+        } catch {
+          throw new Error(
+            `Admin login API returned a non-JSON response (HTTP ${res.status}). Check Vercel runtime logs.`,
+          );
+        }
+      }
 
-      if (!data.success) {
-        throw new Error(data.error || "Login failed");
+      if (!res.ok || !data.success) {
+        throw new Error(
+          data.error ||
+            `Admin login failed (HTTP ${res.status}). Check Vercel runtime logs and production environment variables.`,
+        );
       }
 
       const auth = getFirebaseAuth();
