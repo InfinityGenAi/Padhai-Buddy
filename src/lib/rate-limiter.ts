@@ -18,6 +18,12 @@ export interface RateLimitStore {
   get(key: string): Promise<RateLimitEntry | undefined>;
   set(key: string, entry: RateLimitEntry): Promise<void>;
   delete(key: string): Promise<void>;
+  consume(
+    key: string,
+    now: number,
+    windowMs: number,
+    maxRequests: number,
+  ): Promise<RateLimitResult>;
 }
 
 class InMemoryRateLimitStore implements RateLimitStore {
@@ -33,6 +39,34 @@ class InMemoryRateLimitStore implements RateLimitStore {
 
   async delete(key: string): Promise<void> {
     this.store.delete(key);
+  }
+
+  async consume(
+    key: string,
+    now: number,
+    windowMs: number,
+    maxRequests: number,
+  ): Promise<RateLimitResult> {
+    // No await between read and write: this is atomic within this Node process.
+    const existing = this.store.get(key);
+    if (!existing || existing.resetAt <= now) {
+      const resetAt = now + windowMs;
+      this.store.set(key, { count: 1, resetAt });
+      return { allowed: true, remaining: maxRequests - 1, resetAt };
+    }
+
+    if (existing.count >= maxRequests) {
+      return {
+        allowed: false,
+        remaining: 0,
+        resetAt: existing.resetAt,
+        retryAfter: Math.max(1, Math.ceil((existing.resetAt - now) / 1000)),
+      };
+    }
+
+    existing.count += 1;
+    this.store.set(key, existing);
+    return { allowed: true, remaining: maxRequests - existing.count, resetAt: existing.resetAt };
   }
 }
 
@@ -92,6 +126,75 @@ class RedisRateLimitStore implements RateLimitStore {
       // Ignore
     }
   }
+
+  async consume(
+    key: string,
+    now: number,
+    windowMs: number,
+    maxRequests: number,
+  ): Promise<RateLimitResult> {
+    await this.ensureConnected();
+
+    // A single Redis Lua script makes read/increment/expiry atomic across
+    // serverless instances. A GET followed by SET can lose concurrent updates
+    // and let bursts exceed the configured limit.
+    const script = `
+      local now = tonumber(ARGV[1])
+      local windowMs = tonumber(ARGV[2])
+      local maxRequests = tonumber(ARGV[3])
+      local raw = redis.call('GET', KEYS[1])
+      local entry = nil
+
+      if raw then
+        entry = cjson.decode(raw)
+        if tonumber(entry.resetAt) <= now then
+          entry = nil
+        end
+      end
+
+      if not entry then
+        local resetAt = now + windowMs
+        entry = { count = 1, resetAt = resetAt }
+        redis.call('SET', KEYS[1], cjson.encode(entry), 'PX', windowMs)
+        return { 1, maxRequests - 1, resetAt, 0 }
+      end
+
+      if tonumber(entry.count) >= maxRequests then
+        local retryAfter = math.max(1, math.ceil((tonumber(entry.resetAt) - now) / 1000))
+        return { 0, 0, tonumber(entry.resetAt), retryAfter }
+      end
+
+      entry.count = tonumber(entry.count) + 1
+      local ttl = math.max(1, tonumber(entry.resetAt) - now)
+      redis.call('SET', KEYS[1], cjson.encode(entry), 'PX', ttl)
+      return { 1, maxRequests - tonumber(entry.count), tonumber(entry.resetAt), 0 }
+    `;
+
+    const redis = this.redis as {
+      eval: (script: string, keys: string[], args: string[]) => Promise<unknown>;
+    };
+    // Unlike the legacy get/set helpers, do not suppress eval failures. The
+    // caller fails closed when the shared limiter cannot make a decision.
+    const rawResult = await redis.eval(
+      script,
+      [`ratelimit:${key}`],
+      [String(now), String(windowMs), String(maxRequests)],
+    );
+    if (!Array.isArray(rawResult) || rawResult.length < 4) {
+      throw new Error("Rate-limit store returned an invalid atomic result");
+    }
+
+    const [allowed, remaining, resetAt, retryAfter] = rawResult.map(Number);
+    if (![allowed, remaining, resetAt, retryAfter].every(Number.isFinite)) {
+      throw new Error("Rate-limit store returned non-numeric values");
+    }
+    return {
+      allowed: allowed === 1,
+      remaining,
+      resetAt,
+      ...(retryAfter > 0 ? { retryAfter } : {}),
+    };
+  }
 }
 
 function createStore(): RateLimitStore {
@@ -129,11 +232,15 @@ export async function checkRateLimit(identifier: string, maxRequests?: number): 
     lastCleanup = now;
   }
 
-  let existing: RateLimitEntry | undefined;
   try {
-    existing = await rateLimitStore.get(identifier);
+    return await rateLimitStore.consume(
+      identifier,
+      now,
+      RATE_LIMIT_WINDOW_MS,
+      Math.max(1, Math.floor(maxReq)),
+    );
   } catch {
-    // Fail-closed: if store is unavailable, deny the request
+    // Fail closed whenever the store cannot make an atomic decision.
     return {
       allowed: false,
       remaining: 0,
@@ -141,47 +248,6 @@ export async function checkRateLimit(identifier: string, maxRequests?: number): 
       retryAfter: 60,
     };
   }
-
-  if (!existing || existing.resetAt < now) {
-    const resetAt = now + RATE_LIMIT_WINDOW_MS;
-    try {
-      await rateLimitStore.set(identifier, { count: 1, resetAt });
-    } catch {
-      // If set fails, still allow but with reduced remaining
-      return {
-        allowed: true,
-        remaining: 0,
-        resetAt,
-      };
-    }
-    return {
-      allowed: true,
-      remaining: maxReq - 1,
-      resetAt,
-    };
-  }
-
-  if (existing.count >= maxReq) {
-    const retryAfter = Math.ceil((existing.resetAt - now) / 1000);
-    return {
-      allowed: false,
-      remaining: 0,
-      resetAt: existing.resetAt,
-      retryAfter,
-    };
-  }
-
-  existing.count += 1;
-  try {
-    await rateLimitStore.set(identifier, existing);
-  } catch {
-    // If set fails, continue with current count
-  }
-  return {
-    allowed: true,
-    remaining: maxReq - existing.count,
-    resetAt: existing.resetAt,
-  };
 }
 
 // Synchronous wrapper for backward compatibility (not recommended for production)
