@@ -44,7 +44,7 @@ const nextConfig = {
       // Connect: Firebase Auth/Google Sign-in, Firestore, Groq AI, Next.js HMR
       // In emulator mode, also allow local Firebase emulator endpoints
       useEmulators
-        ? `connect-src 'self' http://localhost:9099 http://127.0.0.1:9099 http://localhost:8080 http://127.0.0.1:8080 https://${firebaseAuthDomain} https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://www.googleapis.com ${groqApiOrigin} wss://${firebaseProjectId}.firebaseio.com`
+        ? `connect-src 'self' http://localhost:9099 http://127.0.0.1:9099 http://localhost:8080 http://127.0.0.1:8080 https://${firebaseAuthDomain} https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://www.googleapis.com https://api.github.com ${groqApiOrigin} wss://${firebaseProjectId}.firebaseio.com`
         : `connect-src 'self' https://${firebaseAuthDomain} https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://www.googleapis.com ${groqApiOrigin} wss://${firebaseProjectId}.firebaseio.com`,
       // Frames: Google Sign-in popup + Firebase Auth domain for popup redirect
       // In emulator mode, also allow local Firebase Auth emulator
