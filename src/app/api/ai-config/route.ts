@@ -102,28 +102,58 @@ export async function POST(req: NextRequest) {
 
     const { provider, apiKey, model, baseUrl, testOnly } = body;
 
-    if (!provider || !apiKey || !model) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    if (typeof provider !== "string" || !provider.trim()) {
+      return NextResponse.json({ error: "Provider is required" }, { status: 400 });
     }
-
-    const providerStr = provider as string;
-    if (!/^(groq|openai|gemini|anthropic|openai-compatible)$/.test(providerStr)) {
+    if (!/^(groq|openai|gemini|anthropic|openai-compatible)$/.test(provider)) {
       return NextResponse.json({ error: "Invalid provider" }, { status: 400 });
     }
-    const providerId: AIProviderId = providerStr as AIProviderId;
+    if (typeof model !== "string" || !model.trim()) {
+      return NextResponse.json({ error: "Model is required" }, { status: 400 });
+    }
+    if (apiKey !== undefined && apiKey !== null && typeof apiKey !== "string") {
+      return NextResponse.json({ error: "API key must be a string" }, { status: 400 });
+    }
+    if (baseUrl !== undefined && baseUrl !== null && typeof baseUrl !== "string") {
+      return NextResponse.json({ error: "Base URL must be a string" }, { status: 400 });
+    }
 
+    const providerId = provider as AIProviderId;
     const providerConfig = getProviderConfig(providerId);
     if (!providerConfig) {
       return NextResponse.json({ error: "Invalid provider" }, { status: 400 });
     }
 
-    if (providerConfig.requiresApiKey && !String(apiKey).trim()) {
-      return NextResponse.json({ error: "API key is required" }, { status: 400 });
+    // Never send stored keys back to the browser. For the currently configured
+    // provider, an empty API-key field means "keep the existing key" so a user
+    // can change model/settings without copying the secret out of the server.
+    const existingConfig = await getUserConfig(decoded.uid);
+    const sameProviderConfig =
+      existingConfig?.provider === providerId && existingConfig.apiKey.trim()
+        ? existingConfig
+        : null;
+    const submittedApiKey = typeof apiKey === "string" ? apiKey.trim() : "";
+    const resolvedApiKey = submittedApiKey || sameProviderConfig?.apiKey || "";
+
+    if (providerConfig.requiresApiKey && !resolvedApiKey) {
+      return NextResponse.json(
+        { error: "Enter an API key for this provider, or keep the current provider selected to reuse its saved key." },
+        { status: 400 },
+      );
     }
 
-    if (providerConfig.supportsCustomBaseUrl && baseUrl) {
+    let resolvedBaseUrl: string | undefined;
+    if (typeof baseUrl === "string") {
+      resolvedBaseUrl = baseUrl.trim() || undefined;
+    } else {
+      // When the field is omitted, preserve a saved custom endpoint for the
+      // same provider. An explicit empty string clears it.
+      resolvedBaseUrl = sameProviderConfig?.baseUrl;
+    }
+
+    if (providerConfig.supportsCustomBaseUrl && resolvedBaseUrl) {
       try {
-        new URL(String(baseUrl));
+        new URL(resolvedBaseUrl);
       } catch {
         return NextResponse.json({ error: "Invalid base URL" }, { status: 400 });
       }
@@ -131,9 +161,9 @@ export async function POST(req: NextRequest) {
 
     const config: UserAIConfig = {
       provider: providerId,
-      apiKey: String(apiKey),
-      model: String(model),
-      baseUrl: baseUrl ? String(baseUrl) : undefined,
+      apiKey: resolvedApiKey,
+      model: model.trim(),
+      baseUrl: resolvedBaseUrl,
       updatedAt: Date.now(),
     };
 
