@@ -404,7 +404,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid subject" }, { status: 400 });
     }
 
-remove duplicate legacy limiter    const numQuestions = Math.min(Math.max(Number(numberOfQuestions) || 5, 1), 20);
+    const numQuestions = Math.min(Math.max(Number(numberOfQuestions) || 5, 1), 20);
     const validClasses = ["5", "6", "7", "8", "9", "10", "11", "12"];
     const validBoards = ["CBSE", "ICSE", "State Board"];
     const validDifficulties = ["easy", "medium", "hard"];
