@@ -7,19 +7,30 @@ test.describe("I. Timer Tests", () => {
 
     await page.route("/api/timer", async (route) => {
       if (route.request().method() === "POST") {
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            session: {
-              id: "session-" + Date.now(),
-              mode: "custom",
-              durationMinutes: 1,
-              completed: true,
-              createdAt: Date.now(),
-            },
-          }),
-        });
+        const postData = await route.request().postData();
+        const body = JSON.parse(postData || "{}");
+        if (body.action === "create") {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              session: {
+                id: "session-" + Date.now(),
+                mode: body.mode,
+                durationSeconds: body.durationSeconds,
+                durationMinutes: Math.ceil(body.durationSeconds / 60),
+                completed: false,
+                createdAt: Date.now(),
+              },
+            }),
+          });
+        } else {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ success: true }),
+          });
+        }
         return;
       }
       await route.fulfill({
