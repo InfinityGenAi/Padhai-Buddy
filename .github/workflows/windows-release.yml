@@ -40,3 +40,13 @@ jobs:
           path: windows-app/dist/Padhai-Buddy-Setup.exe
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish latest Windows installer
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: windows-latest
+          name: Padhai Buddy Windows (Latest)
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
+          files: windows-app/dist/Padhai-Buddy-Setup.exe
