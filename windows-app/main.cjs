@@ -1,3 +1,5 @@
+/* Electron's CommonJS entry point must use require(). */
+/* eslint @typescript-eslint/no-require-imports: "off" */
 const { app, BrowserWindow, shell } = require("electron");
 
 const APP_URL = "https://padhai-buddy-two.vercel.app/";

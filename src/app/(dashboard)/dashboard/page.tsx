@@ -143,15 +143,15 @@ function getIconComponent(iconName: string) {
 
 function getColorClasses(color: string) {
   switch (color) {
-    case "red": return { colorClass: "text-red-400", bgClass: "bg-red-950/30", borderClass: "border-red-800/50" };
-    case "amber": return { colorClass: "text-amber-400", bgClass: "bg-amber-950/30", borderClass: "border-amber-800/50" };
-    case "blue": return { colorClass: "text-blue-400", bgClass: "bg-blue-950/30", borderClass: "border-blue-800/50" };
-    case "indigo": return { colorClass: "text-indigo-400", bgClass: "bg-indigo-950/30", borderClass: "border-indigo-800/50" };
-    case "teal": return { colorClass: "text-teal-400", bgClass: "bg-teal-950/30", borderClass: "border-teal-800/50" };
-    case "emerald": return { colorClass: "text-emerald-400", bgClass: "bg-emerald-950/30", borderClass: "border-emerald-800/50" };
-    case "purple": return { colorClass: "text-purple-400", bgClass: "bg-purple-950/30", borderClass: "border-purple-800/50" };
-    case "primary": return { colorClass: "text-primary", bgClass: "bg-primary/10", borderClass: "border-primary/30" };
-    default: return { colorClass: "text-primary", bgClass: "bg-primary/10", borderClass: "border-primary/30" };
+    case "red": return { colorClass: "text-rose-700", bgClass: "bg-rose-50", borderClass: "border-rose-200" };
+    case "amber": return { colorClass: "text-amber-800", bgClass: "bg-amber-50", borderClass: "border-amber-200" };
+    case "blue": return { colorClass: "text-slate-700", bgClass: "bg-slate-100", borderClass: "border-slate-200" };
+    case "indigo": return { colorClass: "text-violet-700", bgClass: "bg-violet-50", borderClass: "border-violet-200" };
+    case "teal": return { colorClass: "text-cyan-800", bgClass: "bg-cyan-50", borderClass: "border-cyan-200" };
+    case "emerald": return { colorClass: "text-stone-700", bgClass: "bg-stone-100", borderClass: "border-stone-200" };
+    case "purple": return { colorClass: "text-purple-700", bgClass: "bg-purple-50", borderClass: "border-purple-200" };
+    case "primary": return { colorClass: "text-primary-dark", bgClass: "bg-primary/10", borderClass: "border-primary/25" };
+    default: return { colorClass: "text-primary-dark", bgClass: "bg-primary/10", borderClass: "border-primary/25" };
   }
 }
 

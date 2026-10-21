@@ -384,21 +384,60 @@ export default function Home() {
         {/* AI Tutor Showcase */}
         <Section id="ai-tutor" className="py-16 lg:py-24" animate={animationsEnabled}>
           <Container size="xl">
-            {/* Study photo */}
+            {/* Product-led study preview — no generic stock-photo hero */}
             <motion.div
-              initial={animationsEnabled ? { opacity: 0, y: 20 } : false}
+              initial={animationsEnabled ? { opacity: 0, y: 16 } : false}
               animate={animationsEnabled ? { opacity: 1, y: 0 } : false}
-              transition={{ duration: 0.6, ease: "easeOut" }}
-              className="mb-16 flex justify-center"
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="mb-16 mx-auto max-w-5xl"
             >
-              <Image
-                src="/images/hero-study.jpg"
-                alt="Student studying with a laptop and notebooks at a desk"
-                width={960}
-                height={560}
-                sizes="(max-width: 640px) calc(100vw - 2rem), (max-width: 1024px) 80vw, 960px"
-                className="block w-full max-w-4xl h-auto max-h-[560px] rounded-2xl object-cover shadow-lg"
-              />
+              <div className="relative overflow-hidden rounded-[2rem] border border-border/80 bg-white p-4 sm:p-7 shadow-[0_24px_80px_-35px_rgba(80,50,30,0.28)]">
+                <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-orange-100/70 blur-3xl" aria-hidden="true" />
+                <div className="relative grid gap-5 md:grid-cols-[0.9fr_1.1fr] md:items-center">
+                  <div className="space-y-4 p-2 sm:p-5">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-800">
+                      <SparklesIcon className="h-4 w-4" /> Your personal learning space
+                    </span>
+                    <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Small steps. Real progress.</h3>
+                    <p className="max-w-md text-sm sm:text-base leading-relaxed text-foreground/60">Learn a concept, practise it, and revisit what needs more work — all in one calm workspace.</p>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="rounded-full bg-[#f8eee6] px-3 py-1.5 text-xs font-medium text-[#8d4d32]">Learn</span>
+                      <span className="rounded-full bg-[#f3eee4] px-3 py-1.5 text-xs font-medium text-[#725a3d]">Practise</span>
+                      <span className="rounded-full bg-[#f1edf9] px-3 py-1.5 text-xs font-medium text-[#6851a2]">Revise</span>
+                    </div>
+                  </div>
+                  <div className="space-y-3 rounded-2xl border border-border/70 bg-[#fcfaf6] p-4 sm:p-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-[0.16em] text-foreground/45">Today’s learning plan</p>
+                        <p className="mt-1 text-lg font-bold text-foreground">You’ve got this.</p>
+                      </div>
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f7e6dc] text-[#b85f3b]"><AcademicCapIcon className="h-6 w-6" /></div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-white p-3">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f8eee6] text-[#b85f3b]"><BookOpenIcon className="h-4 w-4" /></span>
+                        <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-foreground">Understand one concept</p><p className="text-xs text-foreground/50">AI Tutor · 10 min</p></div>
+                        <CheckIcon className="h-4 w-4 text-[#b85f3b]" />
+                      </div>
+                      <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-white p-3">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f3eee4] text-[#92703e]"><ClipboardDocumentCheckIcon className="h-4 w-4" /></span>
+                        <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-foreground">Try 5 practice questions</p><p className="text-xs text-foreground/50">Quick Quiz · 8 min</p></div>
+                        <ClockIcon className="h-4 w-4 text-foreground/35" />
+                      </div>
+                      <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-white p-3">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f1edf9] text-[#6851a2]"><ArrowPathIcon className="h-4 w-4" /></span>
+                        <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-foreground">Review tricky answers</p><p className="text-xs text-foreground/50">Smart revision · 5 min</p></div>
+                        <span className="text-[10px] font-semibold text-foreground/45">NEXT</span>
+                      </div>
+                    </div>
+                    <div className="rounded-xl bg-[#f7e6dc] px-4 py-3">
+                      <div className="flex items-center justify-between text-xs font-semibold text-[#8d4d32]"><span>Daily goal</span><span>2 of 3 steps</span></div>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/80"><div className="h-full w-2/3 rounded-full bg-[#c96b46]" /></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </motion.div>
 
             <AnimatedContainer variant="slide-up" delay={0.1} animate={animationsEnabled} className="text-center mb-16">
