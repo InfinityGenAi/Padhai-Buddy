@@ -30,14 +30,26 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "attemptId is required" }, { status: 400 });
     }
 
-    const attemptRef = adminDb.collection("users").doc(decoded.uid).collection("quizAttempts").doc(attemptId);
-    const snap = await attemptRef.get();
+    const userRef = adminDb.collection("users").doc(decoded.uid);
+    const attemptRef = userRef.collection("quizAttempts").doc(attemptId);
+    const authorityRef = userRef.collection("quizAttemptAuthority").doc(attemptId);
+    const [snap, authoritySnap] = await Promise.all([attemptRef.get(), authorityRef.get()]);
 
     if (!snap.exists) {
       return NextResponse.json({ error: "Quiz attempt not found" }, { status: 404 });
     }
+    if (!authoritySnap.exists) {
+      return NextResponse.json(
+        { error: "This quiz attempt cannot be verified. Please start a new quiz." },
+        { status: 409 },
+      );
+    }
 
-    const attemptData = snap.data() as QuizAttempt;
+    // Never trust the user-visible attempt document as the question/answer source.
+    const attemptData = authoritySnap.data() as QuizAttempt;
+    if (attemptData.serverCreated !== true) {
+      return NextResponse.json({ error: "This quiz attempt cannot be verified. Please start a new quiz." }, { status: 409 });
+    }
     const attemptForClient = attemptData.completedAt
       ? attemptData
       : {
@@ -90,7 +102,7 @@ function validateQuestions(questions: unknown[]): QuizQuestion[] | null {
 
 export async function POST(req: NextRequest) {
   try {
-    if (!adminAuth || initializationError) {
+    if (!adminAuth || !adminDb || initializationError) {
       return NextResponse.json({ error: initializationError || "Server configuration error" }, { status: 500 });
     }
 
@@ -151,14 +163,25 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Server not initialized" }, { status: 500 });
       }
 
-      const attemptRef = db.collection("users").doc(decoded.uid).collection("quizAttempts").doc(attemptId);
-      const snap = await attemptRef.get();
+      const userRef = db.collection("users").doc(decoded.uid);
+      const attemptRef = userRef.collection("quizAttempts").doc(attemptId);
+      const authorityRef = userRef.collection("quizAttemptAuthority").doc(attemptId);
+      const [snap, authoritySnap] = await Promise.all([attemptRef.get(), authorityRef.get()]);
       if (!snap.exists) {
         return NextResponse.json({ error: "Quiz attempt not found" }, { status: 404 });
       }
+      if (!authoritySnap.exists) {
+        return NextResponse.json(
+          { error: "This quiz attempt predates the security update. Please start a new quiz." },
+          { status: 409 },
+        );
+      }
 
-      const attemptData = snap.data() as QuizAttempt;
-      if (attemptData.completedAt) {
+      const attemptData = authoritySnap.data() as QuizAttempt;
+      if (attemptData.serverCreated !== true) {
+        return NextResponse.json({ error: "This quiz attempt cannot be verified. Please start a new quiz." }, { status: 409 });
+      }
+      if (attemptData.serverScored === true || attemptData.completedAt) {
         return NextResponse.json({ error: "This quiz has already been submitted" }, { status: 409 });
       }
 
@@ -358,19 +381,45 @@ export async function POST(req: NextRequest) {
 
       // Persist completion exactly once, even when two submit requests race.
       const submitResult = await db.runTransaction(async (transaction) => {
-        const currentSnap = await transaction.get(attemptRef);
-        if (!currentSnap.exists) return "not-found" as const;
-        if (currentSnap.data()?.completedAt) return "already-submitted" as const;
-        transaction.update(attemptRef, {
+        const [currentSnap, currentAuthoritySnap] = await Promise.all([
+          transaction.get(attemptRef),
+          transaction.get(authorityRef),
+        ]);
+        if (!currentSnap.exists || !currentAuthoritySnap.exists) return "not-found" as const;
+        const currentAuthority = currentAuthoritySnap.data() || {};
+        if (currentAuthority.serverCreated !== true) return "not-authoritative" as const;
+        if (currentAuthority.serverScored === true || currentAuthority.completedAt) return "already-submitted" as const;
+
+        const trustedAttempt = {
+          id: attemptId,
+          subject: attemptData.subject,
+          class: attemptData.class,
+          board: attemptData.board,
+          difficulty: attemptData.difficulty,
+          totalQuestions,
+          questions: scoredQuestions,
+          correctAnswers,
+          score,
+          createdAt: attemptData.createdAt,
+          completedAt,
+          serverCreated: true,
+          serverScored: true,
+        };
+        transaction.set(attemptRef, trustedAttempt);
+        transaction.update(authorityRef, {
           questions: scoredQuestions,
           correctAnswers,
           score,
           completedAt,
+          serverScored: true,
         });
         return "submitted" as const;
       });
       if (submitResult === "not-found") {
         return NextResponse.json({ error: "Quiz attempt not found" }, { status: 404 });
+      }
+      if (submitResult === "not-authoritative") {
+        return NextResponse.json({ error: "This quiz attempt cannot be verified. Please start a new quiz." }, { status: 409 });
       }
       if (submitResult === "already-submitted") {
         return NextResponse.json({ error: "This quiz has already been submitted" }, { status: 409 });
@@ -471,11 +520,22 @@ export async function POST(req: NextRequest) {
         score: 0,
         questions,
         createdAt: Date.now(),
+        serverCreated: true,
+        serverScored: false,
       };
 
-      if (adminDb) {
-        await adminDb.collection("users").doc(decoded.uid).collection("quizAttempts").doc(attempt.id).set(attempt);
+      const db = adminDb;
+      if (!db) {
+        return NextResponse.json({ error: "Server not initialized" }, { status: 500 });
       }
+      const userRef = db.collection("users").doc(decoded.uid);
+      const attemptRef = userRef.collection("quizAttempts").doc(attempt.id);
+      const authorityRef = userRef.collection("quizAttemptAuthority").doc(attempt.id);
+      // Create the user-visible record and the server-only canonical record together.
+      await db.runTransaction(async (transaction) => {
+        transaction.create(attemptRef, attempt);
+        transaction.create(authorityRef, attempt);
+      });
 
       return NextResponse.json({
         attempt: {
