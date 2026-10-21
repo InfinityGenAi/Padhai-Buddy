@@ -126,12 +126,12 @@ async function isAdmin(decoded: { admin?: unknown }): Promise<boolean> {
  * before being credited, so forged or incomplete activity never inflates scores.
  *
  *   - Doubts: every doc in users/{uid}/doubts counts (10 pts each).
- *   - Quizzes: only completed attempts (completedAt set) count (20 pts each).
+ *   - Quizzes: only server-authorized and server-scored attempts count (20 pts each).
  *   - Study sessions: completed sessions with server completion timestamps
  *     and enough elapsed time count (5 pts each).
  *   - Flashcards: only cards with the server-owned scoreCredited marker count
  *     (5 pts each; status "known" is the canonical review state).
- *   - Notes: every server-created note counts (5 pts each).
+ *   - Notes: only server-created notes count (5 pts each).
  *   - Study plans: duration-eligible plans with server completion timestamps
  *     count (15 pts each).
  */
@@ -182,12 +182,15 @@ export async function POST(req: NextRequest) {
     const data = userDoc.data();
 
     const doubtsSnap = await db.collection("users").doc(uid).collection("doubts").get();
-    const quizSnap = await db.collection("users").doc(uid).collection("quizAttempts").get();
+    const quizSnap = await db.collection("users").doc(uid).collection("quizAttemptAuthority").get();
     const notesSnap = await db.collection("users").doc(uid).collection("notes").get();
     const sessionsSnap = await db.collection("users").doc(uid).collection("studySessions").get();
     const plansSnap = await db.collection("users").doc(uid).collection("studyPlans").get();
 
-    const completedQuizzes = quizSnap.docs.filter((d) => !!d.data().completedAt).length;
+    const completedQuizzes = quizSnap.docs.filter((d) => {
+      const attempt = d.data();
+      return attempt.serverCreated === true && attempt.serverScored === true && !!attempt.completedAt;
+    }).length;
     const completedSessions = sessionsSnap.docs.filter((d) => {
       const session = d.data();
       const durationSeconds = typeof session.durationSeconds === "number"
@@ -195,7 +198,9 @@ export async function POST(req: NextRequest) {
         : typeof session.durationMinutes === "number"
           ? session.durationMinutes * 60
           : 0;
-      return session.completed === true
+      return session.serverCreated === true
+        && session.serverVerified === true
+        && session.completed === true
         && typeof session.completedAt === "number"
         && typeof session.createdAt === "number"
         && durationSeconds > 0
@@ -204,7 +209,9 @@ export async function POST(req: NextRequest) {
     const completedPlans = plansSnap.docs.filter((d) => {
       const plan = d.data();
       if (
-        plan.completed !== true
+        plan.serverCreated !== true
+        || plan.serverCompleted !== true
+        || plan.completed !== true
         || typeof plan.completedAt !== "number"
         || typeof plan.createdAt !== "number"
         || typeof plan.durationMinutes !== "number"
@@ -241,7 +248,7 @@ export async function POST(req: NextRequest) {
       doubts: doubtsSnap.size,
       quizzes: completedQuizzes,
       flashcards: reviewedFlashcards,
-      notes: notesSnap.size,
+      notes: notesSnap.docs.filter((d) => d.data().serverCreated === true).length,
       sessions: completedSessions,
       plans: completedPlans,
     });
