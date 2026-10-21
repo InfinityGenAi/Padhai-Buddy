@@ -122,14 +122,6 @@ export async function POST(req: NextRequest) {
         updatedAt: Date.now(),
       };
       await planRef.set(plan);
-      // Credit the server-owned ledger for a completed plan.
-      if (plan.completed) {
-        try {
-          await incrementUserScore(decoded.uid, "plan");
-        } catch {
-          // Never block plan creation on ledger updates.
-        }
-      }
       return NextResponse.json({ plan: { id: planRef.id, ...plan } });
     }
 
