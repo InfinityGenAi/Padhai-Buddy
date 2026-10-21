@@ -180,7 +180,7 @@ export default function Home() {
 
         <div className="flex items-center gap-2 sm:gap-3">
           <Link
-            href="/download/android"
+            href="/download"
             className="inline-flex items-center justify-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-primary hover:bg-primary/15 transition-colors focus-ring whitespace-nowrap"
           >
             <ArrowDownTrayIcon className="h-4 w-4" />
@@ -621,7 +621,7 @@ export default function Home() {
                 <li><Link href="#ai-tutor" className="hover:text-foreground transition-colors">AI Tutor</Link></li>
                 <li><Link href="#how-it-works" className="hover:text-foreground transition-colors">How It Works</Link></li>
                 <li><Link href="#trust" className="hover:text-foreground transition-colors">Why Choose Us</Link></li>
-                <li><Link href="/download/android" className="inline-flex items-center gap-2 text-primary font-semibold hover:underline"><ArrowDownTrayIcon className="h-4 w-4" /> Download App</Link></li>
+                <li><Link href="/download" className="inline-flex items-center gap-2 text-primary font-semibold hover:underline"><ArrowDownTrayIcon className="h-4 w-4" /> Download App</Link></li>
               </ul>
             </div>
             <div>
