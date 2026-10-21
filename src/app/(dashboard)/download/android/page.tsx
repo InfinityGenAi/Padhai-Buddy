@@ -205,7 +205,6 @@ export default function DownloadAndroidPage() {
                 </div>
               </motion.div>
             ) : (
-              // No APK available - show PWA option
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -213,19 +212,28 @@ export default function DownloadAndroidPage() {
               >
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <CheckCircleIcon className="w-5 h-5 text-primary" />
+                    <ArrowDownTrayIcon className="w-5 h-5 text-primary" />
                   </div>
-                  <div className="text-left">
-                    <p className="text-sm font-medium text-foreground">
-                      Progressive Web App (PWA)
-                    </p>
-                    <p className="text-xs text-foreground/60">
-                      Works offline, no app store needed
+                  <div className="text-left flex-1">
+                    <p className="text-sm font-medium text-foreground">Download Android APK</p>
+                    <p className="text-xs text-foreground/60 mt-0.5">
+                      Download the Android app directly. You do not need to install the website as a PWA.
                     </p>
                   </div>
                 </div>
+                <a
+                  href="https://github.com/InfinityGenAi/Padhai-Buddy/releases/download/1.0.0/app-release.apk"
+                  className="mt-4 w-full btn-primary py-3 rounded-xl font-medium flex items-center justify-center gap-2"
+                >
+                  <ArrowDownTrayIcon className="w-5 h-5" />
+                  Download Padhai Buddy APK
+                </a>
+                <p className="text-xs text-foreground/60 mt-2">
+                  If the download link is unavailable, use the release page to check available APK files.
+                  <a href="https://github.com/InfinityGenAi/Padhai-Buddy/releases/tag/1.0.0" className="underline ml-1" target="_blank" rel="noopener noreferrer">Open GitHub Release</a>
+                </p>
               </motion.div>
-            )}
+            )
 
             {/* Clear platform-specific installation instructions */}
             <div className="bg-foreground/5 border border-border rounded-xl p-4 text-left">
