@@ -180,21 +180,85 @@ export default function TimerPage() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      saveAttemptedRef.current = false;
-      if (mode === "stopwatch") {
-        if (!cancelled) { setTimeLeft(0); setElapsed(0); }
-      } else {
-        if (!cancelled) { setTimeLeft(getDuration()); setElapsed(0); }
-      }
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      if (!cancelled) setIsRunning(false);
-    })();
+    // A restored/active server session owns the current mode and time. Do not
+    // reset it just because state hydration changes the selected mode.
+    if (activeSessionRef.current) return;
+
+    saveAttemptedRef.current = false;
+    if (mode === "stopwatch") {
+      setTimeLeft(0);
+      setElapsed(0);
+    } else {
+      setTimeLeft(getDuration());
+      setElapsed(0);
+    }
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    setIsRunning(false);
     return () => { cancelled = true; };
   }, [mode, customMinutes, getDuration]);
+
+  const restoredSessionUidRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const uid = user?.uid;
+    if (!uid || restoredSessionUidRef.current === uid) return;
+    restoredSessionUidRef.current = uid;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const token = await (await import("@/lib/auth-utils")).getFirebaseIdToken();
+        const res = await fetch("/api/timer", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not restore timer session");
+
+        const session = data.activeSession as TimerSession | null;
+        if (cancelled || !session || !session.id) return;
+
+        activeSessionRef.current = session;
+        setActiveSession(session);
+        setMode(session.mode as TimerMode);
+        const durationSeconds = session.durationSeconds ?? session.durationMinutes * 60;
+
+        if (session.mode === "stopwatch") {
+          setTimeLeft(0);
+          setElapsed(Math.max(0, Math.floor((Date.now() - session.createdAt) / 1000)));
+          setTimerError("Your unfinished stopwatch session was restored. Press Start to continue, or Reset to discard it.");
+          return;
+        }
+
+        if (session.mode === "custom") {
+          setCustomMinutes(Math.max(1, Math.min(180, Math.ceil(durationSeconds / 60))));
+        }
+        const remainingSeconds = Math.max(
+          0,
+          Math.ceil((session.createdAt + durationSeconds * 1000 - Date.now()) / 1000),
+        );
+        setElapsed(Math.max(0, durationSeconds - remainingSeconds));
+        setTimeLeft(remainingSeconds);
+        if (remainingSeconds === 0) {
+          // If the deadline passed while the app was closed, ask the server to
+          // finish it now; the server still verifies elapsed time atomically.
+          saveAttemptedRef.current = true;
+          const completed = await finishSession(durationSeconds);
+          if (!completed) saveAttemptedRef.current = false;
+        } else {
+          setTimerError("Your unfinished timer session was restored. Press Start to continue, or Reset to discard it.");
+        }
+      } catch (err: unknown) {
+        if (!cancelled) {
+          setTimerError(err instanceof Error ? err.message : "Could not restore timer session");
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [user?.uid, finishSession]);
 
   useEffect(() => {
     if (!isRunning) return;
