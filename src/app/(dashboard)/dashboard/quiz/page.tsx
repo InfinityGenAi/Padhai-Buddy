@@ -14,7 +14,7 @@ import {
   ArrowPathIcon,
   PlayIcon,
 } from "@heroicons/react/24/outline";
-import { playQuizCorrect, playQuizWrong, playQuizComplete } from "@/lib/sounds";
+import { playQuizComplete } from "@/lib/sounds";
 import type { QuizAttempt } from "@/types";
 
 type QuizState = "setup" | "active" | "result";
@@ -38,7 +38,6 @@ export default function QuizPage() {
 
   const currentQuestion = attempt?.questions[currentIndex];
   const totalAnswered = attempt?.questions.filter((q) => q.selectedIndex !== undefined).length || 0;
-  const correctCount = attempt?.questions.filter((q) => q.selectedIndex === q.correctIndex).length || 0;
 
   // Load quiz attempt from query parameter
   useEffect(() => {
@@ -124,13 +123,8 @@ export default function QuizPage() {
         ...updated.questions[currentIndex],
         selectedIndex: index,
       };
-      if (index === updated.questions[currentIndex].correctIndex) {
-        updated.correctAnswers = (updated.correctAnswers || 0) + 1;
-        updated.score = Math.round((updated.correctAnswers / updated.totalQuestions) * 100);
-        if (preferences.soundEnabled) playQuizCorrect();
-      } else {
-        if (preferences.soundEnabled) playQuizWrong();
-      }
+      // Correct answers and explanations are intentionally not sent to the
+      // browser until submission; only the server computes the score.
       setAttempt(updated);
     }
   };
@@ -307,7 +301,7 @@ export default function QuizPage() {
                 Question {currentIndex + 1} of {attempt.questions.length}
               </span>
               <span className="text-xs text-foreground/50 font-medium">
-                {correctCount}/{totalAnswered} correct
+                {totalAnswered}/{attempt.totalQuestions} answered
               </span>
             </div>
             <div className="h-1.5 bg-foreground/5 rounded-full overflow-hidden">
@@ -324,12 +318,8 @@ export default function QuizPage() {
               <div className="space-y-2">
                 {currentQuestion?.options.map((option, idx) => {
                   let colorClass = "bg-foreground/5 hover:bg-foreground/8";
-                  if (selectedIndex !== null) {
-                    if (idx === currentQuestion.correctIndex) {
-                      colorClass = "bg-green-950/30 border border-green-800/50";
-                    } else if (idx === selectedIndex) {
-                      colorClass = "bg-red-950/30 border border-red-800/50";
-                    }
+                  if (selectedIndex !== null && idx === selectedIndex) {
+                    colorClass = "bg-primary/15 border border-primary/40";
                   }
                   return (
                     <button
@@ -351,8 +341,9 @@ export default function QuizPage() {
                   animate={{ opacity: 1, y: 0 }}
                   className="mt-4 p-3 rounded-xl bg-primary/5 border border-primary/10"
                 >
-                  <p className="text-xs text-foreground/60 font-medium mb-1">Explanation</p>
-                  <p className="text-sm text-foreground/80">{currentQuestion?.explanation}</p>
+                  <p className="text-sm text-foreground/80">
+                    Answer selected. Correct answers and explanations will appear after you submit the quiz.
+                  </p>
                 </motion.div>
               )}
 
@@ -404,6 +395,24 @@ export default function QuizPage() {
               You got <span className="font-semibold text-primary">{attempt.correctAnswers}</span> out of{" "}
               <span className="font-semibold">{attempt.totalQuestions}</span> questions correct.
             </p>
+            <div className="space-y-3 text-left">
+              {attempt.questions.map((question, index) => (
+                <div key={question.id} className="rounded-xl border border-border p-4">
+                  <p className="font-medium text-sm mb-2">{index + 1}. {question.question}</p>
+                  <p className="text-xs text-foreground/60">
+                    Your answer: {question.selectedIndex !== undefined
+                      ? question.options[question.selectedIndex] ?? "No answer selected"
+                      : "No answer selected"}
+                  </p>
+                  <p className="text-xs text-green-400 mt-1">
+                    Correct answer: {question.options[question.correctIndex] ?? "Unavailable"}
+                  </p>
+                  {question.explanation && (
+                    <p className="text-sm text-foreground/70 mt-2">{question.explanation}</p>
+                  )}
+                </div>
+              ))}
+            </div>
             <div className="flex gap-3 justify-center">
               <motion.button
                 whileHover={{ scale: 1.05 }}
