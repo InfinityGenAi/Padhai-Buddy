@@ -56,8 +56,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Duration exceeds maximum allowed (600 minutes)" }, { status: 400 });
       }
 
-      const durationMinutesRounded = Math.max(1, Math.round(totalSeconds / 60));
-      const sessionRef = adminDb.collection("users").doc(decoded.uid).collection("studySessions").doc();
+      const userRef = adminDb.collection("users").doc(decoded.uid);
+      const sessionsRef = userRef.collection("studySessions");
+      const sessionRef = sessionsRef.doc();
+      const activeSessionRef = userRef.collection("timerState").doc("active");
       const createdAt = Date.now();
       const session = {
         mode: String(mode),
@@ -66,7 +68,33 @@ export async function POST(req: NextRequest) {
         completed: false,
         createdAt,
       };
-      await sessionRef.set(session);
+
+      // One active timer per user prevents creating many simultaneous sessions
+      // and bulk-completing them later to inflate leaderboard points.
+      const createResult = await adminDb.runTransaction(async (transaction) => {
+        const activeSnap = await transaction.get(activeSessionRef);
+        if (activeSnap.exists) {
+          const activeSessionId = activeSnap.data()?.sessionId;
+          if (typeof activeSessionId === "string") {
+            const existingSessionRef = sessionsRef.doc(activeSessionId);
+            const existingSnap = await transaction.get(existingSessionRef);
+            if (existingSnap.exists && existingSnap.data()?.completed !== true) {
+              return "already-active" as const;
+            }
+          }
+        }
+
+        transaction.create(sessionRef, session);
+        transaction.set(activeSessionRef, { sessionId: sessionRef.id, updatedAt: createdAt });
+        return "created" as const;
+      });
+
+      if (createResult === "already-active") {
+        return NextResponse.json(
+          { error: "You already have an unfinished timer session. Resume or reset it before starting another." },
+          { status: 409 },
+        );
+      }
       return NextResponse.json({ session: { id: sessionRef.id, ...session } });
     }
 
@@ -75,11 +103,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "completed must be true when finishing a timer session" }, { status: 400 });
       }
 
-      const sessionRef = adminDb.collection("users").doc(decoded.uid).collection("studySessions").doc(sessionId);
+      const userRef = adminDb.collection("users").doc(decoded.uid);
+      const sessionRef = userRef.collection("studySessions").doc(sessionId);
+      const activeSessionRef = userRef.collection("timerState").doc("active");
       const completionResult = await adminDb.runTransaction(async (transaction) => {
         const sessionSnap = await transaction.get(sessionRef);
         if (!sessionSnap.exists) return { kind: "not-found" as const };
         const sessionData = sessionSnap.data() || {};
+        const activeSnap = await transaction.get(activeSessionRef);
         if (sessionData.completed === true) return { kind: "already-completed" as const };
 
         const createdAt = typeof sessionData.createdAt === "number" ? sessionData.createdAt : 0;
@@ -95,6 +126,9 @@ export async function POST(req: NextRequest) {
         }
 
         transaction.update(sessionRef, { completed: true, completedAt: now });
+        if (activeSnap.data()?.sessionId === sessionId) {
+          transaction.delete(activeSessionRef);
+        }
         return { kind: "completed" as const };
       });
 
@@ -120,12 +154,18 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "cancel" && sessionId) {
-      const sessionRef = adminDb.collection("users").doc(decoded.uid).collection("studySessions").doc(sessionId);
+      const userRef = adminDb.collection("users").doc(decoded.uid);
+      const sessionRef = userRef.collection("studySessions").doc(sessionId);
+      const activeSessionRef = userRef.collection("timerState").doc("active");
       const cancelResult = await adminDb.runTransaction(async (transaction) => {
         const sessionSnap = await transaction.get(sessionRef);
         if (!sessionSnap.exists) return "not-found" as const;
+        const activeSnap = await transaction.get(activeSessionRef);
         if (sessionSnap.data()?.completed === true) return "already-completed" as const;
         transaction.delete(sessionRef);
+        if (activeSnap.data()?.sessionId === sessionId) {
+          transaction.delete(activeSessionRef);
+        }
         return "cancelled" as const;
       });
 
