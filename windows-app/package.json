@@ -1,0 +1,44 @@
+{
+  "name": "padhai-buddy-windows",
+  "version": "1.0.0",
+  "description": "Padhai Buddy desktop app for Windows",
+  "author": "InfinityGenAi",
+  "main": "main.cjs",
+  "private": true,
+  "scripts": {
+    "dist": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.padhaibuddy.desktop",
+    "productName": "Padhai Buddy",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.cjs",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Padhai-Buddy-Setup.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Padhai Buddy"
+    }
+  }
+}
