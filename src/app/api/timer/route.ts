@@ -119,6 +119,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
+    if (action === "cancel" && sessionId) {
+      const sessionRef = adminDb.collection("users").doc(decoded.uid).collection("studySessions").doc(sessionId);
+      const cancelResult = await adminDb.runTransaction(async (transaction) => {
+        const sessionSnap = await transaction.get(sessionRef);
+        if (!sessionSnap.exists) return "not-found" as const;
+        if (sessionSnap.data()?.completed === true) return "already-completed" as const;
+        transaction.delete(sessionRef);
+        return "cancelled" as const;
+      });
+
+      if (cancelResult === "not-found") {
+        return NextResponse.json({ error: "Study session not found" }, { status: 404 });
+      }
+      if (cancelResult === "already-completed") {
+        return NextResponse.json({ error: "A completed session cannot be cancelled" }, { status: 409 });
+      }
+      return NextResponse.json({ success: true });
+    }
+
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   } catch {
     return NextResponse.json({ error: "Failed to process request" }, { status: 500 });
