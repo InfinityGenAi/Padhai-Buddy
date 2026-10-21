@@ -16,6 +16,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
   BellIcon,
+  ArrowDownTrayIcon,
   Cog6ToothIcon,
   ArrowLeftOnRectangleIcon,
   UserIcon,
@@ -156,6 +157,14 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
           <header className="hidden sm:flex items-center justify-between px-6 h-16 border-b border-border/40">
             <DashboardGreeting animationsEnabled={animationsEnabled} />
             <div className="flex items-center gap-2 sm:gap-3">
+              <a
+                href="https://github.com/InfinityGenAi/Padhai-Buddy/releases/download/1.0.0/app-release.apk"
+                className="inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/15 transition-colors focus-ring"
+                aria-label="Download Padhai Buddy Android app"
+              >
+                <ArrowDownTrayIcon className="h-4 w-4" />
+                <span className="hidden md:inline">Download App</span>
+              </a>
               {/* Notifications */}
               <div className="relative" ref={notificationsRef}>
                 <motion.button
@@ -276,6 +285,17 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
             </div>
           </header>
           <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">
+            {pathname === "/dashboard" && (
+              <div className="sm:hidden px-4 pt-3">
+                <a
+                  href="https://github.com/InfinityGenAi/Padhai-Buddy/releases/download/1.0.0/app-release.apk"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary hover:bg-primary/15 transition-colors focus-ring"
+                >
+                  <ArrowDownTrayIcon className="h-4 w-4" />
+                  Download Padhai Buddy Android App
+                </a>
+              </div>
+            )}
             <div
               className={
                 isChatPage
