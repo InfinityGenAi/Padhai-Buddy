@@ -112,6 +112,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
 
+    const contentLength = Number(req.headers.get("content-length") || "0");
+    if (Number.isFinite(contentLength) && contentLength > 128 * 1024) {
+      return NextResponse.json({ error: "Request body exceeds 128 KB" }, { status: 413 });
+    }
+
     let body: {
       action?: string;
       attemptId?: string;
@@ -402,6 +407,9 @@ export async function POST(req: NextRequest) {
     const sub = String(subject).trim();
     if (!sub || sub === "undefined" || sub.length > 100) {
       return NextResponse.json({ error: "Invalid subject" }, { status: 400 });
+    }
+    if (noteBody !== undefined && (typeof noteBody !== "string" || noteBody.length > 16000)) {
+      return NextResponse.json({ error: "noteBody must be a string of at most 16000 characters" }, { status: 400 });
     }
 
     const numQuestions = Math.min(Math.max(Number(numberOfQuestions) || 5, 1), 20);
