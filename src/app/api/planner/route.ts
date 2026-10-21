@@ -117,6 +117,7 @@ export async function POST(req: NextRequest) {
         durationMinutes,
         plannedDate,
         completed: false,
+        serverCreated: true,
         priority: priority || "medium",
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -165,6 +166,10 @@ export async function POST(req: NextRequest) {
         const current = planSnap.data() || {};
         const wasCompleted = current.completed === true;
 
+        if (completed === true && !wasCompleted && current.serverCreated !== true) {
+          return { kind: "not-authoritative" as const };
+        }
+
         if (
           wasCompleted &&
           (
@@ -196,6 +201,7 @@ export async function POST(req: NextRequest) {
           }
           transactionUpdates.completed = true;
           transactionUpdates.completedAt = now;
+          transactionUpdates.serverCompleted = true;
           completedNow = true;
         } else if (completed === false) {
           transactionUpdates.completed = false;
@@ -207,6 +213,12 @@ export async function POST(req: NextRequest) {
 
       if (completionResult.kind === "not-found") {
         return NextResponse.json({ error: "Plan not found" }, { status: 404 });
+      }
+      if (completionResult.kind === "not-authoritative") {
+        return NextResponse.json(
+          { error: "This plan was created before the security update. Create a new plan to earn points for its completion." },
+          { status: 409 },
+        );
       }
       if (completionResult.kind === "already-completed") {
         return NextResponse.json({ error: "A completed plan cannot be reopened" }, { status: 409 });
@@ -229,7 +241,7 @@ export async function POST(req: NextRequest) {
       const planRef = adminDb.collection("users").doc(decoded.uid).collection("studyPlans").doc(planId);
       const planSnap = await planRef.get();
       if (!planSnap.exists) return NextResponse.json({ error: "Plan not found" }, { status: 404 });
-      const hadScoreCredit = planSnap.data()?.completed === true;
+      const hadScoreCredit = planSnap.data()?.serverCompleted === true;
       await planRef.delete();
       if (hadScoreCredit) {
         try {
