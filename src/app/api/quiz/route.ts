@@ -146,11 +146,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "attemptId and questions are required" }, { status: 400 });
       }
 
-      if (!adminDb) {
+      const db = adminDb;
+      if (!db) {
         return NextResponse.json({ error: "Server not initialized" }, { status: 500 });
       }
 
-      const attemptRef = adminDb.collection("users").doc(decoded.uid).collection("quizAttempts").doc(attemptId);
+      const attemptRef = db.collection("users").doc(decoded.uid).collection("quizAttempts").doc(attemptId);
       const snap = await attemptRef.get();
       if (!snap.exists) {
         return NextResponse.json({ error: "Quiz attempt not found" }, { status: 404 });
@@ -265,14 +266,14 @@ export async function POST(req: NextRequest) {
 
           // Upsert topicMastery for each question using batched writes (no transactions)
           // to avoid emulator transaction timeout issues.
-          const batch = adminDb.batch();
+          const batch = db.batch();
           for (const r of results) {
             // Deterministic doc ID: normalized subject + topic
             const docId =
               `${r.topic.replace(/\s+/g, "_").toLowerCase()}_${sub
                 .replace(/\s+/g, "_")
                 .toLowerCase()}`;
-            const masteryRef = adminDb
+            const masteryRef = db
               .collection("users")
               .doc(decoded.uid)
               .collection("topicMastery")
@@ -280,7 +281,7 @@ export async function POST(req: NextRequest) {
 
             // Use a transaction but catch and ignore errors per-operation
             try {
-              await adminDb.runTransaction(async (transaction) => {
+              await db.runTransaction(async (transaction) => {
                 const existingSnap = await transaction.get(masteryRef);
                 const existingData = existingSnap.data();
                 const newTotal = (existingData?.totalQuestions || 0) + 1;
@@ -325,7 +326,7 @@ export async function POST(req: NextRequest) {
             if (r.isCorrect === false) {
               const mistakeDocId = `${attemptId}_${mi}_${r.topic.replace(/\s+/g, "_").toLowerCase()}_${r.serverQ.id}`;
               try {
-                await adminDb.collection("users")
+                await db.collection("users")
                   .doc(decoded.uid)
                   .collection("mistakeBank")
                   .doc(mistakeDocId)
@@ -356,7 +357,7 @@ export async function POST(req: NextRequest) {
       };
 
       // Persist completion exactly once, even when two submit requests race.
-      const submitResult = await adminDb.runTransaction(async (transaction) => {
+      const submitResult = await db.runTransaction(async (transaction) => {
         const currentSnap = await transaction.get(attemptRef);
         if (!currentSnap.exists) return "not-found" as const;
         if (currentSnap.data()?.completedAt) return "already-submitted" as const;
