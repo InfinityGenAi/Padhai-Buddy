@@ -233,7 +233,7 @@ export default function DownloadAndroidPage() {
                   <a href="https://github.com/InfinityGenAi/Padhai-Buddy/releases/tag/1.0.0" className="underline ml-1" target="_blank" rel="noopener noreferrer">Open GitHub Release</a>
                 </p>
               </motion.div>
-            )
+            )}
 
             {/* Clear platform-specific installation instructions */}
             <div className="bg-foreground/5 border border-border rounded-xl p-4 text-left">
