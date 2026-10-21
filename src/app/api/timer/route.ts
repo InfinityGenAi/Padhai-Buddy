@@ -49,6 +49,9 @@ export async function POST(req: NextRequest) {
       } else {
         return NextResponse.json({ error: "durationSeconds (preferred) or durationMinutes must be a positive integer" }, { status: 400 });
       }
+      if (totalSeconds < 60) {
+        return NextResponse.json({ error: "Study sessions must be at least 60 seconds long" }, { status: 400 });
+      }
       if (totalSeconds > 600 * 60) {
         return NextResponse.json({ error: "Duration exceeds maximum allowed (600 minutes)" }, { status: 400 });
       }
