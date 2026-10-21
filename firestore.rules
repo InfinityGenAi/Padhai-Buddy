@@ -57,11 +57,8 @@ service cloud.firestore {
 
       match /doubts/{doubtId} {
         allow read: if request.auth != null && request.auth.uid == userId;
-        allow create: if request.auth != null && request.auth.uid == userId
-          && request.resource.data.type in ["text", "photo"]
-          && request.resource.data.question is string
-          && request.resource.data.answer is string;
-        allow update, delete: if request.auth != null && request.auth.uid == userId;
+        // Scored doubt records are created through authenticated server APIs.
+        allow write: if false;
       }
 
       match /sessions/{sessionId} {
@@ -102,82 +99,39 @@ service cloud.firestore {
 
       match /studyPlans/{planId} {
         allow read: if request.auth != null && request.auth.uid == userId;
-        allow create: if request.auth != null && request.auth.uid == userId
-          && request.resource.data.title is string
-          && request.resource.data.subject is string
-          && request.resource.data.durationMinutes is number
-          && request.resource.data.plannedDate is string
-          && request.resource.data.completed is bool
-          && request.resource.data.createdAt is number
-          && request.resource.data.updatedAt is number;
-        allow update: if request.auth != null && request.auth.uid == userId;
-        allow delete: if request.auth != null && request.auth.uid == userId;
+        // Completion and score fields are server-owned via /api/planner.
+        allow write: if false;
       }
 
       match /quizAttempts/{attemptId} {
         allow read: if request.auth != null && request.auth.uid == userId;
-        allow create: if request.auth != null && request.auth.uid == userId
-          && request.resource.data.subject is string
-          && request.resource.data.class is int
-          && request.resource.data.board in ["CBSE", "ICSE", "State Board"]
-          && request.resource.data.difficulty in ["easy", "medium", "hard"]
-          && request.resource.data.totalQuestions is int
-          && request.resource.data.totalQuestions >= 1
-          && request.resource.data.totalQuestions <= 20
-          && request.resource.data.questions is list
-          && request.resource.data.questions.size() == request.resource.data.totalQuestions;
-        allow update: if request.auth != null && request.auth.uid == userId;
-        allow delete: if request.auth != null && request.auth.uid == userId;
+        // Question keys, answer keys, scores and completion state are written
+        // exclusively by /api/quiz using the Admin SDK.
+        allow write: if false;
       }
 
       match /flashcardDecks/{deckId} {
         allow read: if request.auth != null && request.auth.uid == userId;
-        allow create: if request.auth != null && request.auth.uid == userId
-          && request.resource.data.title is string
-          && request.resource.data.subject is string
-          && request.resource.data.createdAt is number
-          && request.resource.data.updatedAt is number;
-        allow update: if request.auth != null && request.auth.uid == userId;
-        allow delete: if request.auth != null && request.auth.uid == userId;
+        // Deck and card writes must pass through /api/flashcards so score-credit
+        // markers, rate limits and delete reversals are applied consistently.
+        allow write: if false;
 
         match /cards/{cardId} {
           allow read: if request.auth != null && request.auth.uid == userId;
-          allow create: if request.auth != null && request.auth.uid == userId
-            && request.resource.data.front is string
-            && request.resource.data.back is string
-            && request.resource.data.status in ["new", "learning", "known", "difficult"]
-            && request.resource.data.createdAt is number
-            && request.resource.data.updatedAt is number
-            // Score-credit markers are server-owned; clients cannot create or alter them.
-            && !("scoreCredited" in request.resource.data);
-          allow update: if request.auth != null && request.auth.uid == userId
-            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["scoreCredited"]);
-          allow delete: if request.auth != null && request.auth.uid == userId;
+          allow write: if false;
         }
       }
 
       match /notes/{noteId} {
         allow read: if request.auth != null && request.auth.uid == userId;
-        allow create: if request.auth != null && request.auth.uid == userId
-          && request.resource.data.title is string
-          && request.resource.data.subject is string
-          && request.resource.data.body is string
-          && request.resource.data.createdAt is number
-          && request.resource.data.updatedAt is number;
-        allow update: if request.auth != null && request.auth.uid == userId;
-        allow delete: if request.auth != null && request.auth.uid == userId;
+        // Note creation/deletion affects the points ledger; use /api/notes.
+        allow write: if false;
       }
 
       match /studySessions/{sessionId} {
         allow read: if request.auth != null && request.auth.uid == userId;
-        allow create: if request.auth != null && request.auth.uid == userId
-          && request.resource.data.mode in ["pomodoro", "stopwatch", "custom"]
-          && request.resource.data.durationMinutes is int
-          && request.resource.data.durationMinutes > 0
-          && request.resource.data.completed is bool
-          && request.resource.data.createdAt is number;
-        allow update: if request.auth != null && request.auth.uid == userId;
-        allow delete: if request.auth != null && request.auth.uid == userId;
+        // The timer API validates elapsed time and writes completedAt server-side.
+        allow write: if false;
       }
 
       match /resources/{resourceId} {
