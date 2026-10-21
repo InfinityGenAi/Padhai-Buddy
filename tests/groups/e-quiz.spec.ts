@@ -81,16 +81,12 @@ test.describe("E. Quiz Tests", () => {
                   id: "q-0",
                   question: "What is 2 + 2?",
                   options: ["3", "4", "5", "6"],
-                  correctIndex: 1,
-                  explanation: "2 + 2 equals 4.",
                   selectedIndex: undefined,
                 },
                 {
                   id: "q-1",
                   question: "What is the capital of France?",
                   options: ["London", "Berlin", "Paris", "Madrid"],
-                  correctIndex: 2,
-                  explanation: "Paris is the capital of France.",
                   selectedIndex: undefined,
                 },
               ],
@@ -126,13 +122,14 @@ test.describe("E. Quiz Tests", () => {
     await expect(page.locator("text=Question 1 of").first()).toBeVisible({ timeout: 60000 });
   });
 
-  test("answering a question advances to next question", async ({ page }) => {
-    await expect(page.locator("text=Subject").first()).toBeAttached();
+  test("answers and explanations stay hidden until quiz submission", async ({ page }) => {
     await page.fill('input[type="text"]', "Physics");
     await page.click("button:has-text('Start Quiz')");
     await expect(page.locator("text=Question 1 of").first()).toBeVisible({ timeout: 60000 });
 
     await page.click("text=4");
+    await expect(page.getByText("Correct answers and explanations will appear after you submit the quiz.")).toBeVisible();
+    await expect(page.getByText("2 + 2 equals 4.")).toHaveCount(0);
     await page.click("button:has-text('Next')");
     await expect(page.locator("text=Question 2 of").first()).toBeVisible({ timeout: 10000 });
   });
