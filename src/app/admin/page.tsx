@@ -1,898 +1,149 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { signInWithCustomToken, signOut } from "firebase/auth";
 import { useAuth } from "@/contexts/AuthContext";
 import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebase";
-import { doc, getDoc, collection, getDocs, query, orderBy, limit, setDoc } from "firebase/firestore";
-import { HomeIcon, ChartBarIcon, UserIcon, DocumentTextIcon, ArrowRightIcon, Cog6ToothIcon, ArrowPathIcon, EyeIcon } from "@heroicons/react/24/outline";
-import { ArrowLeftIcon } from "@heroicons/react/24/outline";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { collection, doc, getDoc, getDocs, limit, orderBy, query } from "firebase/firestore";
+import {
+  AcademicCapIcon, ArrowPathIcon, ArrowRightOnRectangleIcon, ArrowTrendingDownIcon,
+  ArrowTrendingUpIcon, Bars3Icon, ChartBarIcon, CheckCircleIcon, ClockIcon,
+  Cog6ToothIcon, CursorArrowRaysIcon, DocumentTextIcon, DownloadIcon, EyeIcon,
+  HomeIcon, ShieldCheckIcon, SparklesIcon, UsersIcon, XMarkIcon,
+} from "@heroicons/react/24/outline";
 
-/**
- * ADMIN ARCHITECTURE NOTE:
- *
- * This admin panel uses a SINGLE STABLE FIREBASE UID ("admin-stable-uid") for all admin sessions.
- *
- * CONSTRAINT: This architecture INTENTIONALLY SUPPORTS ONLY ONE ADMIN ACCOUNT.
- *
- * Implications:
- * - All admin logins share the same Firebase Auth identity (admin-stable-uid)
- * - Admin sessions cannot be individually tracked or revoked per admin user
- * - Audit trails will show all admin actions under the same UID
- * - If multiple people need admin access, they must share the ADMIN_SECRET
- * - Session revocation (logout) affects all admin sessions simultaneously
- *
- * If multiple distinct admin accounts are needed in the future, this must be redesigned to:
- * 1. Create individual Firebase Auth users for each admin
- * 2. Set custom claims (admin: true) on each admin user
- * 3. Use their actual Firebase UIDs for session tracking and audit logs
- * 4. Remove the ADMIN_UID constant and ADMIN_SECRET-based login
- *
- * SECURITY: ADMIN_SECRET must remain server-side only. Never expose to client.
- */
+type Section = "overview" | "traffic" | "features" | "downloads" | "settings" | "more";
+type DailyMetric = { date: string; pageViews: number; uniqueVisitors: number | null; signups: number; downloads: number; featureUses: number };
+type FeatureMetric = { feature: string; count: number };
+const navItems: { id: Section; label: string; icon: typeof HomeIcon }[] = [
+  { id: "overview", label: "Overview", icon: HomeIcon },
+  { id: "traffic", label: "Traffic analytics", icon: ChartBarIcon },
+  { id: "features", label: "Feature usage", icon: SparklesIcon },
+  { id: "downloads", label: "Downloads", icon: DownloadIcon },
+  { id: "settings", label: "Settings", icon: Cog6ToothIcon },
+  { id: "more", label: "More tools", icon: Bars3Icon },
+];
+const dateKey = (date: Date) => date.toISOString().slice(0, 10);
+const lastDays = (count: number) => Array.from({ length: count }, (_, i) => { const d = new Date(); d.setUTCDate(d.getUTCDate() - (count - i - 1)); return dateKey(d); });
+const fmt = (n: number) => new Intl.NumberFormat("en-IN").format(n);
+const dayLabel = (date: string) => new Date(date + "T00:00:00Z").toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" });
+
+function Metric({ label, value, detail, icon: Icon, tone = "neutral" }: { label: string; value: string; detail: string; icon: typeof EyeIcon; tone?: "neutral" | "green" | "red" }) {
+  const colors = tone === "green" ? "bg-emerald-50 text-emerald-700" : tone === "red" ? "bg-rose-50 text-rose-700" : "bg-slate-100 text-slate-700";
+  return <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium text-slate-500">{label}</p><p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{value}</p></div><span className={`rounded-xl p-2.5 ${colors}`}><Icon className="h-5 w-5" /></span></div><p className="mt-3 text-xs leading-5 text-slate-500">{detail}</p></article>;
+}
+
+function TrafficChart({ data }: { data: DailyMetric[] }) {
+  const max = Math.max(1, ...data.map((d) => d.pageViews));
+  if (!data.length || data.every((d) => d.pageViews === 0)) return <div className="flex min-h-52 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center"><ChartBarIcon className="h-8 w-8 text-slate-400" /><p className="mt-3 text-sm font-medium text-slate-700">No page-view history yet</p><p className="mt-1 text-xs text-slate-500">Recorded traffic will appear here when events arrive.</p></div>;
+  return <><div className="flex h-52 items-end gap-2 pt-4 sm:gap-3" role="img" aria-label="Daily page views chart">{data.map((d, i) => { const prev = i ? data[i - 1].pageViews : d.pageViews; const up = d.pageViews >= prev; const height = Math.max(d.pageViews ? 4 : 1, d.pageViews / max * 100); return <div key={d.date} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2"><span className="text-[10px] text-slate-500 sm:text-xs">{fmt(d.pageViews)}</span><div className="flex h-[75%] w-full items-end justify-center"><div title={`${d.date}: ${d.pageViews} page views`} className={`w-full max-w-8 rounded-t-md ${up ? "bg-emerald-500" : "bg-rose-500"}`} style={{ height: `${height}%`, minHeight: d.pageViews ? 4 : 1 }} /></div><span className="whitespace-nowrap text-[9px] text-slate-400 sm:text-[11px]">{dayLabel(d.date)}</span></div>; })}</div><div className="mt-4 flex flex-wrap gap-4 border-t border-slate-100 pt-4 text-xs text-slate-500"><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Higher than previous day</span><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-sm bg-rose-500" /> Lower than previous day</span></div></>;
+}
+
+function FeatureList({ features }: { features: FeatureMetric[] }) {
+  const max = Math.max(1, ...features.map((f) => f.count));
+  if (!features.length) return <div className="mt-5 rounded-xl border border-dashed border-slate-200 p-8 text-center"><SparklesIcon className="mx-auto h-7 w-7 text-slate-400" /><p className="mt-2 text-sm font-medium text-slate-700">No feature-use data available</p><p className="mt-1 text-xs text-slate-500">Feature activity appears after analytics events are collected.</p></div>;
+  return <div className="mt-5 space-y-4">{features.map((f, i) => <div key={f.feature}><div className="mb-2 flex justify-between gap-3"><span className="truncate text-sm font-medium capitalize text-slate-700">{f.feature.replace(/[-_]/g, " ")}</span><span className="text-sm font-semibold tabular-nums text-slate-900">{fmt(f.count)}</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${i % 2 ? "bg-slate-500" : "bg-emerald-500"}`} style={{ width: `${Math.max(f.count ? 2 : 0, f.count / max * 100)}%` }} /></div></div>)}</div>;
+}
 
 export default function AdminDashboard() {
-  const { loading, isAdmin, authError, user } = useAuth();
-  const [selectedSection, setSelectedSection] = useState<string>("overview");
+  const { loading, isAdmin, authError } = useAuth();
+  const [section, setSection] = useState<Section>("overview");
+  const [password, setPassword] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [daily, setDaily] = useState<DailyMetric[]>([]);
+  const [features, setFeatures] = useState<FeatureMetric[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [refreshRate, setRefreshRate] = useState("60");
+  const [compact, setCompact] = useState(false);
+  const [sound, setSound] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const handleLogin = async (password: string) => {
-    setLoginLoading(true);
-    setLoginError(null);
+  const refresh = useCallback(async (showSpinner = false) => {
+    if (!isAdmin) return;
+    if (showSpinner) setRefreshing(true);
+    setError(null);
     try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ password }),
-      });
+      const db = getFirestoreDb();
+      if (!db) throw new Error("Firebase database is unavailable. Check the app configuration.");
+      const dates = lastDays(14);
+      const snapshots = await Promise.all(dates.map((d) => getDoc(doc(db, "dailyAnalytics", d))));
+      setDaily(snapshots.map((snap, i) => {
+        const d = snap.exists() ? snap.data() : {};
+        return { date: dates[i], pageViews: typeof d.pageViews === "number" ? d.pageViews : 0, uniqueVisitors: typeof d.uniqueVisitors === "number" ? d.uniqueVisitors : null, signups: typeof d.signups === "number" ? d.signups : 0, downloads: typeof d.todayDownloads === "number" ? d.todayDownloads : 0, featureUses: typeof d.featureUses === "number" ? d.featureUses : 0 };
+      }));
+      const featureSnap = await getDocs(query(collection(db, "featureUsage"), orderBy("count", "desc"), limit(12)));
+      setFeatures(featureSnap.docs.map((s) => { const d = s.data(); return { feature: typeof d.feature === "string" ? d.feature : s.id, count: typeof d.count === "number" ? d.count : 0 }; }));
+      setLastUpdated(new Date());
+    } catch (e) {
+      console.error("[Admin dashboard] Analytics load failed", e);
+      setError(e instanceof Error ? e.message : "Analytics could not be loaded.");
+    } finally { setRefreshing(false); }
+  }, [isAdmin]);
 
-      const data = (await res.json()) as {
-        success: boolean;
-        error?: string;
-        customToken?: string;
-      };
+  useEffect(() => { if (isAdmin) void refresh(); }, [isAdmin, refresh]);
+  useEffect(() => {
+    try { setRefreshRate(localStorage.getItem("pb-admin-refresh") || "60"); setCompact(localStorage.getItem("pb-admin-compact") === "true"); setSound(localStorage.getItem("pb-admin-sound") === "true"); } catch { /* Browser storage is optional. */ }
+  }, []);
+  useEffect(() => {
+    if (!isAdmin || refreshRate === "manual") return;
+    const seconds = Number(refreshRate);
+    if (seconds < 15) return;
+    const timer = window.setInterval(() => void refresh(), seconds * 1000);
+    return () => window.clearInterval(timer);
+  }, [isAdmin, refreshRate, refresh]);
 
-      if (!data.success) {
-        throw new Error(data.error || "Login failed");
-      }
-
-      const auth = getFirebaseAuth();
-      if (!auth) throw new Error("Firebase auth not initialized");
-      if (data.customToken) {
-        const cred = await signInWithCustomToken(auth, data.customToken);
-        await cred.user.getIdTokenResult(true);
-      }
-      setLoginError(null);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Login failed";
-      setLoginError(errorMessage);
-      console.error("Admin login error:", err);
-    } finally {
-      setLoginLoading(false);
-    }
-  };
-
-  // Handle admin logout
-  const handleLogout = async () => {
+  async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault(); setLoginLoading(true); setLoginError(null);
     try {
-      const auth = getFirebaseAuth();
-      if (auth) {
-        await signOut(auth);
-      }
-    } catch (err) {
-      console.error("Admin logout error:", err);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-        <div className="p-8 bg-white border border-border rounded-xl shadow-xl text-center">
-          <h1 className="text-3xl font-bold text-foreground">
-            Loading Admin Dashboard
-          </h1>
-        </div>
-      </div>
-    );
+      const response = await fetch("/api/admin/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }) });
+      const data = await response.json().catch(() => ({})) as { success?: boolean; error?: string; customToken?: string };
+      if (!response.ok || !data.success || !data.customToken) throw new Error(data.error || "Sign-in failed. Check your password and server configuration.");
+      const auth = getFirebaseAuth(); if (!auth) throw new Error("Firebase authentication is not initialized.");
+      const credential = await signInWithCustomToken(auth, data.customToken); await credential.user.getIdTokenResult(true); setPassword("");
+    } catch (e) { setLoginError(e instanceof Error ? e.message : "Admin sign-in failed."); }
+    finally { setLoginLoading(false); }
   }
+  async function logout() { const auth = getFirebaseAuth(); if (auth) await signOut(auth); }
 
-  // Show login form if not admin
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="max-w-md mx-auto p-8">
-          <h1 className="text-4xl font-bold text-foreground mb-8">
-            Admin Login
-          </h1>
+  const today = daily[daily.length - 1];
+  const prev = daily[daily.length - 2];
+  const pageViews14 = useMemo(() => daily.reduce((n, d) => n + d.pageViews, 0), [daily]);
+  const signups14 = useMemo(() => daily.reduce((n, d) => n + d.signups, 0), [daily]);
+  const downloads14 = useMemo(() => daily.reduce((n, d) => n + d.downloads, 0), [daily]);
+  const featureUses14 = useMemo(() => daily.reduce((n, d) => n + d.featureUses, 0), [daily]);
+  const selected = navItems.find((n) => n.id === section) ?? navItems[0];
 
-          <div className="bg-white border border-border p-6 shadow-xl max-w-md mx-auto">
-            <h2 className="text-2xl font-bold text-foreground mb-6">Admin Authentication</h2>
+  if (loading) return <div className="flex min-h-screen items-center justify-center bg-slate-950 text-white"><div className="text-center"><div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-slate-500 border-t-white" /><p className="mt-4 text-sm text-slate-400">Checking administrator access…</p></div></div>;
 
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const elements = (e.target as HTMLFormElement).elements;
-              const passwordInput = elements.namedItem("admin-password") as HTMLInputElement;
-              handleLogin(passwordInput.value);
-            }}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Admin Password
-                </label>
-                <input
-                  type="password"
-                  id="admin-password"
-                  name="admin-password"
-                  required
-                  className="w-full px-4 py-2 rounded-xl border border-border focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
-                  placeholder="Enter admin password"
-                />
-              </div>
+  if (!isAdmin) return <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-12 text-slate-100"><div className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-2xl"><div className="mb-7 flex items-center gap-3"><div className="rounded-2xl bg-emerald-500/10 p-3 text-emerald-400"><AcademicCapIcon className="h-7 w-7" /></div><div><p className="text-lg font-semibold">Padhai Buddy</p><p className="text-sm text-slate-400">Admin control center</p></div></div><h1 className="text-2xl font-semibold">Admin sign in</h1><p className="mt-2 text-sm leading-6 text-slate-400">Sign in to access private analytics and settings.</p><form className="mt-6 space-y-4" onSubmit={handleLogin}><label htmlFor="admin-password" className="block text-sm font-medium text-slate-300">Admin password</label><input id="admin-password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" placeholder="Enter admin password" /><button disabled={loginLoading} className="w-full rounded-xl bg-emerald-500 px-4 py-3 font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-60">{loginLoading ? "Signing in…" : "Sign in securely"}</button></form>{(loginError || authError) && <p role="alert" className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-sm text-rose-300">{loginError || authError}</p>}<p className="mt-6 flex items-center gap-2 text-xs text-slate-500"><ShieldCheckIcon className="h-4 w-4" /> Authentication remains required.</p></div></main>;
 
-              <button
-                type="submit"
-                disabled={loginLoading}
-                className="w-full px-4 py-3 rounded-xl text-white bg-primary font-medium hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                {loginLoading ? "Signing in..." : "Sign In as Admin"}
-              </button>
-            </form>
-
-            {loginError && (
-              <div className="mt-4 p-3 rounded-xl bg-red-500/10 text-red-400 text-sm">
-                {loginError}
-              </div>
-            )}
-            {authError && !loginError && (
-              <div className="mt-4 p-3 rounded-xl bg-red-500/10 text-red-400 text-sm">
-                {authError}
-              </div>
-            )}
-          </div>
-
-          <div className="mt-8 text-center text-foreground/50">
-            <p>Padhai Buddy Admin Panel</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // User is authenticated as admin - show dashboard
-  return (
-    <div className="min-h-screen bg-background text-foreground font-poppins">
-      <nav className="border-b border-border bg-background/80 backdrop-blur-sticky sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl font-bold text-primary">Padhai Buddy Admin</h1>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-foreground/60">
-                {new Date().toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })} {new Date().toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" })}
-              </span>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 rounded-xl text-sm text-red-400 hover:text-red-300 transition-all">
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto p-4 md:p-8">
-        <h1 className="text-4xl font-bold text-foreground mb-8">Admin Dashboard</h1>
-
-        <p className="text-foreground/60 mb-6">
-          Professional analytics and user management terminal
-        </p>
-
-        {/* Section Navigation */}
-        <div className="bg-white border border-border p-6 mb-8 shadow-xl">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-            <button
-              onClick={() => setSelectedSection("overview")}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                selectedSection === "overview"
-                  ? "bg-primary text-white shadow-lg shadow-primary/20"
-                  : "text-foreground/60 hover:bg-foreground/5 hover:text-foreground"
-              }`}
-              aria-pressed={selectedSection === "overview"}
-            >
-              <HomeIcon className="w-4 h-4 mr-2" /> Overview
-            </button>
-            <button
-              onClick={() => setSelectedSection("analytics")}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                selectedSection === "analytics"
-                  ? "bg-primary text-white shadow-lg shadow-primary/20"
-                  : "text-foreground/60 hover:bg-foreground/5 hover:text-foreground"
-              }`}
-              aria-pressed={selectedSection === "analytics"}
-            >
-              <ChartBarIcon className="w-4 h-4 mr-2" /> Analytics
-            </button>
-            <button
-              onClick={() => setSelectedSection("users")}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                selectedSection === "users"
-                  ? "bg-primary text-white shadow-lg shadow-primary/20"
-                  : "text-foreground/60 hover:bg-foreground/5 hover:text-foreground"
-              }`}
-              aria-pressed={selectedSection === "users"}
-            >
-              <UserIcon className="w-4 h-4 mr-2" /> Users
-            </button>
-            <button
-              onClick={() => setSelectedSection("downloads")}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                selectedSection === "downloads"
-                  ? "bg-primary text-white shadow-lg shadow-primary/20"
-                  : "text-foreground/60 hover:bg-foreground/5 hover:text-foreground"
-              }`}
-              aria-pressed={selectedSection === "downloads"}
-            >
-              <DocumentTextIcon className="w-4 h-4 mr-2" /> Downloads
-            </button>
-            <button
-              onClick={() => setSelectedSection("update")}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                selectedSection === "update"
-                  ? "bg-primary text-white shadow-lg shadow-primary/20"
-                  : "text-foreground/60 hover:bg-foreground/5 hover:text-foreground"
-              }`}
-              aria-pressed={selectedSection === "update"}
-            >
-              Update
-            </button>
-          </div>
-        </div>
-
-        {/* Selected Section Content */}
-        {selectedSection === "overview" && <OverviewSection />}
-        {selectedSection === "analytics" && <AnalyticsSection />}
-        {selectedSection === "users" && <UsersSection />}
-        {selectedSection === "downloads" && <DownloadsSection />}
-        {selectedSection === "update" && <UpdateSection />}
+  return <div className="min-h-screen bg-slate-100 text-slate-900">
+    {mobileOpen && <button aria-label="Close navigation overlay" onClick={() => setMobileOpen(false)} className="fixed inset-0 z-40 bg-slate-950/50 lg:hidden" />}
+    <aside className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-slate-800 bg-slate-950 text-slate-100 transition-transform lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <div className="flex items-center justify-between border-b border-slate-800 px-5 py-5"><div className="flex items-center gap-3"><div className="rounded-xl bg-emerald-500 p-2 text-slate-950"><AcademicCapIcon className="h-6 w-6" /></div><div><p className="font-semibold">Padhai Buddy</p><p className="text-xs text-slate-400">Admin control center</p></div></div><button aria-label="Close menu" onClick={() => setMobileOpen(false)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 lg:hidden"><XMarkIcon className="h-5 w-5" /></button></div>
+      <div className="px-4 pt-6"><p className="px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Workspace</p><nav className="mt-3 space-y-1">{navItems.map((n) => { const Icon = n.icon; return <button key={n.id} onClick={() => { setSection(n.id); setMobileOpen(false); }} aria-current={section === n.id ? "page" : undefined} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition ${section === n.id ? "bg-emerald-500 text-slate-950" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}><Icon className="h-5 w-5" />{n.label}</button>; })}</nav></div>
+      <div className="mt-auto p-4"><div className="rounded-2xl border border-slate-800 bg-slate-900 p-4"><div className="flex items-center gap-2 text-xs font-medium text-emerald-300"><span className="h-2 w-2 rounded-full bg-emerald-400" /> Private admin area</div><p className="mt-2 text-xs leading-5 text-slate-400">Only collected analytics are shown. Missing data is not fabricated.</p></div><button onClick={() => void logout()} className="mt-3 flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-slate-400 hover:bg-rose-500/10 hover:text-rose-300"><ArrowRightOnRectangleIcon className="h-5 w-5" /> Sign out</button></div>
+    </aside>
+    <div className="min-h-screen lg:pl-72">
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur-xl"><div className="flex min-h-[76px] items-center justify-between gap-4 px-4 sm:px-7"><div className="flex items-center gap-3"><button aria-label="Open navigation" onClick={() => setMobileOpen(true)} className="rounded-xl border border-slate-200 p-2 lg:hidden"><Bars3Icon className="h-5 w-5" /></button><div><p className="text-xs font-medium text-slate-500">Admin / {selected.label}</p><h1 className="mt-1 text-lg font-semibold sm:text-xl">{selected.label}</h1></div></div><div className="flex items-center gap-3"><div className="hidden text-right sm:block"><p className="text-xs text-slate-500">Last updated</p><p className="text-xs font-medium text-slate-700">{lastUpdated ? lastUpdated.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" }) + " IST" : "Not loaded"}</p></div><button onClick={() => void refresh(true)} disabled={refreshing} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium shadow-sm hover:bg-slate-50 disabled:opacity-60"><ArrowPathIcon className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} /><span className="hidden sm:inline">Refresh</span></button></div></div></header>
+      <main className={`mx-auto max-w-[1600px] p-4 sm:p-7 ${compact ? "space-y-4" : "space-y-6"}`}>
+        {error && <div role="alert" className="flex flex-wrap items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"><strong>Analytics unavailable.</strong><span className="flex-1">{error}</span><button onClick={() => void refresh(true)} className="font-semibold underline">Retry</button></div>}
+        {section === "overview" && <>
+          <div><p className="text-sm font-medium text-emerald-700">Your learning platform, at a glance</p><h2 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Welcome back, Admin</h2><p className="mt-2 text-sm text-slate-500">Traffic and product activity · Analytics date buckets use UTC.</p></div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Page views today" value={fmt(today?.pageViews ?? 0)} detail="Every recorded page view, including repeat visits." icon={EyeIcon} tone="green" /><Metric label="Unique visitors" value={today?.uniqueVisitors == null ? "—" : fmt(today.uniqueVisitors)} detail="Deduplicated signed-in visitors only; public visitors are not counted as unique." icon={UsersIcon} /><Metric label="Sign-ups today" value={fmt(today?.signups ?? 0)} detail="Sign-up events recorded by the tracker." icon={AcademicCapIcon} tone="green" /><Metric label="Feature uses today" value={fmt(today?.featureUses ?? 0)} detail="Authenticated feature-use events recorded today." icon={CursorArrowRaysIcon} /></div>
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]"><section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">Traffic overview</h3><p className="mt-1 text-sm text-slate-500">Daily page views · last 14 days</p></div><span className="rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs text-slate-600">UTC dates</span></div><TrafficChart data={daily} /></section><section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><h3 className="font-semibold">Usage summary</h3><p className="mt-1 text-sm text-slate-500">Total across the displayed 14-day window</p><div className="mt-5 space-y-4">{[{ label: "Page views", value: pageViews14, icon: EyeIcon }, { label: "Sign-ups", value: signups14, icon: UsersIcon }, { label: "Downloads", value: downloads14, icon: DownloadIcon }, { label: "Feature uses", value: featureUses14, icon: SparklesIcon }].map((x) => { const Icon = x.icon; return <div key={x.label} className="flex items-center justify-between"><span className="flex items-center gap-3 text-sm text-slate-600"><Icon className="h-4 w-4" />{x.label}</span><strong className="tabular-nums">{fmt(x.value)}</strong></div>; })}</div><div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-3"><div className="flex items-center gap-2 text-sm font-semibold text-amber-900"><ClockIcon className="h-4 w-4" /> Time on site</div><p className="mt-1 text-xs leading-5 text-amber-800">Not measured yet. The current event schema does not collect reliable session duration.</p></div></section></div>
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="flex justify-between gap-3"><div><h3 className="font-semibold">Popular features</h3><p className="mt-1 text-sm text-slate-500">All-time aggregate feature-use counts</p></div><button onClick={() => setSection("features")} className="text-sm font-semibold text-emerald-700">View details →</button></div><FeatureList features={features.slice(0, 5)} /></section>
+        </>}
+        {section === "traffic" && <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-semibold">Website traffic</h2><p className="mt-1 text-sm text-slate-500">Daily recorded page views over the last 14 days.</p></div><span className={`flex items-center gap-2 text-sm font-semibold ${(today?.pageViews ?? 0) >= (prev?.pageViews ?? 0) ? "text-emerald-700" : "text-rose-700"}`}>{(today?.pageViews ?? 0) >= (prev?.pageViews ?? 0) ? <ArrowTrendingUpIcon className="h-5 w-5" /> : <ArrowTrendingDownIcon className="h-5 w-5" />}{fmt((today?.pageViews ?? 0) - (prev?.pageViews ?? 0))} vs previous day</span></div><TrafficChart data={daily} /><div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-sm font-semibold">About red/green bars</p><p className="mt-1 text-sm leading-6 text-slate-600">Green means the page-view count is at least as high as the previous day; red means it is lower. A true stock-style candlestick requires intraday open/high/low/close data, which the current tracker does not collect. This chart does not invent those values.</p></div></section>}
+        {section === "features" && <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"><h2 className="text-xl font-semibold">Feature usage</h2><p className="mt-1 text-sm text-slate-500">Aggregate counts from the existing featureUsage collection.</p><FeatureList features={features} /></section>}
+        {section === "downloads" && <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"><div className="flex items-center gap-3"><DownloadIcon className="h-6 w-6 text-slate-600" /><div><h2 className="text-xl font-semibold">Downloads & installs</h2><p className="mt-1 text-sm text-slate-500">Download events recorded in the last 14 UTC days.</p></div></div><div className="mt-6 grid gap-4 sm:grid-cols-2"><Metric label="Downloads in window" value={fmt(downloads14)} detail="Sum of daily download counters for the displayed period." icon={DownloadIcon} /><Metric label="Today" value={fmt(today?.downloads ?? 0)} detail="Recorded downloads for the latest UTC date bucket." icon={DocumentTextIcon} /></div><p className="mt-4 text-xs leading-5 text-slate-500">Browser PWA installs are not observable in every browser. These numbers reflect only events the app sends to analytics.</p></section>}
+        {section === "settings" && <section className="max-w-3xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"><h2 className="text-xl font-semibold">Dashboard settings</h2><p className="mt-1 text-sm text-slate-500">Preferences apply only to this browser.</p><div className="mt-6 divide-y divide-slate-100"><div className="flex flex-col justify-between gap-3 py-5 sm:flex-row sm:items-center"><div><p className="font-medium">Auto-refresh</p><p className="mt-1 text-sm text-slate-500">Automatically reload analytics data.</p></div><select value={refreshRate} onChange={(e) => { setRefreshRate(e.target.value); try { localStorage.setItem("pb-admin-refresh", e.target.value); } catch { /* ignore */ } }} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"><option value="15">Every 15 seconds</option><option value="30">Every 30 seconds</option><option value="60">Every minute</option><option value="300">Every 5 minutes</option><option value="manual">Manual only</option></select></div><div className="flex items-center justify-between gap-4 py-5"><div><p className="font-medium">Compact layout</p><p className="mt-1 text-sm text-slate-500">Reduce dashboard spacing.</p></div><input type="checkbox" checked={compact} onChange={(e) => { setCompact(e.target.checked); try { localStorage.setItem("pb-admin-compact", String(e.target.checked)); } catch { /* ignore */ } }} className="h-5 w-5 accent-emerald-600" /></div><div className="flex items-center justify-between gap-4 py-5"><div><p className="font-medium">Sound alerts</p><p className="mt-1 text-sm text-slate-500">Preference saved; sound alerts are not activated until an alert event is configured.</p></div><input type="checkbox" checked={sound} onChange={(e) => { setSound(e.target.checked); try { localStorage.setItem("pb-admin-sound", String(e.target.checked)); } catch { /* ignore */ } }} className="h-5 w-5 accent-emerald-600" /></div><div className="flex items-center justify-between gap-4 py-5"><div><p className="font-medium">Time display</p><p className="mt-1 text-sm text-slate-500">Header uses IST; daily analytics buckets use UTC.</p></div><span className="rounded-lg bg-slate-100 px-3 py-2 text-sm">IST / UTC</span></div></div><div className="mt-5 flex items-start gap-3 rounded-xl border border-emerald-100 bg-emerald-50 p-4"><CheckCircleIcon className="h-5 w-5 shrink-0 text-emerald-700" /><p className="text-sm text-emerald-900">These settings do not alter server security or student settings.</p></div></section>}
+        {section === "more" && <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{[{ title: "System health", desc: error ? "Analytics could not be loaded." : "Check the latest refresh and database connection.", status: error ? "Needs attention" : "Refresh status", icon: ShieldCheckIcon }, { title: "Tracking coverage", desc: "Public page views are counted, but unique visitor deduplication applies only to authenticated users.", status: "Partial coverage", icon: EyeIcon }, { title: "Session duration", desc: "The current schema does not reliably aggregate heartbeat or session-end duration.", status: "Not implemented", icon: ClockIcon }, { title: "Feature reports", desc: "Review aggregate feature usage collected by the analytics endpoint.", status: `${features.length} feature groups`, icon: SparklesIcon }, { title: "Privacy & access", desc: "The existing administrator authentication flow is preserved.", status: "Protected UI", icon: ShieldCheckIcon }, { title: "Data freshness", desc: lastUpdated ? `Last successful refresh: ${lastUpdated.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST` : "No successful refresh yet.", status: lastUpdated ? "Loaded" : "Waiting", icon: ClockIcon }].map((x) => { const Icon = x.icon; return <article key={x.title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><span className="rounded-xl bg-slate-100 p-2.5"><Icon className="h-5 w-5" /></span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">{x.status}</span></div><h3 className="mt-4 font-semibold">{x.title}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{x.desc}</p></article>; })}</div>}
+        <footer className="flex flex-col justify-between gap-2 border-t border-slate-200 pt-5 text-xs text-slate-400 sm:flex-row"><span>Padhai Buddy · Admin analytics</span><span>Collected data only · Timezone-aware reporting</span></footer>
       </main>
     </div>
-  );
-}
-
-/* --- Overview Section --- */
-function OverviewSection() {
-  const [stats, setStats] = useState({
-    todayVisitors: 0,
-    totalVisitors: 0,
-    todaySignups: 0,
-    totalSignups: 0,
-    todayDownloads: 0,
-    totalDownloads: 0,
-    todayReturning: 0,
-    totalReturning: 0,
-    totalRegistered: 0,
-  });
-  const [percentageChanges, setPercentageChanges] = useState({
-    visitors: 0, signups: 0, downloads: 0, returning: 0,
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchAnalyticsData = async () => {
-      const db = getFirestoreDb();
-      if (!db) {
-        setLoading(false);
-        return;
-      }
-
-      const today = new Date();
-      const dateStr = today.toISOString().split("T")[0];
-
-      // Read from today's date-keyed document (matching the tracking endpoint)
-      const dailyRef = doc(db, "dailyAnalytics", dateStr);
-      const snap = await getDoc(dailyRef);
-
-      if (snap.exists()) {
-        const data = snap.data();
-        // Map fields: pageViews = total page-view events, uniqueVisitors = estimated unique visitors
-        setStats({
-          todayVisitors: data.uniqueVisitors ?? 0,        // estimated unique visitors (NOT pageViews)
-          totalVisitors: data.totalVisitors ?? 0,         // cumulative total visitors (stored separately)
-          todaySignups: data.signups ?? 0,                // total signups
-          totalSignups: data.totalSignups ?? 0,           // cumulative total signups
-          todayDownloads: data.todayDownloads ?? 0,       // today's downloads
-          totalDownloads: data.totalDownloads ?? 0,        // cumulative total downloads
-          todayReturning: data.todayReturning ?? 0,       // today's returning users
-          totalReturning: data.totalReturning ?? 0,       // cumulative total returning
-          totalRegistered: data.totalRegistered ?? 0,      // total registered users
-        });
-
-        const calculatePct = (current: number, previous: number) => {
-          if (previous === 0 && current === 0) return 0;
-          if (previous === 0) return 100;
-          return ((current - previous) / previous) * 100;
-        };
-
-        // Use stored delta values if available, otherwise calculate from current vs previous day
-        setPercentageChanges({
-          visitors: calculatePct((data.todayVisitors ?? 0), (data._prevTodayVisitors ?? 0)),
-          signups: calculatePct((data.todaySignups ?? 0), (data._prevTodaySignups ?? 0)),
-          downloads: calculatePct((data.todayDownloads ?? 0), (data._prevTodayDownloads ?? 0)),
-          returning: calculatePct((data.todayReturning ?? 0), (data._prevTodayReturning ?? 0)),
-        });
-      } else {
-        setStats({
-          todayVisitors: 0, totalVisitors: 0, todaySignups: 0, totalSignups: 0,
-          todayDownloads: 0, totalDownloads: 0, todayReturning: 0, totalReturning: 0,
-          totalRegistered: 0,
-        });
-        setPercentageChanges({ visitors: 0, signups: 0, downloads: 0, returning: 0 });
-      }
-      setLoading(false);
-    };
-
-    fetchAnalyticsData();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="max-w-7xl mx-auto p-4 md:p-8">
-          <h1 className="text-4xl font-bold text-foreground mb-8">Today&apos;s Analytics</h1>
-          <div className="bg-card border border-border p-8 shadow-xl text-center">
-            <p className="text-foreground/60">Loading analytics data from Firestore...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-      <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
-        <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Today&apos;s Visitors</p>
-        <p className="text-5xl font-bold text-foreground" style={{ color: percentageChanges.visitors >= 0 ? "var(--success)" : "var(--error)" }}>
-          {stats.todayVisitors.toLocaleString()}
-        </p>
-        <p className="text-xs text-foreground/60">±{Math.abs(Math.round(percentageChanges.visitors))}% {percentageChanges.visitors >= 0 ? "▲" : "▼"} vs yesterday</p>
-      </div>
-
-      <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
-        <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Total Visitors</p>
-        <p className="text-5xl font-bold text-foreground">{stats.totalVisitors.toLocaleString()}</p>
-      </div>
-
-      <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
-        <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Today&apos;s Signups</p>
-        <p className="text-5xl font-bold text-foreground" style={{ color: percentageChanges.signups >= 0 ? "var(--success)" : "var(--error)" }}>
-          {stats.todaySignups.toLocaleString()}
-        </p>
-        <p className="text-xs text-foreground/60">±{Math.abs(Math.round(percentageChanges.signups))}% {percentageChanges.signups >= 0 ? "▲" : "▼"} vs yesterday</p>
-      </div>
-
-      <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
-        <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Total Signups</p>
-        <p className="text-5xl font-bold text-foreground">{stats.totalSignups.toLocaleString()}</p>
-      </div>
-
-      <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
-        <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Today&apos;s Downloads</p>
-        <p className="text-5xl font-bold text-foreground" style={{ color: percentageChanges.downloads >= 0 ? "var(--success)" : "var(--error)" }}>
-          {stats.todayDownloads.toLocaleString()}
-        </p>
-        <p className="text-xs text-foreground/60">±{Math.abs(Math.round(percentageChanges.downloads))}% {percentageChanges.downloads >= 0 ? "▲" : "▼"} vs yesterday</p>
-      </div>
-
-      <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
-        <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Today&apos;s Returning</p>
-        <p className="text-5xl font-bold text-foreground" style={{ color: percentageChanges.returning >= 0 ? "var(--success)" : "var(--error)" }}>
-          {stats.todayReturning.toLocaleString()}
-        </p>
-        <p className="text-xs text-foreground/60">±{Math.abs(Math.round(percentageChanges.returning))}% {percentageChanges.returning >= 0 ? "▲" : "▼"} vs yesterday</p>
-      </div>
-
-      <div className="bg-card border border-border rounded-xl p-6 shadow-lg">
-        <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Total Registered</p>
-        <p className="text-5xl font-bold text-foreground">{stats.totalRegistered.toLocaleString()}</p>
-      </div>
-    </div>
-  );
-}
-
-/* --- Analytics Section --- */
-function AnalyticsSection() {
-  const [analytics, setAnalytics] = useState<{
-    dailyUniqueVisitors: { date: string; uniqueVisitors?: number; signups?: number }[];
-    weeklySignups: { date: string; count: number }[];
-    featureUsage: { feature: string; count: number }[];
-    loading: boolean;
-  }>({
-    dailyUniqueVisitors: [],
-    weeklySignups: [],
-    featureUsage: [],
-    loading: true,
-  });
-
-  useEffect(() => {
-    const fetchAnalytics = async () => {
-      try {
-        const db = getFirestoreDb();
-        if (!db) return;
-
-        // Fetch daily unique visitors from dailyAnalytics collection.
-        // NOTE: uniqueVisitors is an estimate derived from page_view events with
-        // authenticated sessions. It is NOT independently measured active users.
-        const analyticsRef = collection(db, "dailyAnalytics");
-        const analyticsSnap = await getDocs(query(analyticsRef, orderBy("date", "desc"), limit(30)));
-        const dailyData = analyticsSnap.docs.map(d => {
-          const data = d.data();
-          return {
-            date: d.id,
-            uniqueVisitors: data.uniqueVisitors ?? 0,   // estimated unique visitors (NOT active users)
-            signups: data.signups ?? 0,
-          };
-        }) as { date: string; uniqueVisitors: number; signups: number }[];
-
-        // Fetch feature usage
-        const featureRef = collection(db, "featureUsage");
-        const featureSnap = await getDocs(query(featureRef, orderBy("count", "desc"), limit(10)));
-        const featureData = featureSnap.docs.map(d => ({ feature: d.id, ...d.data() })) as { feature: string; count: number }[];
-
-        setAnalytics({
-          dailyUniqueVisitors: dailyData,
-          weeklySignups: [],
-          featureUsage: featureData,
-          loading: false,
-        });
-      } catch (error) {
-        console.error("Analytics fetch error:", error);
-        setAnalytics(prev => ({ ...prev, loading: false }));
-      }
-    };
-
-    fetchAnalytics();
-  }, []);
-
-  if (analytics.loading) {
-    return (
-      <div className="max-w-7xl mx-auto p-4 md:p-8">
-        <h1 className="text-4xl font-bold text-foreground mb-8">Admin Analytics</h1>
-        <div className="bg-white border border-border p-8 shadow-xl text-center">
-          <p className="text-foreground/60">Loading analytics data...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-7xl mx-auto p-4 md:p-8">
-      <h1 className="text-4xl font-bold text-foreground mb-8">Admin Analytics</h1>
-
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold mb-4">Daily Estimated Unique Visitors (Last 30 Days)</h2>
-        {analytics.dailyUniqueVisitors.length > 0 ? (
-          <div className="bg-white border rounded-xl p-6 shadow-xl overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-2 px-4 font-medium text-foreground/60">Date</th>
-                  <th className="text-right py-2 px-4 font-medium text-foreground/60">Estimated Unique Visitors</th>
-                  <th className="text-right py-2 px-4 font-medium text-foreground/60">Signups</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analytics.dailyUniqueVisitors.map((day, i) => (
-                  <tr key={day.date} className={`border-b border-border/50 ${i % 2 === 0 ? "bg-foreground/5" : ""}`}>
-                    <td className="py-2 px-4 font-mono">{day.date}</td>
-                    <td className="py-2 px-4 text-right font-medium">{day.uniqueVisitors ?? 0}</td>
-                    <td className="py-2 px-4 text-right">{day.signups ?? 0}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="bg-white border rounded-xl p-8 shadow-xl text-center">
-            <p className="text-foreground/60">No analytics data available yet.</p>
-          </div>
-        )}
-      </div>
-
-      <div>
-        <h2 className="text-2xl font-bold mb-4">Feature Usage</h2>
-        {analytics.featureUsage.length > 0 ? (
-          <div className="bg-white border rounded-xl p-6 shadow-xl">
-            <div className="space-y-3">
-              {analytics.featureUsage.map((feature) => (
-                <div key={feature.feature} className="flex items-center justify-between p-3 bg-foreground/5 rounded-lg">
-                  <span className="font-medium capitalize">{feature.feature.replace(/([A-Z])/g, " $1").trim()}</span>
-                  <span className="font-mono text-lg font-bold text-primary">{feature.count ?? 0}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="bg-white border rounded-xl p-8 shadow-xl text-center">
-            <p className="text-foreground/60">No feature usage data available yet.</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* --- Users Section --- */
-function UsersSection() {
-  interface UserDoc {
-    uid: string;
-    email: string;
-    displayName: string | null;
-    class?: number;
-    board?: string;
-    createdAt: number;
-    lastLogin?: number;
-  }
-
-  const [users, setUsers] = useState<UserDoc[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(0);
-  const pageSize = 20;
-
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const db = getFirestoreDb();
-        if (!db) return;
-
-        const usersRef = collection(db, "users");
-        const usersSnap = await getDocs(query(usersRef, orderBy("createdAt", "desc"), limit(pageSize + 1)));
-        const usersData = usersSnap.docs.map(d => ({ uid: d.id, ...d.data() })) as UserDoc[];
-        setUsers(usersData);
-        setLoading(false);
-      } catch (error) {
-        console.error("Users fetch error:", error);
-        setLoading(false);
-      }
-    };
-
-    fetchUsers();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto p-4 md:p-8">
-        <h1 className="text-4xl font-bold text-foreground mb-8">User Management</h1>
-        <div className="bg-white border border-border p-8 shadow-xl text-center">
-          <p className="text-foreground/60">Loading users...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-7xl mx-auto p-4 md:p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-4xl font-bold text-foreground">User Management</h1>
-        <span className="text-sm text-foreground/60">{users.length} users</span>
-      </div>
-
-      <div className="bg-white border rounded-xl shadow-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-foreground/5">
-                <th className="text-left py-3 px-4 font-medium text-foreground/60">UID</th>
-                <th className="text-left py-3 px-4 font-medium text-foreground/60">Name</th>
-                <th className="text-left py-3 px-4 font-medium text-foreground/60">Email</th>
-                <th className="text-left py-3 px-4 font-medium text-foreground/60">Class/Board</th>
-                <th className="text-left py-3 px-4 font-medium text-foreground/60">Created</th>
-                <th className="text-left py-3 px-4 font-medium text-foreground/60">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.length > 0 ? (
-                users.map((user) => (
-                  <tr key={user.uid} className="border-b border-border/50 hover:bg-foreground/5">
-                    <td className="py-3 px-4 font-mono text-xs text-foreground/70">{user.uid.slice(0, 12)}…</td>
-                    <td className="py-3 px-4 font-medium">{user.displayName || "—"}</td>
-                    <td className="py-3 px-4 text-foreground/70">{user.email}</td>
-                    <td className="py-3 px-4">
-                      {user.class ? `Class ${user.class}` : "—"} {user.board ? `· ${user.board}` : ""}
-                    </td>
-                    <td className="py-3 px-4 text-foreground/50 font-mono text-xs">
-                      {new Date(user.createdAt).toLocaleDateString("en-IN")}
-                    </td>
-                    <td className="py-3 px-4">
-                      <button className="text-primary hover:underline text-sm">View</button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-foreground/50">No users found</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* --- Downloads Section --- */
-function DownloadsSection() {
-  interface DownloadDoc {
-    id: string;
-    platform: string;
-    count: number;
-    date: string;
-    version?: string;
-  }
-
-  const [downloads, setDownloads] = useState<DownloadDoc[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchDownloads = async () => {
-      try {
-        const db = getFirestoreDb();
-        if (!db) return;
-
-        const downloadsRef = collection(db, "downloads");
-        const downloadsSnap = await getDocs(query(downloadsRef, orderBy("date", "desc"), limit(50)));
-        const downloadsData = downloadsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as DownloadDoc[];
-        setDownloads(downloadsData);
-        setLoading(false);
-      } catch (error) {
-        console.error("Downloads fetch error:", error);
-        setLoading(false);
-      }
-    };
-
-    fetchDownloads();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto p-4 md:p-8">
-        <h1 className="text-4xl font-bold text-foreground mb-8">App Download Analytics</h1>
-        <div className="bg-white border border-border p-8 shadow-xl text-center">
-          <p className="text-foreground/60">Loading download data...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const totalDownloads = downloads.reduce((sum, d) => sum + (d.count || 0), 0);
-  const platformStats = downloads.reduce((acc, d) => {
-    acc[d.platform] = (acc[d.platform] || 0) + (d.count || 0);
-    return acc;
-  }, {} as Record<string, number>);
-
-  return (
-    <div className="max-w-7xl mx-auto p-4 md:p-8">
-      <h1 className="text-4xl font-bold text-foreground mb-8">App Download Analytics</h1>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white border rounded-xl p-6 shadow-lg">
-          <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Total Downloads</p>
-          <p className="text-5xl font-bold text-foreground">{totalDownloads.toLocaleString()}</p>
-        </div>
-        <div className="bg-white border rounded-xl p-6 shadow-lg">
-          <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Android (APK)</p>
-          <p className="text-5xl font-bold text-foreground">{platformStats.android?.toLocaleString() || 0}</p>
-        </div>
-        <div className="bg-white border rounded-xl p-6 shadow-lg">
-          <p className="text-sm text-foreground/60 uppercase tracking-wider mb-2">Windows (PWA)</p>
-          <p className="text-5xl font-bold text-foreground">{platformStats.windows?.toLocaleString() || 0}</p>
-        </div>
-      </div>
-
-      <div className="bg-white border rounded-xl shadow-xl overflow-hidden">
-        <div className="p-6 border-b border-border">
-          <h2 className="text-2xl font-bold">Recent Downloads</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-foreground/5">
-                <th className="text-left py-3 px-4 font-medium text-foreground/60">Date</th>
-                <th className="text-left py-3 px-4 font-medium text-foreground/60">Platform</th>
-                <th className="text-right py-3 px-4 font-medium text-foreground/60">Downloads</th>
-                <th className="text-left py-3 px-4 font-medium text-foreground/60">Version</th>
-              </tr>
-            </thead>
-            <tbody>
-              {downloads.length > 0 ? (
-                downloads.map((d) => (
-                  <tr key={d.id} className="border-b border-border/50 hover:bg-foreground/5">
-                    <td className="py-3 px-4 font-mono text-xs">{d.date}</td>
-                    <td className="py-3 px-4 capitalize">{d.platform}</td>
-                    <td className="py-3 px-4 text-right font-medium">{d.count}</td>
-                    <td className="py-3 px-4 text-foreground/50 text-xs">{d.version || "—"}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={4} className="py-8 text-center text-foreground/50">No download data available</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* --- Update Section --- */
-function UpdateSection() {
-  const [releaseConfig, setReleaseConfig] = useState<{
-    latestVersion: string;
-    minSupportedVersion: string;
-    releaseNotes: string;
-    forceUpdate: boolean;
-    downloadUrl: string;
-    createdAt: number;
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    const fetchConfig = async () => {
-      try {
-        const db = getFirestoreDb();
-        if (!db) return;
-
-        const configRef = doc(db, "appConfig", "release");
-        const snap = await getDoc(configRef);
-        if (snap.exists()) {
-          setReleaseConfig(snap.data() as typeof releaseConfig);
-        }
-      } catch (error) {
-        console.error("Release config fetch error:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchConfig();
-  }, []);
-
-  const handleSave = async () => {
-    if (!releaseConfig) return;
-    setSaving(true);
-    try {
-      const db = getFirestoreDb();
-      if (!db) return;
-
-      await setDoc(doc(db, "appConfig", "release"), {
-        ...releaseConfig,
-        createdAt: Date.now(),
-      });
-    } catch (error) {
-      console.error("Release config save error:", error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto p-4 md:p-8">
-        <h1 className="text-4xl font-bold text-foreground mb-8">App Update Management</h1>
-        <div className="bg-white border border-border p-8 shadow-xl text-center">
-          <p className="text-foreground/60">Loading configuration...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-3xl mx-auto p-4 md:p-8">
-      <h1 className="text-4xl font-bold text-foreground mb-8">App Update Management</h1>
-      <p className="text-foreground/60 mb-8">
-        Configure the latest app version for the UpdateAvailable toast notification system.
-        This controls the in-app update prompt shown to users.
-      </p>
-
-      <div className="bg-white border rounded-xl p-6 shadow-xl space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-foreground/60 mb-1">Latest Version</label>
-          <input
-            type="text"
-            value={releaseConfig?.latestVersion || ""}
-            onChange={(e) => setReleaseConfig(prev => ({ ...prev!, latestVersion: e.target.value }))}
-            placeholder="e.g., 1.2.0"
-            className="w-full max-w-xs px-4 py-2 rounded-xl border border-border bg-background focus:ring-2 focus:ring-primary/30"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-foreground/60 mb-1">Minimum Supported Version</label>
-          <input
-            type="text"
-            value={releaseConfig?.minSupportedVersion || ""}
-            onChange={(e) => setReleaseConfig(prev => ({ ...prev!, minSupportedVersion: e.target.value }))}
-            placeholder="e.g., 1.0.0"
-            className="w-full max-w-xs px-4 py-2 rounded-xl border border-border bg-background focus:ring-2 focus:ring-primary/30"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-foreground/60 mb-1">Download URL</label>
-          <input
-            type="url"
-            value={releaseConfig?.downloadUrl || ""}
-            onChange={(e) => setReleaseConfig(prev => ({ ...prev!, downloadUrl: e.target.value }))}
-            placeholder="https://example.com/app-release.apk"
-            className="w-full max-w-md px-4 py-2 rounded-xl border border-border bg-background focus:ring-2 focus:ring-primary/30"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-foreground/60 mb-1">Release Notes</label>
-          <textarea
-            value={releaseConfig?.releaseNotes || ""}
-            onChange={(e) => setReleaseConfig(prev => ({ ...prev!, releaseNotes: e.target.value }))}
-            rows={4}
-            placeholder="What's new in this version..."
-            className="w-full max-w-2xl px-4 py-2 rounded-xl border border-border bg-background focus:ring-2 focus:ring-primary/30 resize-none"
-          />
-        </div>
-
-        <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={releaseConfig?.forceUpdate || false}
-              onChange={(e) => setReleaseConfig(prev => ({ ...prev!, forceUpdate: e.target.checked }))}
-              className="w-4 h-4 rounded border-border text-primary focus:ring-primary/30"
-            />
-            <span className="text-sm font-medium">Force Update (block app usage until updated)</span>
-          </label>
-        </div>
-
-        <div className="flex gap-3 pt-4 border-t border-border">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-6 py-2.5 bg-primary text-white rounded-xl text-sm font-medium disabled:opacity-50 hover:bg-primary/90 transition-colors"
-          >
-            {saving ? "Saving..." : "Save Configuration"}
-          </button>
-          <button
-            onClick={() => setReleaseConfig({
-              latestVersion: "1.0.0",
-              minSupportedVersion: "1.0.0",
-              releaseNotes: "",
-              forceUpdate: false,
-              downloadUrl: "",
-              createdAt: Date.now(),
-            })}
-            className="px-6 py-2.5 rounded-xl text-sm font-medium bg-foreground/5 hover:bg-foreground/10"
-          >
-            Reset to Defaults
-          </button>
-        </div>
-      </div>
-
-      {releaseConfig && (
-        <div className="mt-8 bg-white border rounded-xl p-6 shadow-xl">
-          <h3 className="text-lg font-semibold mb-4">Current Live Configuration</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between"><span className="text-foreground/60">Version:</span> <span className="font-mono font-bold">{releaseConfig.latestVersion}</span></div>
-            <div className="flex justify-between"><span className="text-foreground/60">Min Supported:</span> <span className="font-mono">{releaseConfig.minSupportedVersion}</span></div>
-            <div className="flex justify-between"><span className="text-foreground/60">Force Update:</span> <span>{releaseConfig.forceUpdate ? "Yes" : "No"}</span></div>
-            <div className="flex justify-between"><span className="text-foreground/60">Last Updated:</span> <span>{new Date(releaseConfig.createdAt).toLocaleString("en-IN")}</span></div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  </div>;
 }
