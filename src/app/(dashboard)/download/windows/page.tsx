@@ -1,106 +1,20 @@
 "use client";
-
+import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ComputerDesktopIcon, CheckCircleIcon, GlobeAltIcon } from "@heroicons/react/24/outline";
+import { ComputerDesktopIcon, CheckCircleIcon, ArrowDownTrayIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import BrandLogo from "@/components/BrandLogo";
 import Link from "next/link";
-
+interface BeforeInstallPromptEvent extends Event { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform?: string }>; }
 export default function DownloadWindowsPage() {
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md"
-      >
-        <div className="bg-card border border-border rounded-2xl p-8 shadow-xl text-center">
-          <div className="flex justify-center mb-6">
-            <BrandLogo size={64} />
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="mb-6"
-          >
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-teal-500 flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <ComputerDesktopIcon className="w-10 h-10 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-foreground mb-2">
-              Install on Windows
-            </h1>
-            <p className="text-foreground/60">
-              Add Padhai Buddy to your desktop for app-like experience
-            </p>
-          </motion.div>
-
-          <div className="space-y-4">
-            <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <CheckCircleIcon className="w-5 h-5 text-primary" />
-                </div>
-                <div className="text-left">
-                  <p className="text-sm font-medium text-foreground">
-                    Progressive Web App (PWA)
-                  </p>
-                  <p className="text-xs text-foreground/60">
-                    Works offline, installs from browser
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-foreground/5 border border-border rounded-xl p-4 text-left">
-              <p className="text-sm font-medium text-foreground mb-2">How to install:</p>
-              <ol className="space-y-2 text-xs text-foreground/60">
-                <li className="flex items-center gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">1</span>Open this page in Chrome or Edge on Windows</li>
-                <li className="flex items-center gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">2</span>Click the install icon in the address bar or menu (⋮) → "Install Padhai Buddy"</li>
-                <li className="flex items-center gap-2"><span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px]">3</span>Confirm to add to Start menu and desktop</li>
-              </ol>
-            </div>
-
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => {
-                if ('serviceWorker' in navigator) {
-                  window.dispatchEvent(new CustomEvent('pwa-install-prompt'));
-                }
-              }}
-              className="w-full btn-primary py-3 rounded-xl font-medium flex items-center justify-center gap-2"
-            >
-              <GlobeAltIcon className="w-5 h-5" />
-              Open in Browser to Install
-            </motion.button>
-
-            <p className="text-xs text-foreground/50 text-center">
-              Padhai Buddy is a Progressive Web App. Install it directly from your browser — no separate installer download needed.
-            </p>
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="mt-6 pt-6 border-t border-border"
-          >
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 text-primary font-medium hover:underline"
-            >
-              <motion.span
-                whileHover={{ x: -4 }}
-                className="inline-block"
-              >
-                ←
-              </motion.span>
-              Back to Dashboard
-            </Link>
-          </motion.div>
-        </div>
-      </motion.div>
-    </div>
-  );
+ const [installPrompt,setInstallPrompt]=useState<BeforeInstallPromptEvent|null>(null); const [message,setMessage]=useState<string|null>(null); const [installed,setInstalled]=useState(false);
+ useEffect(()=>{const onBeforeInstall=(event:Event)=>{event.preventDefault();setInstallPrompt(event as BeforeInstallPromptEvent)};const onInstalled=()=>{setInstalled(true);setInstallPrompt(null);setMessage("Padhai Buddy was installed successfully.")};window.addEventListener("beforeinstallprompt",onBeforeInstall);window.addEventListener("appinstalled",onInstalled);if(window.matchMedia("(display-mode: standalone)").matches)setInstalled(true);return()=>{window.removeEventListener("beforeinstallprompt",onBeforeInstall);window.removeEventListener("appinstalled",onInstalled)}},[]);
+ const handleInstall=useCallback(async()=>{if(!installPrompt){setMessage("Your browser did not provide an automatic install prompt. In Chrome or Edge, open the menu (⋮ or …) and choose Install Padhai Buddy or Apps → Install this site as an app.");return}try{await installPrompt.prompt();const choice=await installPrompt.userChoice;setMessage(choice.outcome==="accepted"?"Installation started. Follow the browser prompt to finish.":"Installation was cancelled. You can try again from the browser menu.")}catch{setMessage("The automatic prompt failed. Open Chrome or Edge's menu and select Install Padhai Buddy.")}finally{setInstallPrompt(null)}},[installPrompt]);
+ return <main className="flex min-h-screen items-center justify-center bg-background p-4 text-foreground"><motion.div initial={{opacity:0,y:18}} animate={{opacity:1,y:0}} className="w-full max-w-xl rounded-3xl border border-border bg-card p-6 shadow-xl sm:p-9"><div className="flex justify-center"><BrandLogo size={60}/></div><div className="mt-6 text-center"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary"><ComputerDesktopIcon className="h-8 w-8"/></div><h1 className="mt-4 text-2xl font-bold">Padhai Buddy for Windows</h1><p className="mt-2 text-sm leading-6 text-foreground/65">Install it as a desktop app from Chrome or Microsoft Edge—no separate installer file is published yet.</p></div>
+ <div className="mt-6 rounded-2xl border border-primary/20 bg-primary/5 p-4"><div className="flex items-start gap-3"><CheckCircleIcon className="mt-0.5 h-5 w-5 shrink-0 text-primary"/><div><p className="font-semibold">Windows desktop app (PWA)</p><p className="mt-1 text-sm leading-6 text-foreground/65">Creates an app window and can be pinned to Start or the taskbar. Browser support and offline capabilities depend on the browser and cached content.</p></div></div></div>
+ <ol className="mt-5 space-y-3 rounded-2xl border border-border p-4 text-sm leading-6 text-foreground/75"><li><strong>1.</strong> Open this page in the latest Google Chrome or Microsoft Edge on Windows.</li><li><strong>2.</strong> Select the install icon in the address bar, or open the browser menu and choose <strong>Install Padhai Buddy</strong> / <strong>Apps → Install this site as an app</strong>.</li><li><strong>3.</strong> Confirm installation, then pin it to Start or the taskbar if you want.</li></ol>
+ <button onClick={()=>void handleInstall()} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 font-semibold text-primary-foreground transition hover:opacity-90"><ArrowDownTrayIcon className="h-5 w-5"/>{installed?"Already installed":installPrompt?"Install Padhai Buddy now":"Show install instructions"}</button>
+ {message&&<p role="status" className="mt-3 rounded-xl border border-border bg-foreground/5 p-3 text-sm leading-6 text-foreground/75">{message}</p>}
+ {!installPrompt&&!installed&&<p className="mt-3 flex items-start gap-2 text-xs leading-5 text-foreground/55"><ExclamationTriangleIcon className="mt-0.5 h-4 w-4 shrink-0"/>Install prompts are browser-controlled. If the option is missing, check HTTPS, and confirm the site manifest and service worker loaded.</p>}
+ <div className="mt-6 flex flex-wrap justify-center gap-4 border-t border-border pt-5 text-sm"><Link href="/download" className="font-medium text-primary hover:underline">All download options</Link><Link href="/" className="font-medium text-primary hover:underline">Back to website</Link></div>
+ </motion.div></main>;
 }
