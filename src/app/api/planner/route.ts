@@ -165,7 +165,16 @@ export async function POST(req: NextRequest) {
         const current = planSnap.data() || {};
         const wasCompleted = current.completed === true;
 
-        if (completed === false && wasCompleted) {
+        if (
+          wasCompleted &&
+          (
+            completed === false ||
+            (updates.durationMinutes !== undefined && updates.durationMinutes !== current.durationMinutes) ||
+            (updates.plannedDate !== undefined && updates.plannedDate !== current.plannedDate)
+          )
+        ) {
+          // Once rewarded, the scheduling fields used by reconciliation are
+          // immutable; otherwise an edit could invalidate already-earned points.
           return { kind: "already-completed" as const };
         }
 
