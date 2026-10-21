@@ -1,0 +1,45 @@
+name: Build Windows Desktop Installer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "windows-app/**"
+      - ".github/workflows/windows-release.yml"
+  workflow_dispatch:
+  push_tags_placeholder: never
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: windows-app
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: windows-app/package.json
+
+      - name: Install desktop dependencies
+        run: npm install
+
+      - name: Build Windows installer
+        run: npm run dist
+
+      - name: Upload Windows installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: padhai-buddy-windows-installer
+          path: windows-app/dist/Padhai-Buddy-Setup.exe
+          if-no-files-found: error
+          retention-days: 30
