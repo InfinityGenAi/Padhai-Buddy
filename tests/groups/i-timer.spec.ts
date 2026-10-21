@@ -59,12 +59,15 @@ test.describe("I. Timer Tests", () => {
     expect(text).toMatch(/\d{2}:\d{2}/);
   });
 
-  test("complete button saves a study session", async ({ page }) => {
+  test("timer creates the session at start and saves it after the duration elapses", async ({ page }) => {
+    await page.clock.install({ time: new Date() });
+    await page.click("text=Custom");
+    await page.fill('input[type="number"]', "1");
+    await expect(page.locator(".font-mono.font-bold").first()).toHaveText("01:00");
+
     await page.click("text=Start");
-    await page.click("text=Pause");
-    const completeBtn = page.locator("button:has-text('Complete')").first();
-    await expect(completeBtn).toBeAttached();
-    await completeBtn.click();
-    await expect(page.locator("text=Recent Sessions").first()).toBeAttached();
+    await expect(page.locator("text=Pause").first()).toBeAttached();
+    await page.clock.runFor(65_000);
+    await expect(page.locator("text=Recent Sessions").first()).toBeAttached({ timeout: 10000 });
   });
 });
