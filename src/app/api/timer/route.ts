@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
         durationMinutes: durationMinutesRounded,
         completed: false,
         createdAt,
+        serverCreated: true,
       };
 
       // One active timer per user prevents creating many simultaneous sessions
@@ -112,6 +113,7 @@ export async function POST(req: NextRequest) {
         if (!sessionSnap.exists) return { kind: "not-found" as const };
         const sessionData = sessionSnap.data() || {};
         const activeSnap = await transaction.get(activeSessionRef);
+        if (sessionData.serverCreated !== true) return { kind: "not-authoritative" as const };
         if (sessionData.completed === true) return { kind: "already-completed" as const };
 
         const createdAt = typeof sessionData.createdAt === "number" ? sessionData.createdAt : 0;
@@ -122,11 +124,11 @@ export async function POST(req: NextRequest) {
             : 0;
         const now = Date.now();
         const remainingSeconds = Math.max(0, Math.ceil((createdAt + durationSeconds * 1000 - now) / 1000));
-        if (durationSeconds <= 0 || remainingSeconds > 0) {
+        if (durationSeconds < 60 || remainingSeconds > 0) {
           return { kind: "not-ready" as const, remainingSeconds };
         }
 
-        transaction.update(sessionRef, { completed: true, completedAt: now });
+        transaction.update(sessionRef, { completed: true, completedAt: now, serverVerified: true });
         if (activeSnap.data()?.sessionId === sessionId) {
           transaction.delete(activeSessionRef);
         }
@@ -135,6 +137,12 @@ export async function POST(req: NextRequest) {
 
       if (completionResult.kind === "not-found") {
         return NextResponse.json({ error: "Study session not found" }, { status: 404 });
+      }
+      if (completionResult.kind === "not-authoritative") {
+        return NextResponse.json(
+          { error: "This timer session cannot be verified. Start a new session to earn points." },
+          { status: 409 },
+        );
       }
       if (completionResult.kind === "already-completed") {
         return NextResponse.json({ error: "This timer session has already been completed" }, { status: 409 });
@@ -214,7 +222,7 @@ export async function GET(req: NextRequest) {
     const activeSessionId = activeSnap.data()?.sessionId;
     if (activeSnap.exists && typeof activeSessionId === "string") {
       const activeDoc = await sessionsRef.doc(activeSessionId).get();
-      if (activeDoc.exists && activeDoc.data()?.completed !== true) {
+      if (activeDoc.exists && activeDoc.data()?.serverCreated === true && activeDoc.data()?.completed !== true) {
         activeSession = { id: activeDoc.id, ...activeDoc.data() };
       } else {
         // Repair stale active pointers left behind by old data or interrupted cleanup.
