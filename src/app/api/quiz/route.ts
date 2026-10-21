@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { getGroqClient, GROQ_TEXT_MODEL } from "@/lib/groq";
-import { checkRateLimit } from "@/lib/rate-limiter";
+import { enforceRateLimit } from "@/lib/api-rate-limit";
 import { incrementUserScore } from "@/lib/score-ledger";
 import type { QuizAttempt, QuizQuestion } from "@/types";
 import { inferTopic } from "@/lib/curriculum";
@@ -38,7 +38,18 @@ export async function GET(req: NextRequest) {
     }
 
     const attemptData = snap.data() as QuizAttempt;
-    return NextResponse.json({ attempt: attemptData });
+    const attemptForClient = attemptData.completedAt
+      ? attemptData
+      : {
+          ...attemptData,
+          questions: attemptData.questions.map(({ id, question, options, selectedIndex }) => ({
+            id,
+            question,
+            options,
+            ...(selectedIndex !== undefined ? { selectedIndex } : {}),
+          })),
+        };
+    return NextResponse.json({ attempt: attemptForClient });
   } catch (error: unknown) {
     console.error("[QUIZ GET] error:", error);
     return NextResponse.json({ error: "Failed to fetch quiz attempt" }, { status: 500 });
@@ -118,6 +129,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
+    const requestLimitResponse = body.action === "submit"
+      ? await enforceRateLimit(`quiz-submit:${decoded.uid}`, 15)
+      : await enforceRateLimit(`quiz-generate:${decoded.uid}`, 5);
+    if (requestLimitResponse) return requestLimitResponse;
+
     if (body.action === "submit") {
       const { attemptId, questions, subject } = body;
       const sub = String(subject);
@@ -170,8 +186,7 @@ export async function POST(req: NextRequest) {
           String(clientQ.question ?? "") === serverQ.question &&
           Array.isArray(clientOptions) &&
           clientOptions.length === serverQ.options.length &&
-          serverQ.options.every((opt: string, idx: number) => clientOptions[idx] === opt) &&
-          String(clientQ.explanation ?? "") === serverQ.explanation;
+          serverQ.options.every((opt: string, idx: number) => clientOptions[idx] === opt);
         if (!contentMatches) {
           return NextResponse.json(
             { error: "Submitted answers do not match the quiz. Please try again." },
@@ -215,7 +230,7 @@ export async function POST(req: NextRequest) {
       // === Additive mastery + mistake bank tracking (never breaks quiz) ===
       // Fire-and-forget with isolated error handling per operation so a single
       // transaction timeout in the Firestore emulator never blocks the quiz submission.
-      const trackingPromise = (async () => {
+      const runTracking = async () => {
         try {
           // Map each question to tracking data
           const trackingPromises = serverQuestions.map(async (serverQ, i) => {
@@ -333,16 +348,31 @@ export async function POST(req: NextRequest) {
             trackingError
           );
         }
-      })();
-      // Fire-and-forget: do NOT await trackingPromise
-      // === End additive tracking ===
+      };
 
-      await attemptRef.update({
-        questions: scoredQuestions,
-        correctAnswers,
-        score,
-        completedAt,
+      // Persist completion exactly once, even when two submit requests race.
+      const submitResult = await adminDb.runTransaction(async (transaction) => {
+        const currentSnap = await transaction.get(attemptRef);
+        if (!currentSnap.exists) return "not-found" as const;
+        if (currentSnap.data()?.completedAt) return "already-submitted" as const;
+        transaction.update(attemptRef, {
+          questions: scoredQuestions,
+          correctAnswers,
+          score,
+          completedAt,
+        });
+        return "submitted" as const;
       });
+      if (submitResult === "not-found") {
+        return NextResponse.json({ error: "Quiz attempt not found" }, { status: 404 });
+      }
+      if (submitResult === "already-submitted") {
+        return NextResponse.json({ error: "This quiz has already been submitted" }, { status: 409 });
+      }
+
+      // Tracking and scoring are only triggered for the winning completion transition.
+      void runTracking();
+      // === End additive tracking ===
 
       // Credit the server-owned points ledger for this completed, verified quiz.
       try {
@@ -374,23 +404,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid subject" }, { status: 400 });
     }
 
-    // Rate limiting for quiz generation - per user
-    const rateLimitResult = await checkRateLimit(`quiz:${decoded.uid}`);
-    if (!rateLimitResult.allowed) {
-      return NextResponse.json(
-        { error: "Too many quiz generation requests. Please wait before trying again." },
-        {
-          status: 429,
-          headers: {
-            "Retry-After": String(rateLimitResult.retryAfter || 60),
-            "X-RateLimit-Limit": String(rateLimitResult.remaining + 1),
-            "X-RateLimit-Remaining": String(rateLimitResult.remaining),
-          },
-        },
-      );
-    }
-
-    const numQuestions = Math.min(Math.max(Number(numberOfQuestions) || 5, 1), 20);
+remove duplicate legacy limiter    const numQuestions = Math.min(Math.max(Number(numberOfQuestions) || 5, 1), 20);
     const validClasses = ["5", "6", "7", "8", "9", "10", "11", "12"];
     const validBoards = ["CBSE", "ICSE", "State Board"];
     const validDifficulties = ["easy", "medium", "hard"];
@@ -454,7 +468,12 @@ export async function POST(req: NextRequest) {
         await adminDb.collection("users").doc(decoded.uid).collection("quizAttempts").doc(attempt.id).set(attempt);
       }
 
-      return NextResponse.json({ attempt });
+      return NextResponse.json({
+        attempt: {
+          ...attempt,
+          questions: questions.map(({ id, question, options }) => ({ id, question, options })),
+        },
+      });
     } catch {
       return NextResponse.json(
         { error: "AI service temporarily unavailable. Please try again in a moment." },
