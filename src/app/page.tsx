@@ -37,6 +37,7 @@ import {
   DevicePhoneMobileIcon,
   GlobeAltIcon,
   ArrowDownTrayIcon,
+  ComputerDesktopIcon,
 } from "@heroicons/react/24/outline";
 
 const studyModes = [
@@ -185,6 +186,13 @@ export default function Home() {
           >
             <ArrowDownTrayIcon className="h-4 w-4" />
             <span>Download App</span>
+          </Link>
+          <Link
+            href="https://github.com/InfinityGenAi/Padhai-Buddy/releases/download/windows-latest/Padhai-Buddy-Setup.exe"
+            className="hidden sm:inline-flex items-center justify-center gap-2 rounded-full border border-border bg-card px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-foreground hover:bg-muted transition-colors focus-ring whitespace-nowrap"
+          >
+            <ComputerDesktopIcon className="h-4 w-4" />
+            <span>Windows</span>
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
           <Link href="#features" className="text-foreground/60 hover:text-foreground transition-colors">Features</Link>
