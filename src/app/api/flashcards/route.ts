@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { getGroqClient, GROQ_TEXT_MODEL } from "@/lib/groq";
-import { activityPoints } from "@/lib/score-ledger";
+import { activityPoints, decrementUserScore } from "@/lib/score-ledger";
+import { enforceRateLimit } from "@/lib/api-rate-limit";
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
 
 interface FlashcardItem {
@@ -74,6 +75,14 @@ export async function POST(req: NextRequest) {
       decoded = await adminAuth.verifyIdToken(token);
     } catch {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+    }
+
+    const rateLimitResponse = await enforceRateLimit(`flashcards:${decoded.uid}`, 30);
+    if (rateLimitResponse) return rateLimitResponse;
+
+    const contentLength = Number(req.headers.get("content-length") || "0");
+    if (Number.isFinite(contentLength) && contentLength > 64 * 1024) {
+      return NextResponse.json({ error: "Request body exceeds 64 KB" }, { status: 413 });
     }
 
     let body: { 
@@ -207,8 +216,18 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Deck not found" }, { status: 404 });
       }
 
+      const cardsSnapshot = await deckRef.collection("cards").get();
+      const creditedCount = cardsSnapshot.docs.filter((card) => card.data().scoreCredited === true).length;
+
       await deleteCollection(adminDb, `users/${decoded.uid}/flashcardDecks/${deckId}/cards`);
       await deckRef.delete();
+      if (creditedCount > 0) {
+        try {
+          await decrementUserScore(decoded.uid, "flashcard", creditedCount);
+        } catch {
+          // The admin reconciliation endpoint can repair the ledger if this write fails.
+        }
+      }
       return NextResponse.json({ success: true });
     }
 
@@ -220,17 +239,44 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Deck not found" }, { status: 404 });
       }
 
-      await deckRef.collection("cards").doc(cardId).delete();
-      await deckRef.update({ updatedAt: Date.now() });
+      const cardRef = deckRef.collection("cards").doc(cardId);
+      const deletionResult = await adminDb.runTransaction(async (transaction) => {
+        const deckSnap = await transaction.get(deckRef);
+        if (!deckSnap.exists) return { kind: "deck-not-found" as const };
+        const cardSnap = await transaction.get(cardRef);
+        if (!cardSnap.exists) return { kind: "card-not-found" as const };
+
+        const wasCredited = cardSnap.data()?.scoreCredited === true;
+        transaction.delete(cardRef);
+        transaction.update(deckRef, { updatedAt: Date.now() });
+        return { kind: "deleted" as const, wasCredited };
+      });
+      if (deletionResult.kind === "deck-not-found") {
+        return NextResponse.json({ error: "Deck not found" }, { status: 404 });
+      }
+      if (deletionResult.kind === "card-not-found") {
+        return NextResponse.json({ error: "Card not found" }, { status: 404 });
+      }
+      if (deletionResult.wasCredited) {
+        try {
+          await decrementUserScore(decoded.uid, "flashcard");
+        } catch {
+          // The admin reconciliation endpoint can repair the ledger if this write fails.
+        }
+      }
       return NextResponse.json({ success: true });
     }
 
     // New action: create flashcards from a note using AI
     if (action === "create-from-note") {
+      const aiRateLimitResponse = await enforceRateLimit(`flashcards-ai:${decoded.uid}`, 4);
+      if (aiRateLimitResponse) return aiRateLimitResponse;
       if (!title || !subject || !noteBody) return NextResponse.json({ error: "Title, subject, and noteBody are required" }, { status: 400 });
       if (typeof title !== "string" || title.trim().length > 100) return NextResponse.json({ error: "Title must be a string of at most 100 characters" }, { status: 400 });
       if (typeof subject !== "string" || subject.trim().length > 100) return NextResponse.json({ error: "Subject must be a string of at most 100 characters" }, { status: 400 });
-      if (typeof noteBody !== "string" || noteBody.trim().length < 50) return NextResponse.json({ error: "Note body must be at least 50 characters" }, { status: 400 });
+      if (typeof noteBody !== "string" || noteBody.trim().length < 50 || noteBody.length > 16000) {
+        return NextResponse.json({ error: "Note body must be between 50 and 16000 characters" }, { status: 400 });
+      }
 
       // Create the deck
       const deckRef = adminDb.collection("users").doc(decoded.uid).collection("flashcardDecks").doc();
@@ -282,8 +328,8 @@ export async function POST(req: NextRequest) {
         const cardRef = deckRef.collection("cards").doc();
         batch.set(cardRef, {
           deckId: deckRef.id,
-          front: card.front.trim(),
-          back: card.back.trim(),
+          front: card.front.trim().slice(0, 500),
+          back: card.back.trim().slice(0, 1000),
           status: "new",
           createdAt: Date.now(),
           updatedAt: Date.now(),

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
-import { checkRateLimit } from "@/lib/rate-limiter";
+import { enforceRateLimit } from "@/lib/api-rate-limit";
 import {
   LeaderboardEntry,
   scoreEntryFromUser,
@@ -48,16 +48,8 @@ export async function GET(req: NextRequest) {
   }
 
   // Rate limit per user so a single client cannot hammer the leaderboard.
-  const rateLimitResult = await checkRateLimit(`leaderboard:${decoded.uid}`);
-  if (!rateLimitResult.allowed) {
-    return NextResponse.json(
-      { error: "Too many requests. Please wait before trying again.", retryAfter: rateLimitResult.retryAfter },
-      {
-        status: 429,
-        headers: { "Retry-After": String(rateLimitResult.retryAfter || 60) },
-      },
-    );
-  }
+  const rateLimitResponse = await enforceRateLimit(`leaderboard:${decoded.uid}`, 30);
+  if (rateLimitResponse) return rateLimitResponse;
 
   // Stable top-10 query: bounded reads, indexed by score. Never scans all users.
   const scoresSnap = await db
@@ -133,12 +125,15 @@ async function isAdmin(decoded: { admin?: unknown }): Promise<boolean> {
  * activity records. Client-writable activity documents are validated here
  * before being credited, so forged or incomplete activity never inflates scores.
  *
- *   - Doubts: every doc in users/{uid}/doubts counts (10 pts each).
- *   - Quizzes: only completed attempts (completedAt set) count (20 pts each).
- *   - Study sessions: only completed sessions count (5 pts each).
- *   - Flashcards: only cards with status "reviewed" count (5 pts each).
- *   - Notes: every doc counts (5 pts each).
- *   - Study plans: only completed plans count (15 pts each).
+ *   - Doubts: only server-created records count (10 pts each).
+ *   - Quizzes: only server-authorized and server-scored attempts count (20 pts each).
+ *   - Study sessions: only server-created sessions verified after their full duration
+ *     count (5 pts each).
+ *   - Flashcards: only cards with the server-owned scoreCredited marker count
+ *     (5 pts each; status "known" is the canonical review state).
+ *   - Notes: only server-created notes count (5 pts each).
+ *   - Study plans: only server-created plans completed by the server after eligible
+ *     duration/date checks count (15 pts each).
  */
 export async function POST(req: NextRequest) {
   if (!adminAuth || !adminDb || initializationError) {
@@ -187,16 +182,48 @@ export async function POST(req: NextRequest) {
     const data = userDoc.data();
 
     const doubtsSnap = await db.collection("users").doc(uid).collection("doubts").get();
-    const quizSnap = await db.collection("users").doc(uid).collection("quizAttempts").get();
+    const quizSnap = await db.collection("users").doc(uid).collection("quizAttemptAuthority").get();
     const notesSnap = await db.collection("users").doc(uid).collection("notes").get();
     const sessionsSnap = await db.collection("users").doc(uid).collection("studySessions").get();
     const plansSnap = await db.collection("users").doc(uid).collection("studyPlans").get();
 
-    const completedQuizzes = quizSnap.docs.filter((d) => !!d.data().completedAt).length;
-    const completedSessions = sessionsSnap.docs.filter((d) => d.data().completed === true).length;
-    const completedPlans = plansSnap.docs.filter((d) => d.data().completed === true).length;
+    const completedQuizzes = quizSnap.docs.filter((d) => {
+      const attempt = d.data();
+      return attempt.serverCreated === true && attempt.serverScored === true && !!attempt.completedAt;
+    }).length;
+    const completedSessions = sessionsSnap.docs.filter((d) => {
+      const session = d.data();
+      const durationSeconds = typeof session.durationSeconds === "number"
+        ? session.durationSeconds
+        : typeof session.durationMinutes === "number"
+          ? session.durationMinutes * 60
+          : 0;
+      return session.serverCreated === true
+        && session.serverVerified === true
+        && session.completed === true
+        && typeof session.completedAt === "number"
+        && typeof session.createdAt === "number"
+        && durationSeconds > 0
+        && session.completedAt >= session.createdAt + durationSeconds * 1000;
+    }).length;
+    const completedPlans = plansSnap.docs.filter((d) => {
+      const plan = d.data();
+      if (
+        plan.serverCreated !== true
+        || plan.serverCompleted !== true
+        || plan.completed !== true
+        || typeof plan.completedAt !== "number"
+        || typeof plan.createdAt !== "number"
+        || typeof plan.durationMinutes !== "number"
+        || plan.durationMinutes < 1
+        || typeof plan.plannedDate !== "string"
+      ) return false;
+      const completedDate = new Date(plan.completedAt).toISOString().slice(0, 10);
+      return plan.completedAt >= plan.createdAt + plan.durationMinutes * 60_000
+        && plan.plannedDate <= completedDate;
+    }).length;
 
-    // Count reviewed flashcards across this user's decks.
+    // Count only cards credited by the server after a valid transition to "known".
     let reviewedFlashcards = 0;
     try {
       const decksSnap = await db
@@ -207,21 +234,21 @@ export async function POST(req: NextRequest) {
       for (const deckDoc of decksSnap.docs) {
         const cardsSnap = await deckDoc.ref
           .collection("cards")
-          .where("status", "==", "reviewed")
+          .where("scoreCredited", "==", true)
           .get();
         reviewedFlashcards += cardsSnap.size;
       }
     } catch {
-      // If flashcard data is unreadable, treat as zero reviewed cards rather than
+      // If flashcard data is unreadable, treat as zero credited cards rather than
       // silently failing the whole recalculation.
       reviewedFlashcards = 0;
     }
 
     const entry = scoreEntryFromUser(uid, data, {
-      doubts: doubtsSnap.size,
+      doubts: doubtsSnap.docs.filter((d) => d.data().serverCreated === true).length,
       quizzes: completedQuizzes,
       flashcards: reviewedFlashcards,
-      notes: notesSnap.size,
+      notes: notesSnap.docs.filter((d) => d.data().serverCreated === true).length,
       sessions: completedSessions,
       plans: completedPlans,
     });

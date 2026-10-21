@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { getGroqClient, GROQ_TEXT_MODEL } from "@/lib/groq";
-import { checkRateLimit } from "@/lib/rate-limiter";
+import { enforceRateLimit } from "@/lib/api-rate-limit";
 import { incrementUserScore } from "@/lib/score-ledger";
 import type { QuizAttempt, QuizQuestion } from "@/types";
 import { inferTopic } from "@/lib/curriculum";
@@ -30,15 +30,38 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "attemptId is required" }, { status: 400 });
     }
 
-    const attemptRef = adminDb.collection("users").doc(decoded.uid).collection("quizAttempts").doc(attemptId);
-    const snap = await attemptRef.get();
+    const userRef = adminDb.collection("users").doc(decoded.uid);
+    const attemptRef = userRef.collection("quizAttempts").doc(attemptId);
+    const authorityRef = userRef.collection("quizAttemptAuthority").doc(attemptId);
+    const [snap, authoritySnap] = await Promise.all([attemptRef.get(), authorityRef.get()]);
 
     if (!snap.exists) {
       return NextResponse.json({ error: "Quiz attempt not found" }, { status: 404 });
     }
+    if (!authoritySnap.exists) {
+      return NextResponse.json(
+        { error: "This quiz attempt cannot be verified. Please start a new quiz." },
+        { status: 409 },
+      );
+    }
 
-    const attemptData = snap.data() as QuizAttempt;
-    return NextResponse.json({ attempt: attemptData });
+    // Never trust the user-visible attempt document as the question/answer source.
+    const attemptData = authoritySnap.data() as QuizAttempt;
+    if (attemptData.serverCreated !== true) {
+      return NextResponse.json({ error: "This quiz attempt cannot be verified. Please start a new quiz." }, { status: 409 });
+    }
+    const attemptForClient = attemptData.completedAt
+      ? attemptData
+      : {
+          ...attemptData,
+          questions: attemptData.questions.map(({ id, question, options, selectedIndex }) => ({
+            id,
+            question,
+            options,
+            ...(selectedIndex !== undefined ? { selectedIndex } : {}),
+          })),
+        };
+    return NextResponse.json({ attempt: attemptForClient });
   } catch (error: unknown) {
     console.error("[QUIZ GET] error:", error);
     return NextResponse.json({ error: "Failed to fetch quiz attempt" }, { status: 500 });
@@ -79,7 +102,7 @@ function validateQuestions(questions: unknown[]): QuizQuestion[] | null {
 
 export async function POST(req: NextRequest) {
   try {
-    if (!adminAuth || initializationError) {
+    if (!adminAuth || !adminDb || initializationError) {
       return NextResponse.json({ error: initializationError || "Server configuration error" }, { status: 500 });
     }
 
@@ -101,6 +124,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
 
+    const contentLength = Number(req.headers.get("content-length") || "0");
+    if (Number.isFinite(contentLength) && contentLength > 128 * 1024) {
+      return NextResponse.json({ error: "Request body exceeds 128 KB" }, { status: 413 });
+    }
+
     let body: {
       action?: string;
       attemptId?: string;
@@ -118,25 +146,48 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
+    const requestLimitResponse = body.action === "submit"
+      ? await enforceRateLimit(`quiz-submit:${decoded.uid}`, 15)
+      : await enforceRateLimit(`quiz-generate:${decoded.uid}`, 5);
+    if (requestLimitResponse) return requestLimitResponse;
+
     if (body.action === "submit") {
-      const { attemptId, questions, subject } = body;
-      const sub = String(subject);
-      if (!sub || !attemptId || typeof attemptId !== "string" || !Array.isArray(questions)) {
-        return NextResponse.json({ error: "attemptId and questions are required" }, { status: 400 });
+      const { attemptId, questions } = body;
+      if (
+        !attemptId ||
+        typeof attemptId !== "string" ||
+        attemptId.length > 100 ||
+        !Array.isArray(questions)
+      ) {
+        return NextResponse.json({ error: "A valid attemptId and question answers are required" }, { status: 400 });
       }
 
-      if (!adminDb) {
+      const db = adminDb;
+      if (!db) {
         return NextResponse.json({ error: "Server not initialized" }, { status: 500 });
       }
 
-      const attemptRef = adminDb.collection("users").doc(decoded.uid).collection("quizAttempts").doc(attemptId);
-      const snap = await attemptRef.get();
+      const userRef = db.collection("users").doc(decoded.uid);
+      const attemptRef = userRef.collection("quizAttempts").doc(attemptId);
+      const authorityRef = userRef.collection("quizAttemptAuthority").doc(attemptId);
+      const [snap, authoritySnap] = await Promise.all([attemptRef.get(), authorityRef.get()]);
       if (!snap.exists) {
         return NextResponse.json({ error: "Quiz attempt not found" }, { status: 404 });
       }
+      if (!authoritySnap.exists) {
+        return NextResponse.json(
+          { error: "This quiz attempt predates the security update. Please start a new quiz." },
+          { status: 409 },
+        );
+      }
 
-      const attemptData = snap.data() as QuizAttempt;
-      if (attemptData.completedAt) {
+      const attemptData = authoritySnap.data() as QuizAttempt;
+      if (attemptData.serverCreated !== true) {
+        return NextResponse.json({ error: "This quiz attempt cannot be verified. Please start a new quiz." }, { status: 409 });
+      }
+      const sub = typeof attemptData.subject === "string" ? attemptData.subject : "";
+      if (!sub) return NextResponse.json({ error: "Quiz attempt is invalid" }, { status: 400 });
+      if (attemptData.serverScored === true || attemptData.completedAt) {
         return NextResponse.json({ error: "This quiz has already been submitted" }, { status: 409 });
       }
 
@@ -170,8 +221,7 @@ export async function POST(req: NextRequest) {
           String(clientQ.question ?? "") === serverQ.question &&
           Array.isArray(clientOptions) &&
           clientOptions.length === serverQ.options.length &&
-          serverQ.options.every((opt: string, idx: number) => clientOptions[idx] === opt) &&
-          String(clientQ.explanation ?? "") === serverQ.explanation;
+          serverQ.options.every((opt: string, idx: number) => clientOptions[idx] === opt);
         if (!contentMatches) {
           return NextResponse.json(
             { error: "Submitted answers do not match the quiz. Please try again." },
@@ -215,7 +265,7 @@ export async function POST(req: NextRequest) {
       // === Additive mastery + mistake bank tracking (never breaks quiz) ===
       // Fire-and-forget with isolated error handling per operation so a single
       // transaction timeout in the Firestore emulator never blocks the quiz submission.
-      const trackingPromise = (async () => {
+      const runTracking = async () => {
         try {
           // Map each question to tracking data
           const trackingPromises = serverQuestions.map(async (serverQ, i) => {
@@ -245,14 +295,14 @@ export async function POST(req: NextRequest) {
 
           // Upsert topicMastery for each question using batched writes (no transactions)
           // to avoid emulator transaction timeout issues.
-          const batch = adminDb.batch();
+          const batch = db.batch();
           for (const r of results) {
             // Deterministic doc ID: normalized subject + topic
             const docId =
               `${r.topic.replace(/\s+/g, "_").toLowerCase()}_${sub
                 .replace(/\s+/g, "_")
                 .toLowerCase()}`;
-            const masteryRef = adminDb
+            const masteryRef = db
               .collection("users")
               .doc(decoded.uid)
               .collection("topicMastery")
@@ -260,7 +310,7 @@ export async function POST(req: NextRequest) {
 
             // Use a transaction but catch and ignore errors per-operation
             try {
-              await adminDb.runTransaction(async (transaction) => {
+              await db.runTransaction(async (transaction) => {
                 const existingSnap = await transaction.get(masteryRef);
                 const existingData = existingSnap.data();
                 const newTotal = (existingData?.totalQuestions || 0) + 1;
@@ -305,7 +355,7 @@ export async function POST(req: NextRequest) {
             if (r.isCorrect === false) {
               const mistakeDocId = `${attemptId}_${mi}_${r.topic.replace(/\s+/g, "_").toLowerCase()}_${r.serverQ.id}`;
               try {
-                await adminDb.collection("users")
+                await db.collection("users")
                   .doc(decoded.uid)
                   .collection("mistakeBank")
                   .doc(mistakeDocId)
@@ -333,16 +383,57 @@ export async function POST(req: NextRequest) {
             trackingError
           );
         }
-      })();
-      // Fire-and-forget: do NOT await trackingPromise
-      // === End additive tracking ===
+      };
 
-      await attemptRef.update({
-        questions: scoredQuestions,
-        correctAnswers,
-        score,
-        completedAt,
+      // Persist completion exactly once, even when two submit requests race.
+      const submitResult = await db.runTransaction(async (transaction) => {
+        const [currentSnap, currentAuthoritySnap] = await Promise.all([
+          transaction.get(attemptRef),
+          transaction.get(authorityRef),
+        ]);
+        if (!currentSnap.exists || !currentAuthoritySnap.exists) return "not-found" as const;
+        const currentAuthority = currentAuthoritySnap.data() || {};
+        if (currentAuthority.serverCreated !== true) return "not-authoritative" as const;
+        if (currentAuthority.serverScored === true || currentAuthority.completedAt) return "already-submitted" as const;
+
+        const trustedAttempt = {
+          id: attemptId,
+          subject: attemptData.subject,
+          class: attemptData.class,
+          board: attemptData.board,
+          difficulty: attemptData.difficulty,
+          totalQuestions,
+          questions: scoredQuestions,
+          correctAnswers,
+          score,
+          createdAt: attemptData.createdAt,
+          completedAt,
+          serverCreated: true,
+          serverScored: true,
+        };
+        transaction.set(attemptRef, trustedAttempt);
+        transaction.update(authorityRef, {
+          questions: scoredQuestions,
+          correctAnswers,
+          score,
+          completedAt,
+          serverScored: true,
+        });
+        return "submitted" as const;
       });
+      if (submitResult === "not-found") {
+        return NextResponse.json({ error: "Quiz attempt not found" }, { status: 404 });
+      }
+      if (submitResult === "not-authoritative") {
+        return NextResponse.json({ error: "This quiz attempt cannot be verified. Please start a new quiz." }, { status: 409 });
+      }
+      if (submitResult === "already-submitted") {
+        return NextResponse.json({ error: "This quiz has already been submitted" }, { status: 409 });
+      }
+
+      // Tracking and scoring are only triggered for the winning completion transition.
+      void runTracking();
+      // === End additive tracking ===
 
       // Credit the server-owned points ledger for this completed, verified quiz.
       try {
@@ -373,21 +464,8 @@ export async function POST(req: NextRequest) {
     if (!sub || sub === "undefined" || sub.length > 100) {
       return NextResponse.json({ error: "Invalid subject" }, { status: 400 });
     }
-
-    // Rate limiting for quiz generation - per user
-    const rateLimitResult = await checkRateLimit(`quiz:${decoded.uid}`);
-    if (!rateLimitResult.allowed) {
-      return NextResponse.json(
-        { error: "Too many quiz generation requests. Please wait before trying again." },
-        {
-          status: 429,
-          headers: {
-            "Retry-After": String(rateLimitResult.retryAfter || 60),
-            "X-RateLimit-Limit": String(rateLimitResult.remaining + 1),
-            "X-RateLimit-Remaining": String(rateLimitResult.remaining),
-          },
-        },
-      );
+    if (noteBody !== undefined && (typeof noteBody !== "string" || noteBody.length > 16000)) {
+      return NextResponse.json({ error: "noteBody must be a string of at most 16000 characters" }, { status: 400 });
     }
 
     const numQuestions = Math.min(Math.max(Number(numberOfQuestions) || 5, 1), 20);
@@ -448,13 +526,29 @@ export async function POST(req: NextRequest) {
         score: 0,
         questions,
         createdAt: Date.now(),
+        serverCreated: true,
+        serverScored: false,
       };
 
-      if (adminDb) {
-        await adminDb.collection("users").doc(decoded.uid).collection("quizAttempts").doc(attempt.id).set(attempt);
+      const db = adminDb;
+      if (!db) {
+        return NextResponse.json({ error: "Server not initialized" }, { status: 500 });
       }
+      const userRef = db.collection("users").doc(decoded.uid);
+      const attemptRef = userRef.collection("quizAttempts").doc(attempt.id);
+      const authorityRef = userRef.collection("quizAttemptAuthority").doc(attempt.id);
+      // Create the user-visible record and the server-only canonical record together.
+      await db.runTransaction(async (transaction) => {
+        transaction.create(attemptRef, attempt);
+        transaction.create(authorityRef, attempt);
+      });
 
-      return NextResponse.json({ attempt });
+      return NextResponse.json({
+        attempt: {
+          ...attempt,
+          questions: questions.map(({ id, question, options }) => ({ id, question, options })),
+        },
+      });
     } catch {
       return NextResponse.json(
         { error: "AI service temporarily unavailable. Please try again in a moment." },

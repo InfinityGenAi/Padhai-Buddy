@@ -12,6 +12,8 @@ export interface RateLimitResult {
   remaining: number;
   resetAt: number;
   retryAfter?: number;
+  /** True when the limiter backend could not make a trustworthy decision. */
+  unavailable?: boolean;
 }
 
 export interface RateLimitStore {
@@ -198,8 +200,14 @@ class RedisRateLimitStore implements RateLimitStore {
 }
 
 function createStore(): RateLimitStore {
-  const useRedis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (useRedis) {
+  const hasRedisConfig = Boolean(
+    process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN,
+  );
+
+  // In-memory limits are useful for local development only. In production,
+  // always select Redis; missing credentials or Redis outages then fail closed
+  // instead of silently allowing each serverless instance its own quota.
+  if (process.env.NODE_ENV === "production" || hasRedisConfig) {
     return new RedisRateLimitStore();
   }
   return new InMemoryRateLimitStore();
@@ -246,17 +254,29 @@ export async function checkRateLimit(identifier: string, maxRequests?: number): 
       remaining: 0,
       resetAt: now + RATE_LIMIT_WINDOW_MS,
       retryAfter: 60,
+      unavailable: true,
     };
   }
 }
 
 // Synchronous wrapper for backward compatibility (not recommended for production)
 export function checkRateLimitSync(_identifier: string): RateLimitResult {
-  // This is a best-effort sync version for non-critical paths
-  // In production with Redis, always use the async version
   const now = Date.now();
-  // Note: This won't work with async Redis store
-  // Only use for in-memory store or non-critical paths
+
+  // A synchronous helper cannot consult Redis. In production it must not
+  // bypass the shared limiter; deny the request until the caller uses the
+  // asynchronous implementation.
+  if (process.env.NODE_ENV === "production") {
+    return {
+      allowed: false,
+      remaining: 0,
+      resetAt: now + RATE_LIMIT_WINDOW_MS,
+      retryAfter: 60,
+      unavailable: true,
+    };
+  }
+
+  // Local development only: this legacy wrapper is intentionally best-effort.
   return {
     allowed: true,
     remaining: RATE_LIMIT_MAX_REQUESTS,

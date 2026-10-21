@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
+import { enforceRateLimit } from "@/lib/api-rate-limit";
 
 export async function GET(req: NextRequest) {
   try {
@@ -63,6 +64,9 @@ export async function POST(req: NextRequest) {
     } catch {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
+
+    const rateLimitResponse = await enforceRateLimit(`resources:${decoded.uid}`, 30);
+    if (rateLimitResponse) return rateLimitResponse;
 
     let body: { action?: string; resourceId?: string; title?: string; subject?: string; type?: string; description?: string; url?: string };
     try {

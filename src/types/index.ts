@@ -110,6 +110,9 @@ export interface QuizAttempt {
   questions: QuizQuestion[];
   createdAt: number;
   completedAt?: number;
+  /** Written only by the server; missing markers indicate legacy/untrusted data. */
+  serverCreated?: boolean;
+  serverScored?: boolean;
 }
 
 export interface QuizQuestion {

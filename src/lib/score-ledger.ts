@@ -14,7 +14,7 @@ import { FieldValue } from "firebase-admin/firestore";
  *   Doubt solved:      10 pts
  *   Quiz taken:        20 pts (only completed attempts)
  *   Study session:     5 pts (only completed sessions)
- *   Flashcard reviewed:5 pts (only cards with status "reviewed")
+ *   Flashcard reviewed:5 pts (only cards with server-owned scoreCredited marker after status "known")
  *   Note created:      5 pts
  *   Plan completed:    15 pts (only completed plans)
  */
@@ -77,24 +77,20 @@ export async function incrementUserScore(
 }
 
 /**
- * Decrement a user's ledger for a single activity (used when an activity is
- * removed, e.g. note deleted). Mirrors incrementUserScore with negative
- * increments so the ledger stays consistent.
+ * Reverse one or more previously credited activities when they are deleted.
+ * Counts are clamped at zero so duplicate deletion/retry requests cannot make
+ * leaderboard totals or scores negative.
  */
 export async function decrementUserScore(
   uid: string,
   activity: ScoreActivity,
+  count = 1,
 ): Promise<void> {
-  if (!adminDb || initializationError) {
+  if (!adminDb || initializationError || !Number.isInteger(count) || count <= 0) {
     return;
   }
 
   const ref = adminDb.collection("userScores").doc(uid);
-  const updates: Record<string, unknown> = {
-    uid,
-    updatedAt: Date.now(),
-  };
-
   const field = {
     doubt: "totalDoubts",
     quiz: "totalQuizzes",
@@ -104,11 +100,29 @@ export async function decrementUserScore(
     plan: "completedPlans",
   }[activity];
 
-  updates[field] = FieldValue.increment(-1);
-  updates.score = FieldValue.increment(-POINTS[activity]);
-  updates.totalActivity = FieldValue.increment(-1);
+  await adminDb.runTransaction(async (transaction) => {
+    const snap = await transaction.get(ref);
+    if (!snap.exists) return;
 
-  await ref.set(updates, { merge: true });
+    const data = snap.data() || {};
+    const currentCount = typeof data[field] === "number" ? Math.max(0, data[field] as number) : 0;
+    const decrementBy = Math.min(count, currentCount);
+    if (decrementBy <= 0) return;
+
+    const currentScore = typeof data.score === "number" ? Math.max(0, data.score) : 0;
+    const currentActivity = typeof data.totalActivity === "number" ? Math.max(0, data.totalActivity) : 0;
+    transaction.set(
+      ref,
+      {
+        uid,
+        updatedAt: Date.now(),
+        [field]: currentCount - decrementBy,
+        score: Math.max(0, currentScore - POINTS[activity] * decrementBy),
+        totalActivity: Math.max(0, currentActivity - decrementBy),
+      },
+      { merge: true },
+    );
+  });
 }
 
 export interface LeaderboardEntry {

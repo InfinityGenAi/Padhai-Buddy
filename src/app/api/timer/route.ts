@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { incrementUserScore } from "@/lib/score-ledger";
+import { enforceRateLimit } from "@/lib/api-rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,6 +20,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
 
+    const rateLimitResponse = await enforceRateLimit(`timer:${decoded.uid}`, 30);
+    if (rateLimitResponse) return rateLimitResponse;
+
     let body: { action?: string; sessionId?: string; mode?: string; durationMinutes?: number; durationSeconds?: number; completed?: boolean };
     try {
       body = await req.json();
@@ -30,6 +34,9 @@ export async function POST(req: NextRequest) {
     const VALID_MODES = ["pomodoro", "stopwatch", "custom"];
 
     if (action === "create") {
+      if (completed === true) {
+        return NextResponse.json({ error: "A timer session must be completed through the update action" }, { status: 400 });
+      }
       if (!mode || !VALID_MODES.includes(String(mode))) {
         return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
       }
@@ -42,51 +49,141 @@ export async function POST(req: NextRequest) {
       } else {
         return NextResponse.json({ error: "durationSeconds (preferred) or durationMinutes must be a positive integer" }, { status: 400 });
       }
+      if (totalSeconds < 60) {
+        return NextResponse.json({ error: "Study sessions must be at least 60 seconds long" }, { status: 400 });
+      }
       if (totalSeconds > 600 * 60) {
         return NextResponse.json({ error: "Duration exceeds maximum allowed (600 minutes)" }, { status: 400 });
       }
 
       const durationMinutesRounded = Math.max(1, Math.round(totalSeconds / 60));
-      const sessionRef = adminDb.collection("users").doc(decoded.uid).collection("studySessions").doc();
-      const session = { mode: String(mode), durationSeconds: totalSeconds, durationMinutes: durationMinutesRounded, completed: completed === true, createdAt: Date.now() };
-      await sessionRef.set(session);
-      // Credit the server-owned ledger for a completed study session.
-      if (session.completed) {
-        try {
-          await incrementUserScore(decoded.uid, "session");
-        } catch {
-          // Never block session creation on ledger updates.
+      const userRef = adminDb.collection("users").doc(decoded.uid);
+      const sessionsRef = userRef.collection("studySessions");
+      const sessionRef = sessionsRef.doc();
+      const activeSessionRef = userRef.collection("timerState").doc("active");
+      const createdAt = Date.now();
+      const session = {
+        mode: String(mode),
+        durationSeconds: totalSeconds,
+        durationMinutes: durationMinutesRounded,
+        completed: false,
+        createdAt,
+        serverCreated: true,
+      };
+
+      // One active timer per user prevents creating many simultaneous sessions
+      // and bulk-completing them later to inflate leaderboard points.
+      const createResult = await adminDb.runTransaction(async (transaction) => {
+        const activeSnap = await transaction.get(activeSessionRef);
+        if (activeSnap.exists) {
+          const activeSessionId = activeSnap.data()?.sessionId;
+          if (typeof activeSessionId === "string") {
+            const existingSessionRef = sessionsRef.doc(activeSessionId);
+            const existingSnap = await transaction.get(existingSessionRef);
+            if (existingSnap.exists && existingSnap.data()?.completed !== true) {
+              return "already-active" as const;
+            }
+          }
         }
+
+        transaction.create(sessionRef, session);
+        transaction.set(activeSessionRef, { sessionId: sessionRef.id, updatedAt: createdAt });
+        return "created" as const;
+      });
+
+      if (createResult === "already-active") {
+        return NextResponse.json(
+          { error: "You already have an unfinished timer session. Resume or reset it before starting another." },
+          { status: 409 },
+        );
       }
       return NextResponse.json({ session: { id: sessionRef.id, ...session } });
     }
 
     if (action === "update" && sessionId) {
-      const sessionRef = adminDb.collection("users").doc(decoded.uid).collection("studySessions").doc(sessionId);
-      const sessionSnap = await sessionRef.get();
-      const oldCompleted = sessionSnap.exists ? sessionSnap.data()?.completed : undefined;
+      if (completed !== true) {
+        return NextResponse.json({ error: "completed must be true when finishing a timer session" }, { status: 400 });
+      }
 
-      const updates: Record<string, unknown> = {};
-      if (completed !== undefined) {
-        if (typeof completed !== "boolean") {
-          return NextResponse.json({ error: "completed must be a boolean" }, { status: 400 });
+      const userRef = adminDb.collection("users").doc(decoded.uid);
+      const sessionRef = userRef.collection("studySessions").doc(sessionId);
+      const activeSessionRef = userRef.collection("timerState").doc("active");
+      const completionResult = await adminDb.runTransaction(async (transaction) => {
+        const sessionSnap = await transaction.get(sessionRef);
+        if (!sessionSnap.exists) return { kind: "not-found" as const };
+        const sessionData = sessionSnap.data() || {};
+        const activeSnap = await transaction.get(activeSessionRef);
+        if (sessionData.serverCreated !== true) return { kind: "not-authoritative" as const };
+        if (sessionData.completed === true) return { kind: "already-completed" as const };
+
+        const createdAt = typeof sessionData.createdAt === "number" ? sessionData.createdAt : 0;
+        const durationSeconds = typeof sessionData.durationSeconds === "number"
+          ? sessionData.durationSeconds
+          : typeof sessionData.durationMinutes === "number"
+            ? sessionData.durationMinutes * 60
+            : 0;
+        const now = Date.now();
+        const remainingSeconds = Math.max(0, Math.ceil((createdAt + durationSeconds * 1000 - now) / 1000));
+        if (durationSeconds < 60 || remainingSeconds > 0) {
+          return { kind: "not-ready" as const, remainingSeconds };
         }
-        updates.completed = completed;
-      }
-      if (Object.keys(updates).length === 0) {
-        return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
-      }
-      await sessionRef.update(updates);
 
-      // Credit the server-owned ledger when a session is marked completed for the first time.
-      if (oldCompleted !== true && completed === true) {
-        try {
-          await incrementUserScore(decoded.uid, "session");
-        } catch {
-          // Never block session update on ledger updates.
+        transaction.update(sessionRef, { completed: true, completedAt: now, serverVerified: true });
+        if (activeSnap.data()?.sessionId === sessionId) {
+          transaction.delete(activeSessionRef);
         }
+        return { kind: "completed" as const };
+      });
+
+      if (completionResult.kind === "not-found") {
+        return NextResponse.json({ error: "Study session not found" }, { status: 404 });
+      }
+      if (completionResult.kind === "not-authoritative") {
+        return NextResponse.json(
+          { error: "This timer session cannot be verified. Start a new session to earn points." },
+          { status: 409 },
+        );
+      }
+      if (completionResult.kind === "already-completed") {
+        return NextResponse.json({ error: "This timer session has already been completed" }, { status: 409 });
+      }
+      if (completionResult.kind === "not-ready") {
+        return NextResponse.json({
+          error: "The timer duration has not elapsed yet",
+          remainingSeconds: completionResult.remainingSeconds,
+        }, { status: 400 });
       }
 
+      try {
+        await incrementUserScore(decoded.uid, "session");
+      } catch {
+        // Never block session completion on ledger updates; reconciliation repairs drift.
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === "cancel" && sessionId) {
+      const userRef = adminDb.collection("users").doc(decoded.uid);
+      const sessionRef = userRef.collection("studySessions").doc(sessionId);
+      const activeSessionRef = userRef.collection("timerState").doc("active");
+      const cancelResult = await adminDb.runTransaction(async (transaction) => {
+        const sessionSnap = await transaction.get(sessionRef);
+        if (!sessionSnap.exists) return "not-found" as const;
+        const activeSnap = await transaction.get(activeSessionRef);
+        if (sessionSnap.data()?.completed === true) return "already-completed" as const;
+        transaction.delete(sessionRef);
+        if (activeSnap.data()?.sessionId === sessionId) {
+          transaction.delete(activeSessionRef);
+        }
+        return "cancelled" as const;
+      });
+
+      if (cancelResult === "not-found") {
+        return NextResponse.json({ error: "Study session not found" }, { status: 404 });
+      }
+      if (cancelResult === "already-completed") {
+        return NextResponse.json({ error: "A completed session cannot be cancelled" }, { status: 409 });
+      }
       return NextResponse.json({ success: true });
     }
 
@@ -113,9 +210,27 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
 
-    const snap = await adminDb.collection("users").doc(decoded.uid).collection("studySessions").orderBy("createdAt", "desc").limit(50).get();
+    const userRef = adminDb.collection("users").doc(decoded.uid);
+    const sessionsRef = userRef.collection("studySessions");
+    const [snap, activeSnap] = await Promise.all([
+      sessionsRef.orderBy("createdAt", "desc").limit(50).get(),
+      userRef.collection("timerState").doc("active").get(),
+    ]);
     const sessions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    return NextResponse.json({ sessions });
+
+    let activeSession: Record<string, unknown> | null = null;
+    const activeSessionId = activeSnap.data()?.sessionId;
+    if (activeSnap.exists && typeof activeSessionId === "string") {
+      const activeDoc = await sessionsRef.doc(activeSessionId).get();
+      if (activeDoc.exists && activeDoc.data()?.serverCreated === true && activeDoc.data()?.completed !== true) {
+        activeSession = { id: activeDoc.id, ...activeDoc.data() };
+      } else {
+        // Repair stale active pointers left behind by old data or interrupted cleanup.
+        await activeSnap.ref.delete().catch(() => undefined);
+      }
+    }
+
+    return NextResponse.json({ sessions, activeSession });
   } catch {
     return NextResponse.json({ error: "Failed to fetch sessions" }, { status: 500 });
   }

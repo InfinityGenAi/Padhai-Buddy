@@ -198,7 +198,7 @@ test.describe("Security: quiz score integrity", () => {
 
   async function seedAttempt(): Promise<string> {
     const attemptId = `audit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    await adminDb.collection("users").doc(user.uid).collection("quizAttempts").doc(attemptId).set({
+    const attempt = {
       id: attemptId,
       subject: "Maths",
       class: 10,
@@ -209,7 +209,17 @@ test.describe("Security: quiz score integrity", () => {
       score: 0,
       questions: SEED_QUESTIONS,
       createdAt: Date.now(),
-    });
+      serverCreated: true,
+      serverScored: false,
+    };
+    const userRef = adminDb.collection("users").doc(user.uid);
+
+    // Quiz submissions now use a separate server-only authority record. Seed
+    // both documents here, matching the contract used by the production API.
+    await Promise.all([
+      userRef.collection("quizAttempts").doc(attemptId).set(attempt),
+      userRef.collection("quizAttemptAuthority").doc(attemptId).set(attempt),
+    ]);
     return attemptId;
   }
 
