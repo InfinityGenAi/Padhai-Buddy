@@ -125,15 +125,15 @@ async function isAdmin(decoded: { admin?: unknown }): Promise<boolean> {
  * activity records. Client-writable activity documents are validated here
  * before being credited, so forged or incomplete activity never inflates scores.
  *
- *   - Doubts: every doc in users/{uid}/doubts counts (10 pts each).
+ *   - Doubts: only server-created records count (10 pts each).
  *   - Quizzes: only server-authorized and server-scored attempts count (20 pts each).
- *   - Study sessions: completed sessions with server completion timestamps
- *     and enough elapsed time count (5 pts each).
+ *   - Study sessions: only server-created sessions verified after their full duration
+ *     count (5 pts each).
  *   - Flashcards: only cards with the server-owned scoreCredited marker count
  *     (5 pts each; status "known" is the canonical review state).
  *   - Notes: only server-created notes count (5 pts each).
- *   - Study plans: duration-eligible plans with server completion timestamps
- *     count (15 pts each).
+ *   - Study plans: only server-created plans completed by the server after eligible
+ *     duration/date checks count (15 pts each).
  */
 export async function POST(req: NextRequest) {
   if (!adminAuth || !adminDb || initializationError) {
