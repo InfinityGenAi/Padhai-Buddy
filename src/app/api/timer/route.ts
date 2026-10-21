@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
 import { incrementUserScore } from "@/lib/score-ledger";
+import { enforceRateLimit } from "@/lib/api-rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,6 +20,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
 
+    const rateLimitResponse = await enforceRateLimit(`timer:${decoded.uid}`, 30);
+    if (rateLimitResponse) return rateLimitResponse;
+
     let body: { action?: string; sessionId?: string; mode?: string; durationMinutes?: number; durationSeconds?: number; completed?: boolean };
     try {
       body = await req.json();
@@ -30,6 +34,9 @@ export async function POST(req: NextRequest) {
     const VALID_MODES = ["pomodoro", "stopwatch", "custom"];
 
     if (action === "create") {
+      if (completed === true) {
+        return NextResponse.json({ error: "A timer session must be completed through the update action" }, { status: 400 });
+      }
       if (!mode || !VALID_MODES.includes(String(mode))) {
         return NextResponse.json({ error: "Invalid mode" }, { status: 400 });
       }
@@ -48,45 +55,64 @@ export async function POST(req: NextRequest) {
 
       const durationMinutesRounded = Math.max(1, Math.round(totalSeconds / 60));
       const sessionRef = adminDb.collection("users").doc(decoded.uid).collection("studySessions").doc();
-      const session = { mode: String(mode), durationSeconds: totalSeconds, durationMinutes: durationMinutesRounded, completed: completed === true, createdAt: Date.now() };
+      const createdAt = Date.now();
+      const session = {
+        mode: String(mode),
+        durationSeconds: totalSeconds,
+        durationMinutes: durationMinutesRounded,
+        completed: false,
+        createdAt,
+      };
       await sessionRef.set(session);
-      // Credit the server-owned ledger for a completed study session.
-      if (session.completed) {
-        try {
-          await incrementUserScore(decoded.uid, "session");
-        } catch {
-          // Never block session creation on ledger updates.
-        }
-      }
       return NextResponse.json({ session: { id: sessionRef.id, ...session } });
     }
 
     if (action === "update" && sessionId) {
+      if (completed !== true) {
+        return NextResponse.json({ error: "completed must be true when finishing a timer session" }, { status: 400 });
+      }
+
       const sessionRef = adminDb.collection("users").doc(decoded.uid).collection("studySessions").doc(sessionId);
-      const sessionSnap = await sessionRef.get();
-      const oldCompleted = sessionSnap.exists ? sessionSnap.data()?.completed : undefined;
+      const completionResult = await adminDb.runTransaction(async (transaction) => {
+        const sessionSnap = await transaction.get(sessionRef);
+        if (!sessionSnap.exists) return { kind: "not-found" as const };
+        const sessionData = sessionSnap.data() || {};
+        if (sessionData.completed === true) return { kind: "already-completed" as const };
 
-      const updates: Record<string, unknown> = {};
-      if (completed !== undefined) {
-        if (typeof completed !== "boolean") {
-          return NextResponse.json({ error: "completed must be a boolean" }, { status: 400 });
+        const createdAt = typeof sessionData.createdAt === "number" ? sessionData.createdAt : 0;
+        const durationSeconds = typeof sessionData.durationSeconds === "number"
+          ? sessionData.durationSeconds
+          : typeof sessionData.durationMinutes === "number"
+            ? sessionData.durationMinutes * 60
+            : 0;
+        const now = Date.now();
+        const remainingSeconds = Math.max(0, Math.ceil((createdAt + durationSeconds * 1000 - now) / 1000));
+        if (durationSeconds <= 0 || remainingSeconds > 0) {
+          return { kind: "not-ready" as const, remainingSeconds };
         }
-        updates.completed = completed;
-      }
-      if (Object.keys(updates).length === 0) {
-        return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
-      }
-      await sessionRef.update(updates);
 
-      // Credit the server-owned ledger when a session is marked completed for the first time.
-      if (oldCompleted !== true && completed === true) {
-        try {
-          await incrementUserScore(decoded.uid, "session");
-        } catch {
-          // Never block session update on ledger updates.
-        }
+        transaction.update(sessionRef, { completed: true, completedAt: now });
+        return { kind: "completed" as const };
+      });
+
+      if (completionResult.kind === "not-found") {
+        return NextResponse.json({ error: "Study session not found" }, { status: 404 });
+      }
+      if (completionResult.kind === "already-completed") {
+        return NextResponse.json({ error: "This timer session has already been completed" }, { status: 409 });
+      }
+      if (completionResult.kind === "not-ready") {
+        return NextResponse.json({
+          error: "The timer duration has not elapsed yet",
+          remainingSeconds: completionResult.remainingSeconds,
+        }, { status: 400 });
       }
 
+      try {
+        await incrementUserScore(decoded.uid, "session");
+      } catch {
+        // Never block session completion on ledger updates; reconciliation repairs drift.
+      }
       return NextResponse.json({ success: true });
     }
 
