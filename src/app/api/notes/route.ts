@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, initializationError } from "@/lib/firebase-admin";
-import { incrementUserScore } from "@/lib/score-ledger";
+import { incrementUserScore, decrementUserScore } from "@/lib/score-ledger";
+import { enforceRateLimit } from "@/lib/api-rate-limit";
 
 export async function GET(req: NextRequest) {
   try {
@@ -67,6 +68,14 @@ export async function POST(req: NextRequest) {
       decoded = await adminAuth.verifyIdToken(token);
     } catch {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+    }
+
+    const rateLimitResponse = await enforceRateLimit(`notes:${decoded.uid}`, 30);
+    if (rateLimitResponse) return rateLimitResponse;
+
+    const contentLength = Number(req.headers.get("content-length") || "0");
+    if (Number.isFinite(contentLength) && contentLength > 64 * 1024) {
+      return NextResponse.json({ error: "Request body exceeds 64 KB" }, { status: 413 });
     }
 
     let body: { 
@@ -145,7 +154,15 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "delete" && noteId) {
-      await adminDb.collection("users").doc(decoded.uid).collection("notes").doc(noteId).delete();
+      const noteRef = adminDb.collection("users").doc(decoded.uid).collection("notes").doc(noteId);
+      const noteSnap = await noteRef.get();
+      if (!noteSnap.exists) return NextResponse.json({ error: "Note not found" }, { status: 404 });
+      await noteRef.delete();
+      try {
+        await decrementUserScore(decoded.uid, "note");
+      } catch {
+        // The admin reconciliation endpoint can repair the ledger if this write fails.
+      }
       return NextResponse.json({ success: true });
     }
 
