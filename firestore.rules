@@ -109,6 +109,11 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
+      match /quizAttemptAuthority/{attemptId} {
+        // Canonical quiz questions, answer keys, and scoring state are server-only.
+        allow read, write: if false;
+      }
+
       match /flashcardDecks/{deckId} {
         allow read: if request.auth != null && request.auth.uid == userId;
         // Deck and card writes must pass through /api/flashcards so score-credit
