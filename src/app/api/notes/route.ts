@@ -110,7 +110,8 @@ export async function POST(req: NextRequest) {
         body: noteBody.trim(), 
         tags: tags?.map(t => t.trim().toLowerCase()) || [], 
         createdAt: Date.now(), 
-        updatedAt: Date.now() 
+        updatedAt: Date.now(),
+        serverCreated: true
       };
       await noteRef.set(note);
       // Credit the server-owned points ledger for this verified activity.
@@ -158,10 +159,12 @@ export async function POST(req: NextRequest) {
       const noteSnap = await noteRef.get();
       if (!noteSnap.exists) return NextResponse.json({ error: "Note not found" }, { status: 404 });
       await noteRef.delete();
-      try {
-        await decrementUserScore(decoded.uid, "note");
-      } catch {
-        // The admin reconciliation endpoint can repair the ledger if this write fails.
+      if (noteSnap.data()?.serverCreated === true) {
+        try {
+          await decrementUserScore(decoded.uid, "note");
+        } catch {
+          // The admin reconciliation endpoint can repair the ledger if this write fails.
+        }
       }
       return NextResponse.json({ success: true });
     }
