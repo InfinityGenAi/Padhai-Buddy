@@ -323,6 +323,7 @@ export async function POST(req: NextRequest) {
           answer,
           type: "photo",
           createdAt: Date.now(),
+          serverCreated: true,
         });
       log("FIRESTORE_SAVE_OK");
     } catch (dbError) {
