@@ -260,6 +260,23 @@ export default function Home() {
                     </Button>
                   </div>
 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 max-w-xl">
+                    <a
+                      href="https://github.com/InfinityGenAi/Padhai-Buddy/releases/download/1.0.0/app-release.apk"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary hover:bg-primary/15 transition-colors focus-ring"
+                    >
+                      <DevicePhoneMobileIcon className="h-5 w-5" />
+                      Download for Android
+                    </a>
+                    <a
+                      href="https://github.com/InfinityGenAi/Padhai-Buddy/releases/download/windows-latest/Padhai-Buddy-Setup.exe"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground hover:bg-muted transition-colors focus-ring"
+                    >
+                      <ComputerDesktopIcon className="h-5 w-5" />
+                      Download for Windows
+                    </a>
+                  </div>
+
                   {/* Trust indicators */}
                   <div className="flex flex-wrap items-center gap-6 text-sm text-foreground/50 pt-6 border-t border-border/50">
                     <span className="flex items-center gap-1.5">
