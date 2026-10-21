@@ -104,10 +104,9 @@ service cloud.firestore {
       }
 
       match /quizAttempts/{attemptId} {
-        allow read: if request.auth != null && request.auth.uid == userId;
-        // Question keys, answer keys, scores and completion state are written
-        // exclusively by /api/quiz using the Admin SDK.
-        allow write: if false;
+        // Quiz attempts contain answer keys. Clients must use /api/quiz, which
+        // redacts answers before completion and returns them after submission.
+        allow read, write: if false;
       }
 
       match /flashcardDecks/{deckId} {
