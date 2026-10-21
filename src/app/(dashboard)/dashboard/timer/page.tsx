@@ -15,7 +15,17 @@ import {
 import { playTimerStart, playTimerPause, playTimerComplete } from "@/lib/sounds";
 
 type TimerMode = "pomodoro" | "stopwatch" | "custom";
+type TimerSession = {
+  id: string;
+  mode: string;
+  durationMinutes: number;
+  durationSeconds?: number;
+  createdAt: number;
+  completed?: boolean;
+  completedAt?: number;
+};
 
+const MIN_REWARDED_SESSION_SECONDS = 60;
 const POMODORO_FOCUS = 25 * 60;
 
 export default function TimerPage() {
@@ -30,7 +40,11 @@ export default function TimerPage() {
   const [elapsed, setElapsed] = useState(0);
   const [soundEnabled, setSoundEnabled] = useState(preferences.soundEnabled);
   const [saving, setSaving] = useState(false);
-  const [completedSessions, setCompletedSessions] = useState<{ id: string; mode: string; durationMinutes: number; durationSeconds?: number; createdAt: number }[]>([]);
+  const [timerError, setTimerError] = useState<string | null>(null);
+  const [activeSession, setActiveSession] = useState<TimerSession | null>(null);
+  const [completedSessions, setCompletedSessions] = useState<TimerSession[]>([]);
+  const activeSessionRef = useRef<TimerSession | null>(null);
+  const creatingSessionRef = useRef(false);
   const saveAttemptedRef = useRef(false);
 
   const intervalRef = useRef<number | null>(null);
@@ -49,25 +63,97 @@ export default function TimerPage() {
     return s > 0 ? `${m}m ${s}s` : `${m}m`;
   };
 
-  const saveSession = useCallback(async (durationSeconds: number) => {
-    if (!user?.uid) return;
+  // Create the server-timestamped session when the timer starts, not after it ends.
+  // Stopwatch sessions use a 60-second server-enforced minimum before they can earn points.
+  const startSession = useCallback(async (durationSeconds: number): Promise<boolean> => {
+    if (!user?.uid) return false;
+    if (activeSessionRef.current) return true;
+    if (creatingSessionRef.current) return false;
+
+    creatingSessionRef.current = true;
     setSaving(true);
+    setTimerError(null);
     try {
       const token = await (await import("@/lib/auth-utils")).getFirebaseIdToken();
       const res = await fetch("/api/timer", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ action: "create", mode, durationSeconds, completed: true }),
+        body: JSON.stringify({ action: "create", mode, durationSeconds }),
       });
-      if (!res.ok) throw new Error((await res.json()).error);
       const data = await res.json();
-      setCompletedSessions((prev) => [data.session, ...prev]);
+      if (!res.ok) throw new Error(data.error || "Failed to start study session");
+      activeSessionRef.current = data.session as TimerSession;
+      setActiveSession(data.session as TimerSession);
+      return true;
     } catch (err: unknown) {
-      console.error("Failed to save session:", err);
+      const message = err instanceof Error ? err.message : "Failed to start study session";
+      setTimerError(message);
+      console.error("Failed to start session:", err);
+      return false;
     } finally {
+      creatingSessionRef.current = false;
       setSaving(false);
     }
   }, [user?.uid, mode]);
+
+  const finishSession = useCallback(async (actualDurationSeconds?: number): Promise<boolean> => {
+    const session = activeSessionRef.current;
+    if (!user?.uid || !session) {
+      setTimerError("Start the timer before completing a session.");
+      return false;
+    }
+
+    setSaving(true);
+    setTimerError(null);
+    try {
+      const token = await (await import("@/lib/auth-utils")).getFirebaseIdToken();
+      const res = await fetch("/api/timer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: "update", sessionId: session.id, completed: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "The session could not be completed yet");
+
+      const durationSeconds = actualDurationSeconds ?? session.durationSeconds ?? session.durationMinutes * 60;
+      const completed = {
+        ...session,
+        durationSeconds,
+        durationMinutes: Math.max(1, Math.ceil(durationSeconds / 60)),
+        completed: true,
+        completedAt: Date.now(),
+      };
+      setCompletedSessions((prev) => [completed, ...prev]);
+      activeSessionRef.current = null;
+      setActiveSession(null);
+      return true;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to complete study session";
+      setTimerError(message);
+      console.error("Failed to complete session:", err);
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }, [user?.uid]);
+
+  const cancelSession = useCallback(async (sessionId: string) => {
+    if (!user?.uid) return;
+    try {
+      const token = await (await import("@/lib/auth-utils")).getFirebaseIdToken();
+      const res = await fetch("/api/timer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: "cancel", sessionId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        console.warn("Could not cancel unfinished timer session:", data.error || res.statusText);
+      }
+    } catch (err) {
+      console.warn("Could not cancel unfinished timer session:", err);
+    }
+  }, [user?.uid]);
 
   const reset = useCallback(() => {
     if (intervalRef.current) {
@@ -76,6 +162,13 @@ export default function TimerPage() {
     }
     setIsRunning(false);
     saveAttemptedRef.current = false;
+    setTimerError(null);
+    const sessionToCancel = activeSessionRef.current;
+    if (sessionToCancel) {
+      activeSessionRef.current = null;
+      setActiveSession(null);
+      void cancelSession(sessionToCancel.id);
+    }
     if (mode === "stopwatch") {
       setElapsed(0);
       setTimeLeft(0);
@@ -83,7 +176,7 @@ export default function TimerPage() {
       setTimeLeft(getDuration());
       setElapsed(0);
     }
-  }, [mode, getDuration]);
+  }, [mode, getDuration, cancelSession]);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,7 +213,9 @@ export default function TimerPage() {
               saveAttemptedRef.current = true;
               const durationSeconds = getDuration();
               if (durationSeconds > 0) {
-                saveSession(durationSeconds);
+                void finishSession(durationSeconds).then((completed) => {
+                  if (!completed) saveAttemptedRef.current = false;
+                });
               }
             }
             return 0;
@@ -133,16 +228,49 @@ export default function TimerPage() {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isRunning, mode, soundEnabled, getDuration, saveSession]);
+  }, [isRunning, mode, soundEnabled, getDuration, finishSession]);
+
+  const handleToggleRunning = async () => {
+    if (saving) return;
+    if (isRunning) {
+      if (soundEnabled) playTimerPause();
+      setIsRunning(false);
+      return;
+    }
+
+    if (mode !== "stopwatch" && timeLeft <= 0) {
+      setTimerError("Press Reset to start a new countdown.");
+      return;
+    }
+
+    if (!activeSessionRef.current) {
+      const durationSeconds = mode === "stopwatch"
+        ? MIN_REWARDED_SESSION_SECONDS
+        : getDuration();
+      const started = await startSession(durationSeconds);
+      if (!started) return;
+    }
+
+    setTimerError(null);
+    if (soundEnabled) playTimerStart();
+    setIsRunning(true);
+  };
 
   const handleComplete = async () => {
-    if (saveAttemptedRef.current) return;
-    saveAttemptedRef.current = true;
+    if (saveAttemptedRef.current || saving) return;
     const durationSeconds = mode === "stopwatch" ? elapsed : getDuration();
-    if (durationSeconds > 0) {
-      await saveSession(durationSeconds);
+    if (durationSeconds < MIN_REWARDED_SESSION_SECONDS) {
+      setTimerError("Study for at least 1 minute before completing a rewarded session.");
+      return;
     }
-    reset();
+
+    saveAttemptedRef.current = true;
+    const completed = await finishSession(durationSeconds);
+    if (completed) {
+      reset();
+    } else {
+      saveAttemptedRef.current = false;
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -170,7 +298,7 @@ export default function TimerPage() {
 
       <div className="flex gap-2">
         {(["pomodoro", "stopwatch", "custom"] as TimerMode[]).map((m) => (
-          <button key={m} onClick={() => setMode(m)} className={`flex-1 py-2 rounded-xl text-sm font-medium capitalize transition-colors ${mode === m ? "bg-primary text-white" : "bg-foreground/5 text-foreground/60 hover:text-foreground"}`}>
+          <button key={m} disabled={!!activeSession || saving} onClick={() => setMode(m)} className={`flex-1 py-2 rounded-xl text-sm font-medium capitalize transition-colors ${mode === m ? "bg-primary text-white" : "bg-foreground/5 text-foreground/60 hover:text-foreground"} disabled:opacity-50`}>
             {m === "pomodoro" ? "Pomodoro" : m === "stopwatch" ? "Stopwatch" : "Custom"}
           </button>
         ))}
@@ -179,7 +307,7 @@ export default function TimerPage() {
       {mode === "custom" && (
         <div className="subtle-card rounded-xl p-4 flex items-center gap-4">
           <label className="text-sm text-foreground/60">Duration (minutes):</label>
-          <input type="number" value={customMinutes} onChange={(e) => setCustomMinutes(Math.max(1, Number(e.target.value) || 1))} min={1} max={180} className="w-20 bg-background border border-border rounded-xl px-3 py-2 text-sm text-center" />
+          <input type="number" disabled={!!activeSession || saving} value={customMinutes} onChange={(e) => setCustomMinutes(Math.min(180, Math.max(1, Number(e.target.value) || 1)))} min={1} max={180} className="w-20 bg-background border border-border rounded-xl px-3 py-2 text-sm text-center disabled:opacity-50" />
         </div>
       )}
 
@@ -217,19 +345,23 @@ export default function TimerPage() {
       </div>
 
       <div className="flex gap-3 justify-center">
-        <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => { if (isRunning && soundEnabled) playTimerPause(); else if (!isRunning && currentTime > 0 && soundEnabled) playTimerStart(); setIsRunning(!isRunning); }} className="px-6 py-3 btn-primary rounded-xl font-medium flex items-center gap-2">
+        <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => { void handleToggleRunning(); }} disabled={saving} className="px-6 py-3 btn-primary rounded-xl font-medium flex items-center gap-2 disabled:opacity-50">
           {isRunning ? <PauseIcon className="w-5 h-5" /> : <PlayIcon className="w-5 h-5" />}
           {isRunning ? "Pause" : "Start"}
         </motion.button>
-        <button onClick={reset} className="px-6 py-3 rounded-xl font-medium bg-foreground/5 hover:bg-foreground/8 flex items-center gap-2">
+        <button onClick={reset} disabled={saving} className="px-6 py-3 rounded-xl font-medium bg-foreground/5 hover:bg-foreground/8 flex items-center gap-2 disabled:opacity-50">
           <ArrowPathIcon className="w-5 h-5" /> Reset
         </button>
-        {!isRunning && currentTime > 0 && (
+        {!isRunning && !!activeSession && (mode === "stopwatch" ? elapsed >= MIN_REWARDED_SESSION_SECONDS : timeLeft === 0) && (
           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={async () => { if (soundEnabled) playTimerComplete(); await handleComplete(); }} disabled={saving} className="px-6 py-3 rounded-xl font-medium bg-green-950/30 text-green-400 hover:bg-green-950/20 flex items-center gap-2 disabled:opacity-50">
             <CheckCircleIcon className="w-5 h-5" /> Complete
           </motion.button>
         )}
       </div>
+
+      {timerError && (
+        <p role="alert" className="text-sm text-red-400 text-center">{timerError}</p>
+      )}
 
       <div className="flex items-center justify-center gap-2">
         <button onClick={() => setSoundEnabled(!soundEnabled)} className="p-2 rounded-lg hover:bg-foreground/5 text-foreground/60">
