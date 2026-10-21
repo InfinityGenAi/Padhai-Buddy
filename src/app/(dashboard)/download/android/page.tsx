@@ -98,7 +98,7 @@ export default function DownloadAndroidPage() {
 
   // Find APK asset in release
   const apkAsset = release?.assets.find(
-    (asset) => asset.name.endsWith(".apk") && asset.content_type === "application/vnd.android.package-archive"
+    (asset) => asset.name.toLowerCase().endsWith(".apk")
   );
 
   const formatBytes = (bytes: number): string => {
@@ -217,11 +217,14 @@ export default function DownloadAndroidPage() {
                   </div>
                   <div className="text-left">
                     <p className="text-sm font-medium text-foreground">
-                      Progressive Web App (PWA)
+                      No APK release published yet
                     </p>
                     <p className="text-xs text-foreground/60">
-                      Works offline, no app store needed
+                      Install the phone app from your browser for now. A direct APK appears here after a signed release is published.
                     </p>
+                    <a href="https://github.com/InfinityGenAi/Padhai-Buddy/releases" target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex text-xs font-semibold text-primary underline underline-offset-2">
+                      Check official releases
+                    </a>
                   </div>
                 </div>
               </motion.div>
@@ -279,7 +282,7 @@ export default function DownloadAndroidPage() {
             className="mt-6 pt-6 border-t border-border"
           >
             <Link
-              href="/dashboard"
+              href="/download"
               className="inline-flex items-center gap-2 text-primary font-medium hover:underline"
             >
               <motion.span

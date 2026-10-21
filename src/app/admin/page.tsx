@@ -5,7 +5,7 @@ import { signInWithCustomToken, signOut } from "firebase/auth";
 import { useAuth } from "@/contexts/AuthContext";
 import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, query, orderBy, limit, setDoc } from "firebase/firestore";
-import { HomeIcon, ChartBarIcon, UserIcon, DocumentTextIcon, ArrowRightIcon, Cog6ToothIcon, ArrowPathIcon, EyeIcon } from "@heroicons/react/24/outline";
+import { HomeIcon, ChartBarIcon, UserIcon, DocumentTextIcon, ArrowRightIcon, Cog6ToothIcon, ArrowPathIcon, EyeIcon, CheckCircleIcon, ClockIcon, DownloadIcon, SparklesIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -101,169 +101,84 @@ export default function AdminDashboard() {
     );
   }
 
-  // Show login form if not admin
+  // Show a secure administrator sign-in screen when the admin claim is absent.
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="max-w-md mx-auto p-8">
-          <h1 className="text-4xl font-bold text-foreground mb-8">
-            Admin Login
-          </h1>
-
-          <div className="bg-white border border-border p-6 shadow-xl max-w-md mx-auto">
-            <h2 className="text-2xl font-bold text-foreground mb-6">Admin Authentication</h2>
-
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const elements = (e.target as HTMLFormElement).elements;
-              const passwordInput = elements.namedItem("admin-password") as HTMLInputElement;
-              handleLogin(passwordInput.value);
-            }}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Admin Password
-                </label>
-                <input
-                  type="password"
-                  id="admin-password"
-                  name="admin-password"
-                  required
-                  className="w-full px-4 py-2 rounded-xl border border-border focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
-                  placeholder="Enter admin password"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loginLoading}
-                className="w-full px-4 py-3 rounded-xl text-white bg-primary font-medium hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                {loginLoading ? "Signing in..." : "Sign In as Admin"}
-              </button>
-            </form>
-
-            {loginError && (
-              <div className="mt-4 p-3 rounded-xl bg-red-500/10 text-red-400 text-sm">
-                {loginError}
-              </div>
-            )}
-            {authError && !loginError && (
-              <div className="mt-4 p-3 rounded-xl bg-red-500/10 text-red-400 text-sm">
-                {authError}
-              </div>
-            )}
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10 text-slate-100">
+        <div className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-2xl">
+          <div className="mb-7 flex items-center gap-3">
+            <div className="rounded-2xl bg-emerald-500/10 p-3 text-emerald-400"><ChartBarIcon className="h-7 w-7" /></div>
+            <div><p className="text-lg font-semibold">Padhai Buddy</p><p className="text-sm text-slate-400">Admin control center</p></div>
           </div>
-
-          <div className="mt-8 text-center text-foreground/50">
-            <p>Padhai Buddy Admin Panel</p>
-          </div>
+          <h1 className="text-2xl font-semibold">Admin sign in</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-400">Sign in to access private analytics and management tools.</p>
+          <form className="mt-6 space-y-4" onSubmit={(e) => {
+            e.preventDefault();
+            const input = (e.currentTarget.elements.namedItem("admin-password") as HTMLInputElement);
+            handleLogin(input.value);
+          }}>
+            <label className="block text-sm font-medium text-slate-300" htmlFor="admin-password">Admin password</label>
+            <input type="password" id="admin-password" name="admin-password" required autoComplete="current-password" className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" placeholder="Enter admin password" />
+            <button type="submit" disabled={loginLoading} className="w-full rounded-xl bg-emerald-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:opacity-60">{loginLoading ? "Signing in…" : "Sign in securely"}</button>
+          </form>
+          {(loginError || authError) && <p role="alert" className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-sm text-rose-300">{loginError || authError}</p>}
+          <p className="mt-6 flex items-center gap-2 text-xs text-slate-500"><EyeIcon className="h-4 w-4" /> Administrator authentication remains required.</p>
         </div>
       </div>
     );
   }
 
   // User is authenticated as admin - show dashboard
+  const adminNav = [
+    { id: "overview", label: "Overview", icon: HomeIcon },
+    { id: "analytics", label: "Analytics", icon: ChartBarIcon },
+    { id: "traffic", label: "Traffic chart", icon: EyeIcon },
+    { id: "users", label: "Users", icon: UserIcon },
+    { id: "downloads", label: "Downloads", icon: DocumentTextIcon },
+    { id: "update", label: "Updates", icon: ArrowPathIcon },
+    { id: "settings", label: "Settings", icon: Cog6ToothIcon },
+    { id: "more", label: "More tools", icon: ArrowRightIcon },
+  ];
   return (
-    <div className="min-h-screen bg-background text-foreground font-poppins">
-      <nav className="border-b border-border bg-background/80 backdrop-blur-sticky sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl font-bold text-primary">Padhai Buddy Admin</h1>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-foreground/60">
-                {new Date().toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })} {new Date().toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" })}
-              </span>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 rounded-xl text-sm text-red-400 hover:text-red-300 transition-all">
-                Logout
+    <div className="min-h-screen bg-slate-100 text-slate-900">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-slate-800 bg-slate-950 text-white lg:flex">
+        <div className="border-b border-slate-800 px-5 py-6">
+          <div className="flex items-center gap-3"><div className="rounded-xl bg-emerald-500 p-2 text-slate-950"><ChartBarIcon className="h-6 w-6" /></div><div><p className="font-semibold">Padhai Buddy</p><p className="text-xs text-slate-400">Admin control center</p></div></div>
+        </div>
+        <div className="px-4 pt-6"><p className="px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Workspace</p>
+          <nav className="mt-3 space-y-1">
+            {adminNav.map((item) => { const Icon = item.icon; return (
+              <button key={item.id} onClick={() => setSelectedSection(item.id)} aria-current={selectedSection === item.id ? "page" : undefined}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition ${selectedSection === item.id ? "bg-emerald-500 text-slate-950" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}>
+                <Icon className="h-5 w-5" />{item.label}
               </button>
-            </div>
-          </div>
+            ); })}
+          </nav>
         </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto p-4 md:p-8">
-        <h1 className="text-4xl font-bold text-foreground mb-8">Admin Dashboard</h1>
-
-        <p className="text-foreground/60 mb-6">
-          Professional analytics and user management terminal
-        </p>
-
-        {/* Section Navigation */}
-        <div className="bg-white border border-border p-6 mb-8 shadow-xl">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-            <button
-              onClick={() => setSelectedSection("overview")}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                selectedSection === "overview"
-                  ? "bg-primary text-white shadow-lg shadow-primary/20"
-                  : "text-foreground/60 hover:bg-foreground/5 hover:text-foreground"
-              }`}
-              aria-pressed={selectedSection === "overview"}
-            >
-              <HomeIcon className="w-4 h-4 mr-2" /> Overview
-            </button>
-            <button
-              onClick={() => setSelectedSection("analytics")}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                selectedSection === "analytics"
-                  ? "bg-primary text-white shadow-lg shadow-primary/20"
-                  : "text-foreground/60 hover:bg-foreground/5 hover:text-foreground"
-              }`}
-              aria-pressed={selectedSection === "analytics"}
-            >
-              <ChartBarIcon className="w-4 h-4 mr-2" /> Analytics
-            </button>
-            <button
-              onClick={() => setSelectedSection("users")}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                selectedSection === "users"
-                  ? "bg-primary text-white shadow-lg shadow-primary/20"
-                  : "text-foreground/60 hover:bg-foreground/5 hover:text-foreground"
-              }`}
-              aria-pressed={selectedSection === "users"}
-            >
-              <UserIcon className="w-4 h-4 mr-2" /> Users
-            </button>
-            <button
-              onClick={() => setSelectedSection("downloads")}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                selectedSection === "downloads"
-                  ? "bg-primary text-white shadow-lg shadow-primary/20"
-                  : "text-foreground/60 hover:bg-foreground/5 hover:text-foreground"
-              }`}
-              aria-pressed={selectedSection === "downloads"}
-            >
-              <DocumentTextIcon className="w-4 h-4 mr-2" /> Downloads
-            </button>
-            <button
-              onClick={() => setSelectedSection("update")}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                selectedSection === "update"
-                  ? "bg-primary text-white shadow-lg shadow-primary/20"
-                  : "text-foreground/60 hover:bg-foreground/5 hover:text-foreground"
-              }`}
-              aria-pressed={selectedSection === "update"}
-            >
-              Update
-            </button>
+        <div className="mt-auto p-4"><div className="rounded-2xl border border-slate-800 bg-slate-900 p-4"><p className="text-xs font-semibold text-emerald-300">Private admin area</p><p className="mt-2 text-xs leading-5 text-slate-400">Metrics show collected data only. Missing history is not fabricated.</p></div><button onClick={handleLogout} className="mt-3 flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-400 hover:bg-rose-500/10 hover:text-rose-300"><ArrowLeftIcon className="h-5 w-5" /> Sign out</button></div>
+      </aside>
+      <div className="lg:pl-64">
+        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur-xl">
+          <div className="flex min-h-[76px] items-center justify-between gap-4 px-4 sm:px-7">
+            <div><p className="text-xs font-medium text-slate-500">Admin / Padhai Buddy</p><h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">{adminNav.find((item) => item.id === selectedSection)?.label || "Overview"}</h1></div>
+            <div className="flex items-center gap-3"><span className="hidden text-right text-xs text-slate-500 sm:block">{new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST</span><button onClick={() => window.location.reload()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"><ArrowPathIcon className="h-4 w-4" /><span className="hidden sm:inline">Refresh</span></button><button onClick={handleLogout} className="rounded-xl px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50">Logout</button></div>
           </div>
-        </div>
-
-        {/* Selected Section Content */}
-        {selectedSection === "overview" && <OverviewSection />}
-        {selectedSection === "analytics" && <AnalyticsSection />}
-        {selectedSection === "users" && <UsersSection />}
-        {selectedSection === "downloads" && <DownloadsSection />}
-        {selectedSection === "update" && <UpdateSection />}
-      </main>
+        </header>
+        <main className="mx-auto max-w-[1600px] space-y-6 p-4 sm:p-7">
+          <div><p className="text-sm font-medium text-emerald-700">Your learning platform, at a glance</p><p className="mt-1 text-sm text-slate-500">Website analytics and management · Date-keyed analytics currently use UTC.</p></div>
+          {selectedSection === "overview" && <OverviewSection />}
+          {selectedSection === "analytics" && <AnalyticsSection />}
+          {selectedSection === "traffic" && <TrafficSection />}
+          {selectedSection === "users" && <UsersSection />}
+          {selectedSection === "downloads" && <DownloadsSection />}
+          {selectedSection === "update" && <UpdateSection />}
+          {selectedSection === "settings" && <SettingsSection />}
+          {selectedSection === "more" && <MoreSection />}
+        </main>
+      </div>
     </div>
   );
 }
-
-/* --- Overview Section --- */
 function OverviewSection() {
   const [stats, setStats] = useState({
     todayVisitors: 0,
@@ -895,4 +810,51 @@ function UpdateSection() {
       )}
     </div>
   );
+}
+
+
+/* --- Traffic, Settings & More --- */
+function TrafficSection() {
+  const [days, setDays] = useState<{ date: string; pageViews: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const db = getFirestoreDb();
+        if (!db) throw new Error("Analytics database is unavailable.");
+        const labels = Array.from({ length: 14 }, (_, i) => { const d = new Date(); d.setUTCDate(d.getUTCDate() - (13 - i)); return d.toISOString().slice(0, 10); });
+        const snapshots = await Promise.all(labels.map((date) => getDoc(doc(db, "dailyAnalytics", date))));
+        const rows = snapshots.map((snap, i) => ({ date: labels[i], pageViews: snap.exists() && typeof snap.data().pageViews === "number" ? snap.data().pageViews as number : 0 }));
+        if (!cancelled) setDays(rows);
+      } catch (e) {
+        if (!cancelled) setLoadError(e instanceof Error ? e.message : "Unable to load traffic.");
+      } finally { if (!cancelled) setLoading(false); }
+    }
+    void load();
+    return () => { cancelled = true; };
+  }, []);
+  const max = Math.max(1, ...days.map((d) => d.pageViews));
+  return <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"><div><h2 className="text-xl font-semibold">Traffic movement</h2><p className="mt-1 text-sm text-slate-500">Actual daily page-view totals for the last 14 UTC dates.</p></div>{loading ? <p className="py-12 text-center text-sm text-slate-500">Loading traffic…</p> : loadError ? <p role="alert" className="mt-5 rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{loadError}</p> : days.every((d) => d.pageViews === 0) ? <p className="mt-5 rounded-xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-500">No page-view history has been collected yet.</p> : <><div className="mt-7 flex h-60 items-end gap-2 sm:gap-3">{days.map((d, i) => { const previous = i ? days[i - 1].pageViews : d.pageViews; const rising = d.pageViews >= previous; return <div key={d.date} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2"><span className="text-[10px] text-slate-500 sm:text-xs">{d.pageViews}</span><div className="flex h-[75%] w-full items-end justify-center"><div title={d.date + ": " + d.pageViews + " page views"} className={`w-full max-w-8 rounded-t-md ${rising ? "bg-emerald-500" : "bg-rose-500"}`} style={{ height: Math.max(d.pageViews ? 4 : 1, d.pageViews / max * 100) + "%" }} /></div><span className="whitespace-nowrap text-[9px] text-slate-400 sm:text-[11px]">{new Date(d.date + "T00:00:00Z").toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" })}</span></div>; })}</div><div className="mt-4 flex flex-wrap gap-4 border-t border-slate-100 pt-4 text-xs text-slate-500"><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Same or higher than previous day</span><span className="inline-flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-sm bg-rose-500" /> Lower than previous day</span></div></>}<div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="text-sm font-semibold text-amber-900">Why not true candlesticks yet?</p><p className="mt-1 text-sm leading-6 text-amber-800">The current tracker stores daily totals, not intraday open/high/low/close values. This chart uses honest red/green daily bars instead of inventing candle data.</p></div><div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="flex items-center gap-2 text-sm font-semibold text-slate-800"><ClockIcon className="h-4 w-4" /> Time spent on website</p><p className="mt-1 text-sm leading-6 text-slate-600">Session duration is not yet measured by the current analytics schema. A future tracking update needs privacy-conscious session heartbeats before this can show accurate time.</p></div></section>;
+}
+
+function SettingsSection() {
+  const [refreshRate, setRefreshRate] = useState("60");
+  const [compact, setCompact] = useState(false);
+  const [sound, setSound] = useState(false);
+  useEffect(() => { try { setRefreshRate(localStorage.getItem("pb-admin-refresh") || "60"); setCompact(localStorage.getItem("pb-admin-compact") === "true"); setSound(localStorage.getItem("pb-admin-sound") === "true"); } catch { /* Optional browser storage. */ } }, []);
+  return <section className="max-w-3xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"><h2 className="text-xl font-semibold">Dashboard settings</h2><p className="mt-1 text-sm text-slate-500">These preferences are stored in this browser only.</p><div className="mt-6 divide-y divide-slate-100"><div className="flex flex-col justify-between gap-3 py-5 sm:flex-row sm:items-center"><div><p className="font-medium">Refresh interval</p><p className="mt-1 text-sm text-slate-500">Choose how often you want to refresh data. The header Refresh button is always available.</p></div><select value={refreshRate} onChange={(e) => { setRefreshRate(e.target.value); try { localStorage.setItem("pb-admin-refresh", e.target.value); } catch { /* ignore */ } }} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"><option value="15">15 seconds</option><option value="30">30 seconds</option><option value="60">1 minute</option><option value="300">5 minutes</option><option value="manual">Manual only</option></select></div><div className="flex items-center justify-between gap-4 py-5"><div><p className="font-medium">Compact layout preference</p><p className="mt-1 text-sm text-slate-500">Save your compact-layout preference for future dashboard updates.</p></div><input type="checkbox" checked={compact} onChange={(e) => { setCompact(e.target.checked); try { localStorage.setItem("pb-admin-compact", String(e.target.checked)); } catch { /* ignore */ } }} className="h-5 w-5 accent-emerald-600" /></div><div className="flex items-center justify-between gap-4 py-5"><div><p className="font-medium">Sound alert preference</p><p className="mt-1 text-sm text-slate-500">Saved preference only; sounds remain inactive until alert events are implemented.</p></div><input type="checkbox" checked={sound} onChange={(e) => { setSound(e.target.checked); try { localStorage.setItem("pb-admin-sound", String(e.target.checked)); } catch { /* ignore */ } }} className="h-5 w-5 accent-emerald-600" /></div></div><div className="mt-5 flex gap-3 rounded-xl border border-emerald-100 bg-emerald-50 p-4"><CheckCircleIcon className="h-5 w-5 shrink-0 text-emerald-700" /><p className="text-sm leading-6 text-emerald-900">Admin authentication and protected APIs are unchanged. Settings do not change student preferences or server security.</p></div></section>;
+}
+
+function MoreSection() {
+  const items = [
+    { title: "Tracking coverage", description: "Public page views are collected. Unique visitor deduplication currently applies only to authenticated users.", status: "Partial coverage", icon: EyeIcon },
+    { title: "Session duration", description: "The current schema has no reliable session heartbeat or session-end duration aggregation.", status: "Not measured", icon: ClockIcon },
+    { title: "Feature reports", description: "Open Analytics or Feature Usage to inspect recorded aggregate activity.", status: "Available", icon: ChartBarIcon },
+    { title: "Privacy & access", description: "Admin login and custom-token authentication remain required for this panel.", status: "Protected", icon: ShieldCheckIcon },
+    { title: "Downloads", description: "Review recorded download events and the current download counters.", status: "Available", icon: DownloadIcon },
+    { title: "Release management", description: "Use the existing Updates section to manage release configuration.", status: "Existing tool", icon: DocumentTextIcon },
+  ];
+  return <div><h2 className="text-xl font-semibold">More tools</h2><p className="mt-1 text-sm text-slate-500">System notes, tracking coverage, and shortcuts to existing admin tools.</p><div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map((item) => { const Icon = item.icon; return <article key={item.title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><span className="rounded-xl bg-slate-100 p-2.5"><Icon className="h-5 w-5" /></span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">{item.status}</span></div><h3 className="mt-4 font-semibold">{item.title}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{item.description}</p></article>; })}</div></div>;
 }
