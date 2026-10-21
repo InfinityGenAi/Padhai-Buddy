@@ -240,13 +240,24 @@ export async function POST(req: NextRequest) {
       }
 
       const cardRef = deckRef.collection("cards").doc(cardId);
-      const cardSnap = await cardRef.get();
-      if (!cardSnap.exists) return NextResponse.json({ error: "Card not found" }, { status: 404 });
-      const wasCredited = cardSnap.data()?.scoreCredited === true;
+      const deletionResult = await adminDb.runTransaction(async (transaction) => {
+        const deckSnap = await transaction.get(deckRef);
+        if (!deckSnap.exists) return { kind: "deck-not-found" as const };
+        const cardSnap = await transaction.get(cardRef);
+        if (!cardSnap.exists) return { kind: "card-not-found" as const };
 
-      await cardRef.delete();
-      await deckRef.update({ updatedAt: Date.now() });
-      if (wasCredited) {
+        const wasCredited = cardSnap.data()?.scoreCredited === true;
+        transaction.delete(cardRef);
+        transaction.update(deckRef, { updatedAt: Date.now() });
+        return { kind: "deleted" as const, wasCredited };
+      });
+      if (deletionResult.kind === "deck-not-found") {
+        return NextResponse.json({ error: "Deck not found" }, { status: 404 });
+      }
+      if (deletionResult.kind === "card-not-found") {
+        return NextResponse.json({ error: "Card not found" }, { status: 404 });
+      }
+      if (deletionResult.wasCredited) {
         try {
           await decrementUserScore(decoded.uid, "flashcard");
         } catch {
