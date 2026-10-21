@@ -98,7 +98,7 @@ export default function DownloadAndroidPage() {
 
   // Find APK asset in release
   const apkAsset = release?.assets.find(
-    (asset) => asset.name.endsWith(".apk") && asset.content_type === "application/vnd.android.package-archive"
+    (asset) => asset.name.toLowerCase().endsWith(".apk")
   );
 
   const formatBytes = (bytes: number): string => {
