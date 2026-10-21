@@ -7,7 +7,6 @@ on:
       - "windows-app/**"
       - ".github/workflows/windows-release.yml"
   workflow_dispatch:
-  push_tags_placeholder: never
 
 permissions:
   contents: write
