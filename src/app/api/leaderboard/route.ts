@@ -245,7 +245,7 @@ export async function POST(req: NextRequest) {
     }
 
     const entry = scoreEntryFromUser(uid, data, {
-      doubts: doubtsSnap.size,
+      doubts: doubtsSnap.docs.filter((d) => d.data().serverCreated === true).length,
       quizzes: completedQuizzes,
       flashcards: reviewedFlashcards,
       notes: notesSnap.docs.filter((d) => d.data().serverCreated === true).length,
