@@ -5,7 +5,7 @@ import { signInWithCustomToken, signOut } from "firebase/auth";
 import { useAuth } from "@/contexts/AuthContext";
 import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs, query, orderBy, limit, setDoc } from "firebase/firestore";
-import { HomeIcon, ChartBarIcon, UserIcon, DocumentTextIcon, ArrowRightIcon, Cog6ToothIcon, ArrowPathIcon, EyeIcon } from "@heroicons/react/24/outline";
+import { HomeIcon, ChartBarIcon, UserIcon, DocumentTextIcon, ArrowRightIcon, Cog6ToothIcon, ArrowPathIcon, EyeIcon, CheckCircleIcon, ClockIcon, DownloadIcon, SparklesIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
