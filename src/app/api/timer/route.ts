@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Duration exceeds maximum allowed (600 minutes)" }, { status: 400 });
       }
 
+      const durationMinutesRounded = Math.max(1, Math.round(totalSeconds / 60));
       const userRef = adminDb.collection("users").doc(decoded.uid);
       const sessionsRef = userRef.collection("studySessions");
       const sessionRef = sessionsRef.doc();
