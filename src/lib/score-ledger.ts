@@ -14,7 +14,7 @@ import { FieldValue } from "firebase-admin/firestore";
  *   Doubt solved:      10 pts
  *   Quiz taken:        20 pts (only completed attempts)
  *   Study session:     5 pts (only completed sessions)
- *   Flashcard reviewed:5 pts (only cards with status "reviewed")
+ *   Flashcard reviewed:5 pts (only cards with server-owned scoreCredited marker after status "known")
  *   Note created:      5 pts
  *   Plan completed:    15 pts (only completed plans)
  */
@@ -77,9 +77,9 @@ export async function incrementUserScore(
 }
 
 /**
- * Decrement a user's ledger for a single activity (used when an activity is
- * removed, e.g. note deleted). Mirrors incrementUserScore with negative
- * increments so the ledger stays consistent.
+ * Reverse one or more previously credited activities when they are deleted.
+ * Counts are clamped at zero so duplicate deletion/retry requests cannot make
+ * leaderboard totals or scores negative.
  */
 export async function decrementUserScore(
   uid: string,
