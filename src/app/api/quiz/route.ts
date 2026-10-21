@@ -152,10 +152,14 @@ export async function POST(req: NextRequest) {
     if (requestLimitResponse) return requestLimitResponse;
 
     if (body.action === "submit") {
-      const { attemptId, questions, subject } = body;
-      const sub = String(subject);
-      if (!sub || !attemptId || typeof attemptId !== "string" || !Array.isArray(questions)) {
-        return NextResponse.json({ error: "attemptId and questions are required" }, { status: 400 });
+      const { attemptId, questions } = body;
+      if (
+        !attemptId ||
+        typeof attemptId !== "string" ||
+        attemptId.length > 100 ||
+        !Array.isArray(questions)
+      ) {
+        return NextResponse.json({ error: "A valid attemptId and question answers are required" }, { status: 400 });
       }
 
       const db = adminDb;
@@ -181,6 +185,8 @@ export async function POST(req: NextRequest) {
       if (attemptData.serverCreated !== true) {
         return NextResponse.json({ error: "This quiz attempt cannot be verified. Please start a new quiz." }, { status: 409 });
       }
+      const sub = typeof attemptData.subject === "string" ? attemptData.subject : "";
+      if (!sub) return NextResponse.json({ error: "Quiz attempt is invalid" }, { status: 400 });
       if (attemptData.serverScored === true || attemptData.completedAt) {
         return NextResponse.json({ error: "This quiz has already been submitted" }, { status: 409 });
       }
