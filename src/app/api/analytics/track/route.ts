@@ -4,6 +4,8 @@ import { checkRateLimit } from "@/lib/rate-limiter";
 import { getClientIp } from "@/lib/client-ip";
 import { FieldValue } from "firebase-admin/firestore";
 
+export const runtime = "nodejs";
+
 export interface AnalyticsEvent {
   event: "page_view" | "feature_use" | "download" | "signup" | "session_start";
   feature?: string;
